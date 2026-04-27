@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-base text-text-primary font-syne;
+  }
+}
+
+@layer utilities {
+  .font-mono-data {
+    font-family: 'DM Mono', monospace;
+  }
+  .text-positive {
+    color: #00D4AA;
+  }
+  .text-negative {
+    color: #FF4D6D;
+  }
+  .text-neutral {
+    color: #FFB347;
+  }
+}

@@ -1,0 +1,83 @@
+import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { broadcastOverrideAck } from '../websocket';
+import { closeTrade } from '../broker/mock';
+import { prisma } from '../index';
+
+function verifyAdmin(authHeader: string | undefined): boolean {
+  if (!authHeader) return false;
+  const [scheme, credentials] = authHeader.split(' ');
+  if (scheme !== 'Basic') return false;
+  const decoded = Buffer.from(credentials || '', 'base64').toString('utf8');
+  const [, password] = decoded.split(':');
+  return password === (process.env.ADMIN_PASSWORD || 'changeme');
+}
+
+const overrideRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook('preHandler', async (req, reply) => {
+    if (!verifyAdmin(req.headers.authorization)) {
+      reply.code(401).send({ error: 'Unauthorized' });
+    }
+  });
+
+  fastify.post('/pause', async () => {
+    await prisma.config.upsert({
+      where: { key: 'system_paused' },
+      update: { value: 'true' },
+      create: { key: 'system_paused', value: 'true' },
+    });
+    broadcastOverrideAck('PAUSE', 'SYSTEM');
+    return { success: true, action: 'SYSTEM_PAUSED' };
+  });
+
+  fastify.post('/resume', async () => {
+    await prisma.config.upsert({
+      where: { key: 'system_paused' },
+      update: { value: 'false' },
+      create: { key: 'system_paused', value: 'false' },
+    });
+    broadcastOverrideAck('RESUME', 'SYSTEM');
+    return { success: true, action: 'SYSTEM_RESUMED' };
+  });
+
+  fastify.post('/close/:ticker', async (req, reply) => {
+    const { ticker } = req.params as { ticker: string };
+
+    const openTrade = await prisma.trade.findFirst({
+      where: { ticker, closedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!openTrade) {
+      return reply.code(404).send({ error: `No open position for ${ticker}` });
+    }
+
+    await closeTrade(openTrade.id, openTrade.filledPrice, 'MANUAL');
+    broadcastOverrideAck('CLOSE', ticker);
+    return { success: true, action: 'POSITION_CLOSED', ticker };
+  });
+
+  fastify.post('/block/:ticker', async (req) => {
+    const { ticker } = req.params as { ticker: string };
+    await prisma.config.upsert({
+      where: { key: `blocked:${ticker}` },
+      update: { value: 'true' },
+      create: { key: `blocked:${ticker}`, value: 'true' },
+    });
+    broadcastOverrideAck('BLOCK', ticker);
+    return { success: true, action: 'TICKER_BLOCKED', ticker };
+  });
+
+  fastify.post('/unblock/:ticker', async (req) => {
+    const { ticker } = req.params as { ticker: string };
+    await prisma.config.upsert({
+      where: { key: `blocked:${ticker}` },
+      update: { value: 'false' },
+      create: { key: `blocked:${ticker}`, value: 'false' },
+    });
+    broadcastOverrideAck('UNBLOCK', ticker);
+    return { success: true, action: 'TICKER_UNBLOCKED', ticker };
+  });
+};
+
+export default overrideRoutes;
