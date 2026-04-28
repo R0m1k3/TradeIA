@@ -20,7 +20,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host-gateway:11434}
       - MODEL_LIGHT=${MODEL_LIGHT:-anthropic/claude-haiku-4-5}
       - MODEL_MID=${MODEL_MID:-anthropic/claude-sonnet-4-5}
       - MODEL_STRONG=${MODEL_STRONG:-anthropic/claude-opus-4}
@@ -74,27 +74,9 @@ services:
       - internal
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama
-    profiles:
-      - gpu
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - internal
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   redis_data:
-  ollama_data:
 
 networks:
   nginx_default:
