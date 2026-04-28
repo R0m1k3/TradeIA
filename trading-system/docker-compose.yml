@@ -20,7 +20,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host-gateway:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://192.168.x.x:11434}
       - MODEL_LIGHT=${MODEL_LIGHT:-anthropic/claude-haiku-4-5}
       - MODEL_MID=${MODEL_MID:-anthropic/claude-sonnet-4-5}
       - MODEL_STRONG=${MODEL_STRONG:-anthropic/claude-opus-4}
