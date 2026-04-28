@@ -3,11 +3,11 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 FROM base AS development
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host"]

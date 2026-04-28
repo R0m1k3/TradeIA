@@ -1,12 +1,13 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
+import { getCredential } from '../config/credentials';
 
 const BASE = 'https://api.polygon.io';
-const KEY = process.env.POLYGON_KEY || '';
 
 async function polygonGet(path: string, params: Record<string, string> = {}): Promise<unknown> {
+  const key = await getCredential('polygon_key', 'POLYGON_KEY');
   const response = await axios.get(`${BASE}${path}`, {
-    params: { ...params, apiKey: KEY },
+    params: { ...params, apiKey: key },
     timeout: 15_000,
   });
   return response.data;
@@ -18,7 +19,6 @@ export interface OptionsData {
 }
 
 export async function getOptionsData(ticker: string): Promise<OptionsData> {
-  if (!KEY) return { put_call_ratio: null, iv30: null };
 
   const cacheKey = `polygon:options:${ticker}`;
   const cached = await cacheGet<OptionsData>(cacheKey);

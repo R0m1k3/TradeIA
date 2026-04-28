@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
+import { getCredential } from '../config/credentials';
 
 const BASE = 'https://www.alphavantage.co/query';
-const KEY = process.env.ALPHA_VANTAGE_KEY || 'demo';
 
 export interface OHLCVBar {
   time: string;
@@ -23,8 +23,9 @@ export interface Fundamentals {
 }
 
 async function avGet(params: Record<string, string>): Promise<Record<string, unknown>> {
+  const key = await getCredential('alpha_vantage_key', 'ALPHA_VANTAGE_KEY') || 'demo';
   const response = await axios.get(BASE, {
-    params: { ...params, apikey: KEY },
+    params: { ...params, apikey: key },
     timeout: 15_000,
   });
   return response.data as Record<string, unknown>;

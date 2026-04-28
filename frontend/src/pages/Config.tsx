@@ -35,8 +35,48 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
 const inputCls = 'w-full bg-bg-elevated border border-border rounded px-3 py-1.5 text-xs font-mono text-text-primary placeholder-text-secondary focus:outline-none focus:border-accent-blue';
 const selectCls = `${inputCls} cursor-pointer`;
 
+function ApiKeyInput({
+  label,
+  configured,
+  placeholder,
+  onSave,
+}: {
+  label: string;
+  configured: boolean;
+  placeholder: string;
+  onSave: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+
+  const isSet = configured && !editing;
+
+  return (
+    <FormRow label={label}>
+      <input
+        type="password"
+        placeholder={isSet ? 'API key is set' : placeholder}
+        value={isSet ? '' : value}
+        onChange={(e) => setValue(e.target.value)}
+        onFocus={() => {
+          setEditing(true);
+          setValue('');
+        }}
+        onBlur={() => {
+          setEditing(false);
+          if (value.trim()) {
+            onSave(value.trim());
+          }
+          setValue('');
+        }}
+        className={inputCls}
+      />
+    </FormRow>
+  );
+}
+
 export function Config() {
-  const { config, saveConfig } = useConfigStore();
+  const { config, secretsConfigured, saveConfig, saveSecret } = useConfigStore();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,14 +123,12 @@ export function Config() {
             </FormRow>
 
             {config.llm_provider === 'openrouter' && (
-              <FormRow label="API Key">
-                <input
-                  type="password"
-                  placeholder="sk-or-v1-..."
-                  className={inputCls}
-                  onChange={(e) => saveConfig({ openrouter_api_key: e.target.value })}
-                />
-              </FormRow>
+              <ApiKeyInput
+                label="API Key"
+                configured={secretsConfigured.openrouter_api_key}
+                placeholder="sk-or-v1-..."
+                onSave={(val) => saveSecret('openrouter_api_key', val)}
+              />
             )}
 
             <FormRow label="Model Light">
@@ -143,15 +181,24 @@ export function Config() {
           <div className="bg-bg-surface rounded-lg border border-border p-6 space-y-4">
             <SectionHeader title="Market Data APIs" />
 
-            <FormRow label="Alpha Vantage">
-              <input type="password" placeholder="API Key" className={inputCls} />
-            </FormRow>
-            <FormRow label="Polygon.io">
-              <input type="password" placeholder="API Key" className={inputCls} />
-            </FormRow>
-            <FormRow label="Finnhub">
-              <input type="password" placeholder="API Key" className={inputCls} />
-            </FormRow>
+            <ApiKeyInput
+              label="Alpha Vantage"
+              configured={secretsConfigured.alpha_vantage_key}
+              placeholder="API Key"
+              onSave={(val) => saveSecret('alpha_vantage_key', val)}
+            />
+            <ApiKeyInput
+              label="Polygon.io"
+              configured={secretsConfigured.polygon_key}
+              placeholder="API Key"
+              onSave={(val) => saveSecret('polygon_key', val)}
+            />
+            <ApiKeyInput
+              label="Finnhub"
+              configured={secretsConfigured.finnhub_key}
+              placeholder="API Key"
+              onSave={(val) => saveSecret('finnhub_key', val)}
+            />
           </div>
 
           {/* Watchlist */}

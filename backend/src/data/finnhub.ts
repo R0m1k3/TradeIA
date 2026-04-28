@@ -1,12 +1,14 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
+import { getCredential } from '../config/credentials';
 
 const BASE = 'https://finnhub.io/api/v1';
-const KEY = process.env.FINNHUB_KEY || '';
 
 async function finnhubGet(path: string, params: Record<string, string> = {}): Promise<unknown> {
+  const key = await getCredential('finnhub_key', 'FINNHUB_KEY');
+  if (!key) throw new Error('Finnhub API key not configured');
   const response = await axios.get(`${BASE}${path}`, {
-    params: { ...params, token: KEY },
+    params: { ...params, token: key },
     timeout: 15_000,
   });
   return response.data;
@@ -26,8 +28,6 @@ export interface MarketSentiment {
 }
 
 export async function getTickerNews(ticker: string): Promise<NewsItem[]> {
-  if (!KEY) return [];
-
   const cacheKey = `finnhub:news:${ticker}`;
   const cached = await cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
@@ -46,8 +46,6 @@ export async function getTickerNews(ticker: string): Promise<NewsItem[]> {
 }
 
 export async function getSentiment(ticker: string): Promise<MarketSentiment> {
-  if (!KEY) return { sentiment_score: 0, buzz_score: 0 };
-
   const cacheKey = `finnhub:sentiment:${ticker}`;
   const cached = await cacheGet<MarketSentiment>(cacheKey);
   if (cached) return cached;

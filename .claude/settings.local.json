@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(gh repo *)",
+      "Bash(mv trading-system/* .)",
+      "Bash(mv trading-system/.env.example .)",
+      "Bash(rmdir trading-system *)",
+      "Bash(rtk git *)",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(git add *)"
+    ]
+  }
+}

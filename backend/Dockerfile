@@ -4,18 +4,18 @@ RUN apk add --no-cache openssl
 
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 FROM base AS build
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npx prisma generate
 RUN npm run build
 
 FROM base AS development
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npx prisma generate
 EXPOSE 4000

@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { initWebSocket } from './websocket';
 import { initScheduler } from './scheduler';
 import { initQueue } from './queue';
+import { initCredentials, warmCredentialsCache } from './config/credentials';
 import portfolioRoutes from './routes/portfolio';
 import signalsRoutes from './routes/signals';
 import configRoutes from './routes/config';
@@ -39,6 +40,9 @@ async function main() {
   await app.register(overrideRoutes, { prefix: '/api/override' });
 
   app.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  initCredentials(prisma);
+  await warmCredentialsCache();
 
   const server = await app.listen({ port: parseInt(process.env.PORT || '4000'), host: '0.0.0.0' });
   app.log.info(`Backend listening on ${server}`);

@@ -12,13 +12,22 @@ interface Config {
   [key: string]: string;
 }
 
+interface ConfigSecrets {
+  openrouter_api_key: boolean;
+  alpha_vantage_key: boolean;
+  polygon_key: boolean;
+  finnhub_key: boolean;
+}
+
 interface ConfigStore {
   config: Config;
+  secretsConfigured: ConfigSecrets;
   paused: boolean;
   setConfig: (config: Partial<Config>) => void;
   setPaused: (paused: boolean) => void;
   fetchConfig: () => Promise<void>;
   saveConfig: (updates: Partial<Config>) => Promise<void>;
+  saveSecret: (key: string, value: string) => Promise<void>;
 }
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -34,6 +43,12 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     daily_loss_limit_pct: '3',
     mock_broker: 'true',
   },
+  secretsConfigured: {
+    openrouter_api_key: false,
+    alpha_vantage_key: false,
+    polygon_key: false,
+    finnhub_key: false,
+  },
   paused: false,
 
   setConfig: (updates) => set((state) => ({ config: { ...state.config, ...updates } })),
@@ -43,8 +58,12 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     try {
       const res = await fetch(`${API}/config`);
       if (res.ok) {
-        const data = await res.json() as Config;
-        set({ config: { ...get().config, ...data } });
+        const data = await res.json();
+        const { secrets_configured, ...configData } = data;
+        set({
+          config: { ...get().config, ...configData },
+          secretsConfigured: secrets_configured || get().secretsConfigured,
+        });
       }
     } catch {
       // ignore
@@ -59,6 +78,21 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
         body: JSON.stringify(updates),
       });
       set((state) => ({ config: { ...state.config, ...updates } }));
+    } catch {
+      // ignore
+    }
+  },
+
+  saveSecret: async (key: string, value: string) => {
+    try {
+      await fetch(`${API}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+      set((state) => ({
+        secretsConfigured: { ...state.secretsConfigured, [key]: value.length > 0 },
+      }));
     } catch {
       // ignore
     }

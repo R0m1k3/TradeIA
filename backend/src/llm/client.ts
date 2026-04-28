@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { getCredential } from '../config/credentials';
 
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant';
@@ -21,6 +22,7 @@ function stripMarkdownJson(raw: string): string {
 
 async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LLMResponse> {
   const start = Date.now();
+  const apiKey = await getCredential('openrouter_api_key', 'OPENROUTER_API_KEY');
   const response = await axios.post(
     'https://openrouter.ai/api/v1/chat/completions',
     {
@@ -31,7 +33,7 @@ async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LL
     },
     {
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://nexus-trade.local',
         'X-Title': 'Nexus Trade AI',
