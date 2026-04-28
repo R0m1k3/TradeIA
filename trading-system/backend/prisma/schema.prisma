@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trade {
+  id                    String    @id @default(uuid())
+  ticker                String
+  action                String
+  tradeType             String
+  filledPrice           Float
+  quantity              Float
+  sizeUsd               Float
+  stopLoss              Float
+  takeProfit            Float
+  invalidationCondition String
+  confidence            Int
+  debateScore           Int
+  bullConviction        Int
+  bearConviction        Int
+  reasoning             String
+  closedAt              DateTime?
+  closePrice            Float?
+  pnlUsd                Float?
+  closeReason           String?
+  mock                  Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+
+  @@index([ticker])
+  @@index([createdAt])
+  @@index([closedAt])
+}
+
+model CycleLog {
+  id          String   @id @default(uuid())
+  payload     Json
+  ordersCount Int
+  alertsCount Int
+  durationMs  Int
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

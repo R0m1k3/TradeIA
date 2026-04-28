@@ -1,0 +1,103 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    environment:
+      - VITE_WS_URL=ws://${DOMAIN:-localhost}/ws
+      - VITE_API_URL=http://${DOMAIN:-localhost}/api
+    networks:
+      - nginx_default
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5432/trading
+      - REDIS_URL=redis://redis:6379
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - MODEL_LIGHT=${MODEL_LIGHT:-anthropic/claude-haiku-4-5}
+      - MODEL_MID=${MODEL_MID:-anthropic/claude-sonnet-4-5}
+      - MODEL_STRONG=${MODEL_STRONG:-anthropic/claude-opus-4}
+      - ALPHA_VANTAGE_KEY=${ALPHA_VANTAGE_KEY}
+      - POLYGON_KEY=${POLYGON_KEY}
+      - FINNHUB_KEY=${FINNHUB_KEY}
+      - MOCK_BROKER=${MOCK_BROKER:-true}
+      - PORTFOLIO_USD=${PORTFOLIO_USD:-10000}
+      - DAILY_LOSS_LIMIT_PCT=${DAILY_LOSS_LIMIT_PCT:-3}
+      - WATCHLIST=${WATCHLIST:-AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META,JPM,BAC,GE}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - PORT=4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nginx_default
+      - internal
+    restart: unless-stopped
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      - POSTGRES_DB=trading
+      - POSTGRES_USER=trading
+      - POSTGRES_PASSWORD=${DB_PASS:-trading123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    profiles:
+      - gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - internal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  nginx_default:
+    external: true
+  internal:
+    driver: bridge

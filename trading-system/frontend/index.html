@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEXUS TRADE — AI Trading Terminal</title>
+    <meta name="description" content="Autonomous AI trading system with multi-agent pipeline" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-base: #0A0E1A;
+        --bg-surface: #111827;
+        --bg-elevated: #1C2333;
+        --accent-green: #00D4AA;
+        --accent-red: #FF4D6D;
+        --accent-amber: #FFB347;
+        --accent-blue: #4A9EFF;
+        --text-primary: #F0F4FF;
+        --text-secondary: #8892A4;
+        --border: #1E2D45;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body, #root { height: 100%; background: var(--bg-base); color: var(--text-primary); }
+      body { font-family: 'Syne', sans-serif; overflow: hidden; }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: var(--bg-base); }
+      ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
