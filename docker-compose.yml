@@ -41,15 +41,19 @@ services:
 
   postgres:
     image: timescale/timescaledb:latest-pg16
+    command: -p 5439
     environment:
       - POSTGRES_DB=trading
       - POSTGRES_USER=trading
       - POSTGRES_PASSWORD=${DB_PASS:-trading123}
+      - PGPORT=5439
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: EXPOSE 4000
-      CMD ["sh", "-c", "until pg_isready -h postgres -p 5439 -U trading; do echo 'Waiting for postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/index.js"]
+      test: ["CMD-SHELL", "pg_isready -p 5439 -U trading -d trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - internal
     restart: unless-stopped
