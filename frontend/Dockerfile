@@ -1,17 +1,16 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine AS build
 WORKDIR /app
-
-FROM base AS deps
 COPY package*.json ./
 RUN npm install
-
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM base AS production
-RUN npm install -g serve
-COPY --from=build /app/dist ./dist
-EXPOSE 51733
-CMD ["serve", "-s", "dist", "-l", "51733"]
+FROM nginx:alpine
+# Supprime la config par défaut
+RUN rm /etc/nginx/conf.d/default.conf
+# Copie le build
+COPY --from=build /app/dist /usr/share/nginx/html
+# Config SPA robuste
+RUN echo 'server { listen 80; location / { root /usr/share/nginx/html; try_files $uri $uri/ /index.html; } }' > /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
