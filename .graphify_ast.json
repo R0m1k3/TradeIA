@@ -1,0 +1,4342 @@
+{
+  "nodes": [
+    {
+      "id": "backend_src_index_ts",
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "index_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L20"
+    },
+    {
+      "id": "backend_src_queue_ts",
+      "label": "queue.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "queue_initqueue",
+      "label": "initQueue()",
+      "file_type": "code",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L13"
+    },
+    {
+      "id": "queue_addcyclejob",
+      "label": "addCycleJob()",
+      "file_type": "code",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L45"
+    },
+    {
+      "id": "backend_src_scheduler_ts",
+      "label": "scheduler.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\scheduler.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "scheduler_initscheduler",
+      "label": "initScheduler()",
+      "file_type": "code",
+      "source_file": "backend\\src\\scheduler.ts",
+      "source_location": "L4"
+    },
+    {
+      "id": "backend_src_websocket_ts",
+      "label": "websocket.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "websocket_initwebsocket",
+      "label": "initWebSocket()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "websocket_broadcast",
+      "label": "broadcast()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L32"
+    },
+    {
+      "id": "websocket_broadcastcycleupdate",
+      "label": "broadcastCycleUpdate()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L45"
+    },
+    {
+      "id": "websocket_broadcastalert",
+      "label": "broadcastAlert()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L49"
+    },
+    {
+      "id": "websocket_broadcastpositionclosed",
+      "label": "broadcastPositionClosed()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L53"
+    },
+    {
+      "id": "websocket_broadcastoverrideack",
+      "label": "broadcastOverrideAck()",
+      "file_type": "code",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L57"
+    },
+    {
+      "id": "backend_src_agents_analyst_ts",
+      "label": "analyst.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "analyst_analystagent",
+      "label": "AnalystAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L26"
+    },
+    {
+      "id": "analyst_analystagent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L27"
+    },
+    {
+      "id": "backend_src_agents_collector_ts",
+      "label": "collector.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "collector_collectoragent",
+      "label": "CollectorAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L33"
+    },
+    {
+      "id": "collector_collectoragent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L34"
+    },
+    {
+      "id": "backend_src_agents_discovery_ts",
+      "label": "discovery.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "discovery_discoveryagent",
+      "label": "DiscoveryAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L14"
+    },
+    {
+      "id": "discovery_discoveryagent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L15"
+    },
+    {
+      "id": "backend_src_agents_orchestrator_ts",
+      "label": "orchestrator.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "orchestrator_runpipeline",
+      "label": "runPipeline()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L16"
+    },
+    {
+      "id": "backend_src_agents_reporter_ts",
+      "label": "reporter.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "reporter_reporteragent",
+      "label": "ReporterAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L10"
+    },
+    {
+      "id": "reporter_reporteragent_updateagent",
+      "label": ".updateAgent()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L21"
+    },
+    {
+      "id": "reporter_reporteragent_finalize",
+      "label": ".finalize()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L41"
+    },
+    {
+      "id": "backend_src_agents_researcher_ts",
+      "label": "researcher.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "researcher_researcheragent",
+      "label": "ResearcherAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L42"
+    },
+    {
+      "id": "researcher_researcheragent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L43"
+    },
+    {
+      "id": "researcher_researcheragent_runbull",
+      "label": ".runBull()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L118"
+    },
+    {
+      "id": "researcher_researcheragent_runbear",
+      "label": ".runBear()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L124"
+    },
+    {
+      "id": "backend_src_agents_risk_ts",
+      "label": "risk.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "risk_riskagent",
+      "label": "RiskAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L12"
+    },
+    {
+      "id": "risk_riskagent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L13"
+    },
+    {
+      "id": "risk_riskagent_deterministicvalidation",
+      "label": ".deterministicValidation()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L53"
+    },
+    {
+      "id": "backend_src_agents_strategist_ts",
+      "label": "strategist.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "strategist_strategistagent",
+      "label": "StrategistAgent",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L22"
+    },
+    {
+      "id": "strategist_strategistagent_run",
+      "label": ".run()",
+      "file_type": "code",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L23"
+    },
+    {
+      "id": "backend_src_broker_mock_ts",
+      "label": "mock.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "mock_applyslippage",
+      "label": "applySlippage()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L32"
+    },
+    {
+      "id": "mock_simulatelatency",
+      "label": "simulateLatency()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L37"
+    },
+    {
+      "id": "mock_executeorder",
+      "label": "executeOrder()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L42"
+    },
+    {
+      "id": "mock_marktomarket",
+      "label": "markToMarket()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L95"
+    },
+    {
+      "id": "mock_closetrade",
+      "label": "closeTrade()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L119"
+    },
+    {
+      "id": "mock_getportfoliostate",
+      "label": "getPortfolioState()",
+      "file_type": "code",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L141"
+    },
+    {
+      "id": "backend_src_data_alphavantage_ts",
+      "label": "alphavantage.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "alphavantage_avget",
+      "label": "avGet()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L25"
+    },
+    {
+      "id": "alphavantage_parseintraday",
+      "label": "parseIntraday()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L34"
+    },
+    {
+      "id": "alphavantage_getintraday",
+      "label": "getIntraday()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L49"
+    },
+    {
+      "id": "alphavantage_getdaily",
+      "label": "getDaily()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L71"
+    },
+    {
+      "id": "alphavantage_getfundamentals",
+      "label": "getFundamentals()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L87"
+    },
+    {
+      "id": "alphavantage_getcurrentprice",
+      "label": "getCurrentPrice()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L116"
+    },
+    {
+      "id": "backend_src_data_cache_ts",
+      "label": "cache.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "cache_cacheget",
+      "label": "cacheGet()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "cache_cacheset",
+      "label": "cacheSet()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L16"
+    },
+    {
+      "id": "cache_cachedel",
+      "label": "cacheDel()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L24"
+    },
+    {
+      "id": "backend_src_data_finnhub_ts",
+      "label": "finnhub.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "finnhub_finnhubget",
+      "label": "finnhubGet()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "finnhub_gettickernews",
+      "label": "getTickerNews()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L30"
+    },
+    {
+      "id": "finnhub_getsentiment",
+      "label": "getSentiment()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L48"
+    },
+    {
+      "id": "finnhub_getmarketcontext",
+      "label": "getMarketContext()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L72"
+    },
+    {
+      "id": "backend_src_data_polygon_ts",
+      "label": "polygon.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "polygon_polygonget",
+      "label": "polygonGet()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "polygon_getoptionsdata",
+      "label": "getOptionsData()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L21"
+    },
+    {
+      "id": "polygon_getdailyvolume",
+      "label": "getDailyVolume()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L47"
+    },
+    {
+      "id": "polygon_getmarketsnapshot",
+      "label": "getMarketSnapshot()",
+      "file_type": "code",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L65"
+    },
+    {
+      "id": "backend_src_lib_prisma_ts",
+      "label": "prisma.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\lib\\prisma.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "backend_src_llm_client_ts",
+      "label": "client.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "client_sleep",
+      "label": "sleep()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L15"
+    },
+    {
+      "id": "client_stripmarkdownjson",
+      "label": "stripMarkdownJson()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L19"
+    },
+    {
+      "id": "client_callopenrouter",
+      "label": "callOpenRouter()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L23"
+    },
+    {
+      "id": "client_callollama",
+      "label": "callOllama()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L50"
+    },
+    {
+      "id": "client_callllm",
+      "label": "callLLM()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L70"
+    },
+    {
+      "id": "client_parsejsonresponse",
+      "label": "parseJsonResponse()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L120"
+    },
+    {
+      "id": "backend_src_llm_models_ts",
+      "label": "models.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\models.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "models_getmodels",
+      "label": "getModels()",
+      "file_type": "code",
+      "source_file": "backend\\src\\llm\\models.ts",
+      "source_location": "L17"
+    },
+    {
+      "id": "backend_src_prompts_analyst_prompt_ts",
+      "label": "analyst.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\analyst.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "analyst_prompt_buildanalystprompt",
+      "label": "buildAnalystPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\analyst.prompt.ts",
+      "source_location": "L57"
+    },
+    {
+      "id": "backend_src_prompts_bear_prompt_ts",
+      "label": "bear.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\bear.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "bear_prompt_buildbearprompt",
+      "label": "buildBearPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\bear.prompt.ts",
+      "source_location": "L33"
+    },
+    {
+      "id": "backend_src_prompts_bull_prompt_ts",
+      "label": "bull.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\bull.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "bull_prompt_buildbullprompt",
+      "label": "buildBullPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\bull.prompt.ts",
+      "source_location": "L33"
+    },
+    {
+      "id": "backend_src_prompts_collector_prompt_ts",
+      "label": "collector.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\collector.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "collector_prompt_buildcollectorprompt",
+      "label": "buildCollectorPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\collector.prompt.ts",
+      "source_location": "L42"
+    },
+    {
+      "id": "backend_src_prompts_risk_prompt_ts",
+      "label": "risk.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\risk.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "risk_prompt_buildriskprompt",
+      "label": "buildRiskPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\risk.prompt.ts",
+      "source_location": "L44"
+    },
+    {
+      "id": "backend_src_prompts_strategist_prompt_ts",
+      "label": "strategist.prompt.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\strategist.prompt.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "strategist_prompt_buildstrategistprompt",
+      "label": "buildStrategistPrompt()",
+      "file_type": "code",
+      "source_file": "backend\\src\\prompts\\strategist.prompt.ts",
+      "source_location": "L40"
+    },
+    {
+      "id": "backend_src_routes_config_ts",
+      "label": "config.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "config_configroutes",
+      "label": "configRoutes()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L22"
+    },
+    {
+      "id": "backend_src_routes_orchestrator_ts",
+      "label": "orchestrator.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\orchestrator.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "orchestrator_orchestratorroutes",
+      "label": "orchestratorRoutes()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\orchestrator.ts",
+      "source_location": "L4"
+    },
+    {
+      "id": "backend_src_routes_override_ts",
+      "label": "override.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "override_verifyadmin",
+      "label": "verifyAdmin()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "override_overrideroutes",
+      "label": "overrideRoutes()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L16"
+    },
+    {
+      "id": "backend_src_routes_portfolio_ts",
+      "label": "portfolio.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "portfolio_portfolioroutes",
+      "label": "portfolioRoutes()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L7"
+    },
+    {
+      "id": "backend_src_routes_signals_ts",
+      "label": "signals.ts",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\signals.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "signals_signalsroutes",
+      "label": "signalsRoutes()",
+      "file_type": "code",
+      "source_file": "backend\\src\\routes\\signals.ts",
+      "source_location": "L4"
+    },
+    {
+      "id": "frontend_postcss_config_js",
+      "label": "postcss.config.js",
+      "file_type": "code",
+      "source_file": "frontend\\postcss.config.js",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_tailwind_config_ts",
+      "label": "tailwind.config.ts",
+      "file_type": "code",
+      "source_file": "frontend\\tailwind.config.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_vite_config_ts",
+      "label": "vite.config.ts",
+      "file_type": "code",
+      "source_file": "frontend\\vite.config.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_app_tsx",
+      "label": "App.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_app",
+      "label": "App()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L16"
+    },
+    {
+      "id": "frontend_src_main_tsx",
+      "label": "main.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\main.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_agents_agentstatus_tsx",
+      "label": "AgentStatus.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\agents\\AgentStatus.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_agents_debateviewer_tsx",
+      "label": "DebateViewer.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\agents\\DebateViewer.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_agents_reasoninglog_tsx",
+      "label": "ReasoningLog.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\agents\\ReasoningLog.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_cards_alerttoast_tsx",
+      "label": "AlertToast.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "alerttoast_toast",
+      "label": "Toast()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L11"
+    },
+    {
+      "id": "alerttoast_alerttoast",
+      "label": "AlertToast()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L44"
+    },
+    {
+      "id": "frontend_src_components_cards_kpicard_tsx",
+      "label": "KpiCard.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\cards\\KpiCard.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_cards_signalfeed_tsx",
+      "label": "SignalFeed.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\cards\\SignalFeed.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_charts_candlestickchart_tsx",
+      "label": "CandlestickChart.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "candlestickchart_totimestamp",
+      "label": "toTimestamp()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L11"
+    },
+    {
+      "id": "candlestickchart_computeema",
+      "label": "computeEMA()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L15"
+    },
+    {
+      "id": "frontend_src_components_charts_heatmap_tsx",
+      "label": "HeatMap.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "heatmap_getcolor",
+      "label": "getColor()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L7"
+    },
+    {
+      "id": "heatmap_getbg",
+      "label": "getBg()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L15"
+    },
+    {
+      "id": "frontend_src_components_charts_portfoliochart_tsx",
+      "label": "PortfolioChart.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\charts\\PortfolioChart.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_controls_overridepanel_tsx",
+      "label": "OverridePanel.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "overridepanel_adminpost",
+      "label": "adminPost()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L6"
+    },
+    {
+      "id": "overridepanel_handleblock",
+      "label": "handleBlock()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L25"
+    },
+    {
+      "id": "overridepanel_handleunblock",
+      "label": "handleUnblock()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L32"
+    },
+    {
+      "id": "overridepanel_handleclose",
+      "label": "handleClose()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L39"
+    },
+    {
+      "id": "frontend_src_components_controls_pausebutton_tsx",
+      "label": "PauseButton.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\PauseButton.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "pausebutton_pausebutton",
+      "label": "PauseButton()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\PauseButton.tsx",
+      "source_location": "L6"
+    },
+    {
+      "id": "frontend_src_components_controls_watchlisteditor_tsx",
+      "label": "WatchlistEditor.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "watchlisteditor_addticker",
+      "label": "addTicker()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L13"
+    },
+    {
+      "id": "watchlisteditor_removeticker",
+      "label": "removeTicker()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L23"
+    },
+    {
+      "id": "frontend_src_components_layout_sidebar_tsx",
+      "label": "Sidebar.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\layout\\Sidebar.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_components_layout_topbar_tsx",
+      "label": "TopBar.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\components\\layout\\TopBar.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_hooks_usewebsocket_ts",
+      "label": "useWebSocket.ts",
+      "file_type": "code",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "usewebsocket_usewebsocket",
+      "label": "useWebSocket()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L13"
+    },
+    {
+      "id": "frontend_src_pages_agents_tsx",
+      "label": "Agents.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_pages_config_tsx",
+      "label": "Config.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "config_sectionheader",
+      "label": "SectionHeader()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L9"
+    },
+    {
+      "id": "config_formrow",
+      "label": "FormRow()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L17"
+    },
+    {
+      "id": "config_fetchmodels",
+      "label": "fetchModels()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L77"
+    },
+    {
+      "id": "config_handlesave",
+      "label": "handleSave()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L109"
+    },
+    {
+      "id": "config_testllm",
+      "label": "testLLM()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L122"
+    },
+    {
+      "id": "frontend_src_pages_dashboard_tsx",
+      "label": "Dashboard.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "dashboard_feargreedgauge",
+      "label": "FearGreedGauge()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L21"
+    },
+    {
+      "id": "dashboard_triggeranalysis",
+      "label": "triggerAnalysis()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L53"
+    },
+    {
+      "id": "frontend_src_pages_markets_tsx",
+      "label": "Markets.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "markets_generatemockbars",
+      "label": "generateMockBars()",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L11"
+    },
+    {
+      "id": "frontend_src_pages_portfolio_tsx",
+      "label": "Portfolio.tsx",
+      "file_type": "code",
+      "source_file": "frontend\\src\\pages\\Portfolio.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_store_config_store_ts",
+      "label": "config.store.ts",
+      "file_type": "code",
+      "source_file": "frontend\\src\\store\\config.store.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_store_portfolio_store_ts",
+      "label": "portfolio.store.ts",
+      "file_type": "code",
+      "source_file": "frontend\\src\\store\\portfolio.store.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_store_signals_store_ts",
+      "label": "signals.store.ts",
+      "file_type": "code",
+      "source_file": "frontend\\src\\store\\signals.store.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "frontend_src_types_index_ts",
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "frontend\\src\\types\\index.ts",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [
+    {
+      "source": "backend_src_index_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "cors",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "rate_limit",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_websocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_scheduler",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_queue",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_routes_portfolio",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_routes_signals",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_routes_config",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_routes_override",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "backend_src_routes_orchestrator",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_index_ts",
+      "target": "index_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_queue_ts",
+      "target": "bullmq",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_queue_ts",
+      "target": "ioredis",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_queue_ts",
+      "target": "backend_src_agents_orchestrator",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_queue_ts",
+      "target": "queue_initqueue",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_queue_ts",
+      "target": "queue_addcyclejob",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\queue.ts",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_scheduler_ts",
+      "target": "node_cron",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\scheduler.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_scheduler_ts",
+      "target": "backend_src_queue",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\scheduler.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_scheduler_ts",
+      "target": "scheduler_initscheduler",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\scheduler.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "http",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "ws",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_initwebsocket",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_broadcast",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_broadcastcycleupdate",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_broadcastalert",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_broadcastpositionclosed",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_websocket_ts",
+      "target": "websocket_broadcastoverrideack",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L57",
+      "weight": 1.0
+    },
+    {
+      "source": "websocket_broadcastcycleupdate",
+      "target": "websocket_broadcast",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "websocket_broadcastalert",
+      "target": "websocket_broadcast",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "websocket_broadcastpositionclosed",
+      "target": "websocket_broadcast",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "websocket_broadcastoverrideack",
+      "target": "websocket_broadcast",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\websocket.ts",
+      "source_location": "L58",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_analyst_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_analyst_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_analyst_ts",
+      "target": "backend_src_prompts_analyst_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_analyst_ts",
+      "target": "backend_src_agents_collector",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_analyst_ts",
+      "target": "analyst_analystagent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "analyst_analystagent",
+      "target": "analyst_analystagent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_data_alphavantage",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_data_polygon",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_data_finnhub",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "backend_src_prompts_collector_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_collector_ts",
+      "target": "collector_collectoragent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "collector_collectoragent",
+      "target": "collector_collectoragent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_discovery_ts",
+      "target": "backend_src_data_polygon",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_discovery_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_discovery_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_discovery_ts",
+      "target": "discovery_discoveryagent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "discovery_discoveryagent",
+      "target": "discovery_discoveryagent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_discovery",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_collector",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_analyst",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_researcher",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_strategist",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_risk",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_agents_reporter",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_broker_mock",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_orchestrator_ts",
+      "target": "orchestrator_runpipeline",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "backend_src_websocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "backend_src_agents_researcher",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "backend_src_broker_mock",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_reporter_ts",
+      "target": "reporter_reporteragent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent",
+      "target": "reporter_reporteragent_updateagent",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent",
+      "target": "reporter_reporteragent_finalize",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_prompts_bull_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_prompts_bear_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_agents_analyst",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "backend_src_agents_collector",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_researcher_ts",
+      "target": "researcher_researcheragent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent",
+      "target": "researcher_researcheragent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent",
+      "target": "researcher_researcheragent_runbull",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L118",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent",
+      "target": "researcher_researcheragent_runbear",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L124",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "backend_src_prompts_risk_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "backend_src_agents_strategist",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "backend_src_broker_mock",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_risk_ts",
+      "target": "risk_riskagent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent",
+      "target": "risk_riskagent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent",
+      "target": "risk_riskagent_deterministicvalidation",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent_run",
+      "target": "risk_riskagent_deterministicvalidation",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_strategist_ts",
+      "target": "backend_src_llm_client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_strategist_ts",
+      "target": "backend_src_llm_models",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_strategist_ts",
+      "target": "backend_src_prompts_strategist_prompt",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_strategist_ts",
+      "target": "backend_src_agents_researcher",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_agents_strategist_ts",
+      "target": "strategist_strategistagent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "strategist_strategistagent",
+      "target": "strategist_strategistagent_run",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "backend_src_websocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "backend_src_data_alphavantage",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_applyslippage",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_simulatelatency",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_executeorder",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_marktomarket",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L95",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_closetrade",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_broker_mock_ts",
+      "target": "mock_getportfoliostate",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "mock_executeorder",
+      "target": "mock_simulatelatency",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "mock_executeorder",
+      "target": "mock_applyslippage",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "mock_marktomarket",
+      "target": "mock_closetrade",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "axios",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "backend_src_data_cache",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_avget",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_parseintraday",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_getintraday",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_getdaily",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_getfundamentals",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L87",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_alphavantage_ts",
+      "target": "alphavantage_getcurrentprice",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L116",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getintraday",
+      "target": "alphavantage_avget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L55",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getintraday",
+      "target": "alphavantage_parseintraday",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L62",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getdaily",
+      "target": "alphavantage_avget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getdaily",
+      "target": "alphavantage_parseintraday",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L78",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getfundamentals",
+      "target": "alphavantage_avget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L93",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getcurrentprice",
+      "target": "alphavantage_avget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L122",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_cache_ts",
+      "target": "ioredis",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_cache_ts",
+      "target": "cache_cacheget",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_cache_ts",
+      "target": "cache_cacheset",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_cache_ts",
+      "target": "cache_cachedel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\cache.ts",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "axios",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "backend_src_data_cache",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "finnhub_finnhubget",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "finnhub_gettickernews",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "finnhub_getsentiment",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L48",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_finnhub_ts",
+      "target": "finnhub_getmarketcontext",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "finnhub_gettickernews",
+      "target": "finnhub_finnhubget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "finnhub_getsentiment",
+      "target": "finnhub_finnhubget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "axios",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "backend_src_data_cache",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "polygon_polygonget",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "polygon_getoptionsdata",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "polygon_getdailyvolume",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_data_polygon_ts",
+      "target": "polygon_getmarketsnapshot",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L65",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getoptionsdata",
+      "target": "polygon_polygonget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getdailyvolume",
+      "target": "polygon_polygonget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getmarketsnapshot",
+      "target": "polygon_polygonget",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_lib_prisma_ts",
+      "target": "client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\lib\\prisma.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "axios",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_sleep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_stripmarkdownjson",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_callopenrouter",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_callollama",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_callllm",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L70",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_client_ts",
+      "target": "client_parsejsonresponse",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L120",
+      "weight": 1.0
+    },
+    {
+      "source": "client_callopenrouter",
+      "target": "client_stripmarkdownjson",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "client_callollama",
+      "target": "client_stripmarkdownjson",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L67",
+      "weight": 1.0
+    },
+    {
+      "source": "client_callllm",
+      "target": "client_callollama",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L88",
+      "weight": 1.0
+    },
+    {
+      "source": "client_callllm",
+      "target": "client_callopenrouter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L89",
+      "weight": 1.0
+    },
+    {
+      "source": "client_callllm",
+      "target": "client_sleep",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\client.ts",
+      "source_location": "L110",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_models_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\models.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_llm_models_ts",
+      "target": "models_getmodels",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\llm\\models.ts",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_analyst_prompt_ts",
+      "target": "analyst_prompt_buildanalystprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\analyst.prompt.ts",
+      "source_location": "L57",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_bear_prompt_ts",
+      "target": "bear_prompt_buildbearprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\bear.prompt.ts",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_bull_prompt_ts",
+      "target": "bull_prompt_buildbullprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\bull.prompt.ts",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_collector_prompt_ts",
+      "target": "collector_prompt_buildcollectorprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\collector.prompt.ts",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_risk_prompt_ts",
+      "target": "risk_prompt_buildriskprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\risk.prompt.ts",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_prompts_strategist_prompt_ts",
+      "target": "strategist_prompt_buildstrategistprompt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\prompts\\strategist.prompt.ts",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "backend_src_config_credentials",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "zod",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "axios",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_config_ts",
+      "target": "config_configroutes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\config.ts",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_orchestrator_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\orchestrator.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_orchestrator_ts",
+      "target": "backend_src_agents_orchestrator",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\orchestrator.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_orchestrator_ts",
+      "target": "orchestrator_orchestratorroutes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\orchestrator.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "zod",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "backend_src_websocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "backend_src_broker_mock",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "override_verifyadmin",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_override_ts",
+      "target": "override_overrideroutes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\override.ts",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_portfolio_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_portfolio_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_portfolio_ts",
+      "target": "backend_src_broker_mock",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_portfolio_ts",
+      "target": "portfolio_portfolioroutes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\portfolio.ts",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_signals_ts",
+      "target": "fastify",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\signals.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_signals_ts",
+      "target": "backend_src_lib_prisma",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\signals.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_signals_ts",
+      "target": "signals_signalsroutes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "backend\\src\\routes\\signals.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_tailwind_config_ts",
+      "target": "tailwindcss",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\tailwind.config.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_vite_config_ts",
+      "target": "vite",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\vite.config.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_vite_config_ts",
+      "target": "plugin_react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\vite.config.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_components_layout_sidebar",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_components_layout_topbar",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_pages_dashboard",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_pages_portfolio",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_pages_agents",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_pages_markets",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_pages_config",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_components_cards_alerttoast",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_hooks_usewebsocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_store_portfolio_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_app_tsx",
+      "target": "app_app",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_main_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\main.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_main_tsx",
+      "target": "client",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\main.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_main_tsx",
+      "target": "frontend_src_app",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\main.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_main_tsx",
+      "target": "frontend_src_index_css",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\main.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_agents_agentstatus_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\agents\\AgentStatus.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_agents_debateviewer_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\agents\\DebateViewer.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_agents_reasoninglog_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\agents\\ReasoningLog.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_alerttoast_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_alerttoast_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_alerttoast_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_alerttoast_tsx",
+      "target": "alerttoast_toast",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_alerttoast_tsx",
+      "target": "alerttoast_alerttoast",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\AlertToast.tsx",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_cards_signalfeed_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\cards\\SignalFeed.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_candlestickchart_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_candlestickchart_tsx",
+      "target": "lightweight_charts",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_candlestickchart_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_candlestickchart_tsx",
+      "target": "candlestickchart_totimestamp",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_candlestickchart_tsx",
+      "target": "candlestickchart_computeema",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\CandlestickChart.tsx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_heatmap_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_heatmap_tsx",
+      "target": "heatmap_getcolor",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_heatmap_tsx",
+      "target": "heatmap_getbg",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "heatmap_getbg",
+      "target": "heatmap_getcolor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\HeatMap.tsx",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_portfoliochart_tsx",
+      "target": "recharts",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\PortfolioChart.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_charts_portfoliochart_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\charts\\PortfolioChart.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "overridepanel_adminpost",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "overridepanel_handleblock",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "overridepanel_handleunblock",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_overridepanel_tsx",
+      "target": "overridepanel_handleclose",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "overridepanel_handleblock",
+      "target": "overridepanel_adminpost",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "overridepanel_handleunblock",
+      "target": "overridepanel_adminpost",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "overridepanel_handleclose",
+      "target": "overridepanel_adminpost",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\OverridePanel.tsx",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_pausebutton_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\PauseButton.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_pausebutton_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\PauseButton.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_pausebutton_tsx",
+      "target": "pausebutton_pausebutton",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\PauseButton.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_watchlisteditor_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_watchlisteditor_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_watchlisteditor_tsx",
+      "target": "watchlisteditor_addticker",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_controls_watchlisteditor_tsx",
+      "target": "watchlisteditor_removeticker",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\controls\\WatchlistEditor.tsx",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_sidebar_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\Sidebar.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_sidebar_tsx",
+      "target": "frontend_src_app",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\Sidebar.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_sidebar_tsx",
+      "target": "frontend_src_hooks_usewebsocket",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\Sidebar.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_sidebar_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\Sidebar.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_topbar_tsx",
+      "target": "frontend_src_store_portfolio_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\TopBar.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_topbar_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\TopBar.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_topbar_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\TopBar.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_layout_topbar_tsx",
+      "target": "frontend_src_components_controls_pausebutton",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\components\\layout\\TopBar.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_hooks_usewebsocket_ts",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_hooks_usewebsocket_ts",
+      "target": "frontend_src_store_portfolio_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_hooks_usewebsocket_ts",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_hooks_usewebsocket_ts",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_hooks_usewebsocket_ts",
+      "target": "usewebsocket_usewebsocket",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\hooks\\useWebSocket.ts",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_components_agents_agentstatus",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_components_agents_reasoninglog",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_components_agents_debateviewer",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_agents_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Agents.tsx",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "frontend_src_store_config_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "frontend_src_components_controls_watchlisteditor",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "frontend_src_components_controls_overridepanel",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "config_sectionheader",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "config_formrow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "config_fetchmodels",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "config_handlesave",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L109",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_config_tsx",
+      "target": "config_testllm",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L122",
+      "weight": 1.0
+    },
+    {
+      "source": "config_handlesave",
+      "target": "config_fetchmodels",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Config.tsx",
+      "source_location": "L118",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_store_portfolio_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_components_cards_kpicard",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_components_cards_signalfeed",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_components_charts_candlestickchart",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_app",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "dashboard_feargreedgauge",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_dashboard_tsx",
+      "target": "dashboard_triggeranalysis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Dashboard.tsx",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "frontend_src_components_charts_candlestickchart",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "frontend_src_components_charts_heatmap",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "frontend_src_store_signals_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_markets_tsx",
+      "target": "markets_generatemockbars",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Markets.tsx",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_portfolio_tsx",
+      "target": "react",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Portfolio.tsx",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_portfolio_tsx",
+      "target": "frontend_src_store_portfolio_store",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Portfolio.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_portfolio_tsx",
+      "target": "frontend_src_components_charts_portfoliochart",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Portfolio.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_pages_portfolio_tsx",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\pages\\Portfolio.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_store_config_store_ts",
+      "target": "zustand",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\store\\config.store.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_store_portfolio_store_ts",
+      "target": "zustand",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\store\\portfolio.store.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_store_portfolio_store_ts",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\store\\portfolio.store.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_store_signals_store_ts",
+      "target": "zustand",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\store\\signals.store.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_store_signals_store_ts",
+      "target": "frontend_src_types",
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend\\src\\store\\signals.store.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "index_main",
+      "target": "websocket_initwebsocket",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L48",
+      "weight": 1.0
+    },
+    {
+      "source": "index_main",
+      "target": "queue_initqueue",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "index_main",
+      "target": "scheduler_initscheduler",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\index.ts",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "analyst_analystagent_run",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\analyst.ts",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "collector_collectoragent_run",
+      "target": "finnhub_getmarketcontext",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "collector_collectoragent_run",
+      "target": "collector_prompt_buildcollectorprompt",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L111",
+      "weight": 1.0
+    },
+    {
+      "source": "collector_collectoragent_run",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L114",
+      "weight": 1.0
+    },
+    {
+      "source": "collector_collectoragent_run",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\collector.ts",
+      "source_location": "L115",
+      "weight": 1.0
+    },
+    {
+      "source": "discovery_discoveryagent_run",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "discovery_discoveryagent_run",
+      "target": "polygon_getmarketsnapshot",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "discovery_discoveryagent_run",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "discovery_discoveryagent_run",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\discovery.ts",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "reporter_reporteragent_updateagent",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "mock_marktomarket",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "strategist_strategistagent_run",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "reporter_reporteragent_finalize",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L60",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "mock_getportfoliostate",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
+      "source": "orchestrator_runpipeline",
+      "target": "mock_executeorder",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\orchestrator.ts",
+      "source_location": "L98",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_updateagent",
+      "target": "websocket_broadcastcycleupdate",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_finalize",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_finalize",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L85",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_finalize",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L91",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_finalize",
+      "target": "websocket_broadcastcycleupdate",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L105",
+      "weight": 1.0
+    },
+    {
+      "source": "reporter_reporteragent_finalize",
+      "target": "websocket_broadcastalert",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\reporter.ts",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_run",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbull",
+      "target": "bull_prompt_buildbullprompt",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbull",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L120",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbull",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L121",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbear",
+      "target": "bear_prompt_buildbearprompt",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L125",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbear",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L126",
+      "weight": 1.0
+    },
+    {
+      "source": "researcher_researcheragent_runbear",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\researcher.ts",
+      "source_location": "L127",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent_run",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent_run",
+      "target": "risk_prompt_buildriskprompt",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent_run",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "risk_riskagent_run",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\risk.ts",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "strategist_strategistagent_run",
+      "target": "models_getmodels",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "strategist_strategistagent_run",
+      "target": "strategist_prompt_buildstrategistprompt",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "strategist_strategistagent_run",
+      "target": "client_callllm",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "strategist_strategistagent_run",
+      "target": "client_parsejsonresponse",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\agents\\strategist.ts",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "mock_marktomarket",
+      "target": "alphavantage_getcurrentprice",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L101",
+      "weight": 1.0
+    },
+    {
+      "source": "mock_closetrade",
+      "target": "websocket_broadcastpositionclosed",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\broker\\mock.ts",
+      "source_location": "L138",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getintraday",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L63",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getdaily",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L79",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getfundamentals",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "alphavantage_getcurrentprice",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\alphavantage.ts",
+      "source_location": "L125",
+      "weight": 1.0
+    },
+    {
+      "source": "finnhub_gettickernews",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "finnhub_getsentiment",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "finnhub_getmarketcontext",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\finnhub.ts",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getoptionsdata",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getdailyvolume",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L58",
+      "weight": 1.0
+    },
+    {
+      "source": "polygon_getmarketsnapshot",
+      "target": "cache_cacheset",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "backend\\src\\data\\polygon.ts",
+      "source_location": "L78",
+      "weight": 1.0
+    },
+    {
+      "source": "app_app",
+      "target": "usewebsocket_usewebsocket",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "frontend\\src\\App.tsx",
+      "source_location": "L19",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
