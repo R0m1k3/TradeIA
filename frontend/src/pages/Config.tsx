@@ -73,22 +73,24 @@ export function Config() {
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState<string[]>([]);
 
-  useEffect(() => {
-    async function fetchModels() {
-      try {
-        const res = await fetch(`${API}/config/llm-models`);
-        const data = await res.json();
-        setModels(data);
-      } catch (err) {
-        console.error('Failed to fetch models:', err);
-      }
+  async function fetchModels() {
+    try {
+      const res = await fetch(`${API}/config/llm-models`);
+      const data = await res.json();
+      setModels(data);
+    } catch (err) {
+      console.error('Failed to fetch models:', err);
     }
+  }
+
+  useEffect(() => {
     fetchModels();
   }, [config.llm_provider]);
 
   async function handleSave() {
     setSaving(true);
     await saveConfig(config);
+    await fetchModels(); // Re-fetch models with the new API key if needed
     setSaving(false);
   }
 
