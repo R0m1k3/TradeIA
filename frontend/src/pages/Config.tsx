@@ -131,6 +131,18 @@ export function Config() {
               />
             )}
 
+            {config.llm_provider === 'ollama' && (
+              <FormRow label="Ollama URL">
+                <input
+                  type="text"
+                  placeholder="http://172.x.x.x:11434"
+                  value={config.ollama_base_url || ''}
+                  onChange={(e) => saveConfig({ ollama_base_url: e.target.value })}
+                  className={inputCls}
+                />
+              </FormRow>
+            )}
+
             <FormRow label="Model Light">
               <select
                 value={config.model_light}

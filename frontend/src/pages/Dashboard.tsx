@@ -7,7 +7,6 @@ import { CandlestickChart } from '../components/charts/CandlestickChart';
 import type { Page } from '../App';
 import type { OHLCVBar } from '../types';
 
-const WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'GOOGL', 'AMZN', 'META', 'JPM'];
 
 const SIGNAL_COLOR: Record<string, string> = {
   BUY: '#00D4AA',
@@ -49,6 +48,19 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
   const { portfolio } = usePortfolioStore();
   const { signals, market } = useSignalsStore();
   const [selectedTicker, setSelectedTicker] = useState('AAPL');
+  const [analyzing, setAnalyzing] = useState(false);
+
+  async function triggerAnalysis() {
+    setAnalyzing(true);
+    try {
+      const api = import.meta.env.VITE_API_URL || '/api';
+      await fetch(`${api}/orchestrator/run`, { method: 'POST' });
+      // The results will come back via WebSocket
+    } catch (err) {
+      console.error('Failed to trigger analysis:', err);
+    }
+    setTimeout(() => setAnalyzing(false), 2000);
+  }
 
   const selectedSignal = signals.find((s) => s.ticker === selectedTicker);
 
@@ -72,6 +84,32 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
 
   return (
     <div className="space-y-4 max-w-[1600px]">
+      <div className="flex items-center justify-between">
+        <h2 className="font-syne font-bold text-xl text-text-primary tracking-tight">Market Overview</h2>
+        <button
+          onClick={triggerAnalysis}
+          disabled={analyzing}
+          className={`
+            px-4 py-2 rounded text-xs font-mono font-bold transition-all duration-200 flex items-center gap-2
+            ${analyzing 
+              ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/30' 
+              : 'bg-accent-green/10 border border-accent-green/40 text-accent-green hover:bg-accent-green/20'
+            }
+          `}
+        >
+          {analyzing ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-accent-blue animate-pulse" />
+              IA Scanning...
+            </>
+          ) : (
+            <>
+              <span className="text-lg">⚡</span>
+              Force Global IA Analysis
+            </>
+          )}
+        </button>
+      </div>
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
@@ -108,9 +146,9 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
           <div className="bg-bg-surface rounded-lg border border-border overflow-hidden">
             {/* Ticker pills */}
             <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-              {WATCHLIST.map((t) => {
-                const sig = signals.find((s) => s.ticker === t);
-                const sigColor = sig ? SIGNAL_COLOR[sig.signal] : '#8892A4';
+              {signals.map((s) => {
+                const t = s.ticker;
+                const sigColor = SIGNAL_COLOR[s.signal] || '#8892A4';
                 return (
                   <button
                     key={t}
@@ -124,11 +162,9 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
                     `}
                   >
                     {t}
-                    {sig && (
-                      <span className="ml-1.5 text-[9px]" style={{ color: sigColor }}>
-                        ●
-                      </span>
-                    )}
+                    <span className="ml-1.5 text-[9px]" style={{ color: sigColor }}>
+                      ●
+                    </span>
                   </button>
                 );
               })}

@@ -62,3 +62,20 @@ export async function getDailyVolume(ticker: string): Promise<number | null> {
     return null;
   }
 }
+export async function getMarketSnapshot(): Promise<any[]> {
+  const cacheKey = 'polygon:snapshot';
+  const cached = await cacheGet<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const data = await polygonGet('/v2/snapshot/locale/us/markets/stocks/tickers') as {
+      results?: any[];
+    };
+    const results = data.results || [];
+    await cacheSet(cacheKey, results, TTL.OHLCV);
+    return results;
+  } catch (err) {
+    console.error('[Polygon] getMarketSnapshot error:', err);
+    return [];
+  }
+}

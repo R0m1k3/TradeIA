@@ -1,3 +1,4 @@
+import { DiscoveryAgent } from './discovery';
 import { CollectorAgent } from './collector';
 import { AnalystAgent } from './analyst';
 import { ResearcherAgent } from './researcher';
@@ -6,10 +7,9 @@ import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
 import { executeOrder, getPortfolioState, markToMarket } from '../broker/mock';
 import { prisma } from '../lib/prisma';
+import { getCredential } from '../config/credentials';
 
-const WATCHLIST = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,NVDA,TSLA').split(',').map((t) => t.trim());
-const PORTFOLIO_USD = parseFloat(process.env.PORTFOLIO_USD || '10000');
-const DAILY_LOSS_LIMIT_PCT = parseFloat(process.env.DAILY_LOSS_LIMIT_PCT || '3');
+const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,NVDA,TSLA').split(',').map((t) => t.trim());
 
 let isRunning = false;
 
@@ -21,7 +21,14 @@ export async function runPipeline(): Promise<void> {
 
   isRunning = true;
   const cycleStart = Date.now();
-  console.log('[Orchestrator] === CYCLE START ===', new Date().toISOString());
+
+  // Dynamic Config retrieval
+  const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
+  const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
+  const lossLimitRaw = await getCredential('daily_loss_limit_pct', 'DAILY_LOSS_LIMIT_PCT');
+  const dailyLossLimitPct = parseFloat(lossLimitRaw || '3');
+
+  console.log(`[Orchestrator] === CYCLE START (Capital: $${portfolioUsd}) ===`, new Date().toISOString());
 
   const reporter = new ReporterAgent();
   reporter.updateAgent('collector', { status: 'running' });
@@ -30,9 +37,19 @@ export async function runPipeline(): Promise<void> {
     // Step 1: Mark to market existing positions
     await markToMarket();
 
-    // Step 2: Collect data
+    // Step 2: Discovery (IA selects tickers)
+    reporter.updateAgent('collector', { status: 'scanning' });
+    const discovery = new DiscoveryAgent();
+    let tickers = await discovery.run();
+    
+    if (tickers.length === 0) {
+      console.log('[Orchestrator] Discovery returned nothing, using fallback watchlist');
+      tickers = WATCHLIST_DEFAULT;
+    }
+
+    // Step 3: Collect data
     const collector = new CollectorAgent();
-    const collectorOutput = await collector.run(WATCHLIST);
+    const collectorOutput = await collector.run(tickers);
     reporter.updateAgent('collector', {
       status: collectorOutput ? 'ok' : 'error',
       lastRun: new Date().toISOString(),
@@ -40,17 +57,17 @@ export async function runPipeline(): Promise<void> {
 
     if (!collectorOutput) {
       console.error('[Orchestrator] Collector failed, aborting cycle');
-      await reporter.finalize(cycleStart, [], [], PORTFOLIO_USD, DAILY_LOSS_LIMIT_PCT);
+      await reporter.finalize(cycleStart, [], [], portfolioUsd, dailyLossLimitPct);
       return;
     }
 
-    // Step 3: Technical analysis
+    // Step 4: Technical analysis
     reporter.updateAgent('analyst', { status: 'running' });
     const analyst = new AnalystAgent();
     const analystOutputs = await analyst.run(collectorOutput);
     reporter.updateAgent('analyst', { status: 'ok', lastRun: new Date().toISOString() });
 
-    // Step 4: Bull/Bear debate (parallel)
+    // Step 5: Bull/Bear debate (parallel)
     reporter.updateAgent('bull', { status: 'running' });
     reporter.updateAgent('bear', { status: 'running' });
     const researcher = new ResearcherAgent();
@@ -58,22 +75,22 @@ export async function runPipeline(): Promise<void> {
     reporter.updateAgent('bull', { status: 'ok', lastRun: new Date().toISOString() });
     reporter.updateAgent('bear', { status: 'ok', lastRun: new Date().toISOString() });
 
-    // Step 5: Strategic decision
+    // Step 6: Strategic decision
     reporter.updateAgent('strategist', { status: 'running' });
-    const portfolio = await getPortfolioState(PORTFOLIO_USD);
+    const portfolio = await getPortfolioState(portfolioUsd);
     const heldTickers = portfolio.positions.map((p) => p.ticker);
 
     const strategist = new StrategistAgent();
     const orderProposals = await strategist.run(debateOutputs, portfolio, collectorOutput.market, heldTickers);
     reporter.updateAgent('strategist', { status: 'ok', lastRun: new Date().toISOString() });
 
-    // Step 6: Risk validation
+    // Step 7: Risk validation
     reporter.updateAgent('risk', { status: 'running' });
     const risk = new RiskAgent();
-    const approvedOrders = await risk.run(orderProposals, PORTFOLIO_USD, portfolio, collectorOutput.market, DAILY_LOSS_LIMIT_PCT);
+    const approvedOrders = await risk.run(orderProposals, portfolioUsd, portfolio, collectorOutput.market, dailyLossLimitPct);
     reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 
-    // Step 7: Execute orders
+    // Step 8: Execute orders
     const execResults = [];
     if (process.env.MOCK_BROKER !== 'false') {
       for (const order of approvedOrders) {
@@ -86,10 +103,10 @@ export async function runPipeline(): Promise<void> {
       }
     }
 
-    // Step 8: Report
+    // Step 9: Report
     reporter.updateAgent('reporter', { status: 'running' });
-    const finalPortfolio = await getPortfolioState(PORTFOLIO_USD);
-    await reporter.finalize(cycleStart, debateOutputs, execResults, PORTFOLIO_USD, DAILY_LOSS_LIMIT_PCT, finalPortfolio, collectorOutput.market);
+    const finalPortfolio = await getPortfolioState(portfolioUsd);
+    await reporter.finalize(cycleStart, debateOutputs, execResults, portfolioUsd, dailyLossLimitPct, finalPortfolio, collectorOutput.market);
     reporter.updateAgent('reporter', { status: 'ok', lastRun: new Date().toISOString() });
 
     const duration = Date.now() - cycleStart;
@@ -107,7 +124,7 @@ export async function runPipeline(): Promise<void> {
   } catch (err) {
     console.error('[Orchestrator] Cycle error:', err);
     reporter.updateAgent('reporter', { status: 'error', error: String(err) });
-    await reporter.finalize(cycleStart, [], [], PORTFOLIO_USD, DAILY_LOSS_LIMIT_PCT);
+    await reporter.finalize(cycleStart, [], [], portfolioUsd, dailyLossLimitPct);
   } finally {
     isRunning = false;
   }
