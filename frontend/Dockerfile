@@ -11,8 +11,7 @@ COPY . .
 RUN npm run build
 
 FROM base AS production
-COPY --from=deps /app/node_modules ./node_modules
+RUN npm install -g serve
 COPY --from=build /app/dist ./dist
-COPY package*.json ./
-EXPOSE 4173
-CMD ["npm", "run", "preview"]
+EXPOSE 51733
+CMD ["serve", "-s", "dist", "-l", "51733"]
