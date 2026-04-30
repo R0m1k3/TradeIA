@@ -8,8 +8,8 @@ services:
     ports:
       - "51733:80"
     environment:
-      - VITE_WS_URL=ws://${DOMAIN:-localhost}:44000/ws
-      - VITE_API_URL=http://${DOMAIN:-localhost}:44000/api
+      - VITE_WS_URL=wss://trade.ffnancy.fr/ws
+      - VITE_API_URL=https://trade.ffnancy.fr/api
     networks:
       - nginx_default
     restart: unless-stopped
