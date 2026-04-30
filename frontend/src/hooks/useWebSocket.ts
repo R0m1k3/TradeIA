@@ -5,7 +5,9 @@ import type { WsMessage, CycleUpdate } from '../types';
 
 export type WsStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost/ws';
+const isSecure = window.location.protocol === 'https:';
+const wsProtocol = isSecure ? 'wss:' : 'ws:';
+const WS_URL = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`;
 const MAX_BACKOFF = 30_000;
 
 export function useWebSocket() {

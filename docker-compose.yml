@@ -5,11 +5,6 @@ services:
     build:
       context: ./frontend
       target: production
-    ports:
-      - "51733:51733"
-    environment:
-      - VITE_WS_URL=wss://trade.ffnancy.fr/ws
-      - VITE_API_URL=https://trade.ffnancy.fr/api
     networks:
       - nginx_default
     restart: unless-stopped
@@ -17,8 +12,9 @@ services:
   backend:
     build:
       context: ./backend
-    ports:
-      - "44000:4000"
+    networks:
+      - nginx_default
+    restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
       - REDIS_URL=redis://redis:6379
@@ -42,9 +38,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - nginx_default
-    restart: unless-stopped
 
   postgres:
     image: timescale/timescaledb:latest-pg16
@@ -75,6 +68,19 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - nginx_default
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "51733:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
     networks:
       - nginx_default
     restart: unless-stopped
