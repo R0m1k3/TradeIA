@@ -18,7 +18,7 @@ model Trade {
   sizeUsd               Float
   stopLoss              Float
   takeProfit            Float
-  invalidationCondition String
+  invalidationCondition String?
   confidence            Int
   debateScore           Int
   bullConviction        Int
@@ -36,6 +36,13 @@ model Trade {
   @@index([closedAt])
 }
 
+model Config {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model CycleLog {
   id          String   @id @default(uuid())
   payload     Json
@@ -45,10 +52,4 @@ model CycleLog {
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
-}
-
-model Config {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
 }
