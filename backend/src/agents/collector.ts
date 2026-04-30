@@ -91,7 +91,19 @@ export class CollectorAgent {
             };
           } catch (err) {
             console.error(`[Collector] Failed to fetch ${ticker}:`, err);
-            rawData[ticker] = { data_quality: 'missing', earnings_blackout: false, current_price: 0 };
+            rawData[ticker] = {
+              data_quality: 'missing',
+              earnings_blackout: false,
+              current_price: 0,
+              ohlcv_15m: [],
+              ohlcv_1h: [],
+              ohlcv_4h: [],
+              fundamentals: {},
+              options: {},
+              news: [],
+              sentiment: {},
+              daily_volume: null,
+            };
           }
         })
       );

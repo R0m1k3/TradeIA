@@ -92,7 +92,7 @@ export function Portfolio() {
               ${portfolio.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </h2>
             <p
-              className="text-sm font-mono-data"
+              className="text-sm font-mono"
               style={{ color: totalPnlPct >= 0 ? '#00D4AA' : '#FF4D6D' }}
             >
               {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% all time
