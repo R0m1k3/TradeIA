@@ -1,6 +1,8 @@
 networks:
   tradeia_net:
     driver: bridge
+  nginx_default:
+    external: true
 
 services:
   frontend:
@@ -9,6 +11,7 @@ services:
       target: production
     networks:
       - tradeia_net
+      - nginx_default
     restart: unless-stopped
 
   backend:
@@ -16,6 +19,7 @@ services:
       context: ./backend
     networks:
       - tradeia_net
+      - nginx_default
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
@@ -84,6 +88,7 @@ services:
       - backend
     networks:
       - tradeia_net
+      - nginx_default
     restart: unless-stopped
 
   ollama:
