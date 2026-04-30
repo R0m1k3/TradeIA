@@ -27,4 +27,4 @@ COPY --from=build /app/prisma ./prisma
 COPY package*.json ./
 
 EXPOSE 4000
-CMD ["sh", "-c", "until pg_isready -h postgres -p 5432 -U trading; do echo 'Waiting for postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "until pg_isready -h postgres -p 5439 -U trading; do echo 'Waiting for postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/index.js"]
