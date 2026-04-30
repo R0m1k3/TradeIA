@@ -21,7 +21,9 @@
       "Bash(python3 -m pip install graphifyy -q)",
       "Bash(python3 -c \"import sys; open\\('.graphify_python', 'w'\\).write\\(sys.executable\\)\")",
       "Read(//c/Users/Bureau/AppData/Local/Microsoft/WindowsApps/**)",
-      "Bash(find /c -maxdepth 6 -name \"python.exe\" -type f)"
+      "Bash(find /c -maxdepth 6 -name \"python.exe\" -type f)",
+      "Bash(rtk docker *)",
+      "Bash(docker compose *)"
     ]
   }
 }
