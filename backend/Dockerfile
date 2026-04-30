@@ -30,4 +30,4 @@ COPY prisma ./prisma
 COPY package*.json ./
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "until nc -z postgres 5432; do echo 'Waiting for postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/index.js"]
