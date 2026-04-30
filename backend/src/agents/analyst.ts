@@ -1,5 +1,5 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 import { buildAnalystPrompt, ANALYST_SYSTEM } from '../prompts/analyst.prompt';
 import type { CollectorOutput } from './collector';
 
@@ -27,6 +27,7 @@ export class AnalystAgent {
   async run(collectorOutput: CollectorOutput): Promise<AnalystOutput[]> {
     console.log('[Analyst] Starting multi-timeframe analysis');
     const results: AnalystOutput[] = [];
+    const MODELS = await getModels();
 
     await Promise.all(
       Object.entries(collectorOutput.tickers).map(async ([ticker, data]) => {

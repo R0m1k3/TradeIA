@@ -2,7 +2,7 @@ import { broadcastCycleUpdate, broadcastAlert, AgentState, CycleUpdatePayload } 
 import type { DebateOutput } from './researcher';
 import type { ExecutionResult } from '../broker/mock';
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 
 const REPORTER_SYSTEM = `You are the trading cycle reporter. Summarize the completed cycle and generate any necessary alerts.
 Output JSON only: { "alerts": [{ "level": "info|warning|critical", "message": "", "ticker": "" }], "summary": "" }`;
@@ -80,6 +80,7 @@ export class ReporterAgent {
 
     // LLM reporter for advanced alerts
     try {
+      const MODELS = await getModels();
       const summary = { debates: debates.length, orders: execResults.length, duration_ms: durationMs };
       const response = await callLLM(
         'reporter',

@@ -1,5 +1,5 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 import { buildRiskPrompt, RISK_SYSTEM } from '../prompts/risk.prompt';
 import type { OrderProposal } from './strategist';
 import type { ApprovedOrder } from '../broker/mock';
@@ -18,6 +18,7 @@ export class RiskAgent {
     dailyLossLimitPct: number
   ): Promise<ApprovedOrder[]> {
     console.log(`[Risk] Validating ${proposals.length} proposals`);
+    const MODELS = await getModels();
 
     if (proposals.length === 0) return [];
 

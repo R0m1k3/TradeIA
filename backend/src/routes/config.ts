@@ -12,6 +12,11 @@ const KEYS_TO_INVALIDATE = new Set([
   'ollama_base_url',
   'portfolio_usd',
   'daily_loss_limit_pct',
+  // Model keys — invalidating cache ensures agents pick up new models on next cycle
+  'model_light',
+  'model_mid',
+  'model_strong',
+  'llm_provider',
 ]);
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {

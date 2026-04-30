@@ -1,6 +1,6 @@
 import { getMarketSnapshot } from '../data/polygon';
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 
 const DISCOVERY_SYSTEM = `You are a Master Market Scanner. 
 Your goal is to analyze a list of top market movers and select the most promising tickers for an algorithmic trading strategy.
@@ -14,6 +14,7 @@ Return ONLY a JSON array of 5 to 10 ticker symbols. Example: ["AAPL", "NVDA", "T
 export class DiscoveryAgent {
   async run(): Promise<string[]> {
     console.log('[Discovery] Scanning global market...');
+    const MODELS = await getModels();
     
     try {
       const snapshot = await getMarketSnapshot();

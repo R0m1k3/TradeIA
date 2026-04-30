@@ -1,5 +1,5 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 import { buildStrategistPrompt, STRATEGIST_SYSTEM } from '../prompts/strategist.prompt';
 import type { DebateOutput } from './researcher';
 
@@ -27,6 +27,7 @@ export class StrategistAgent {
     heldTickers: string[]
   ): Promise<OrderProposal[]> {
     console.log(`[Strategist] Processing ${debates.length} debate outcomes`);
+    const MODELS = await getModels();
 
     if (debates.length === 0) {
       console.log('[Strategist] No debates to process, returning []');

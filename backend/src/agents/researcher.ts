@@ -1,5 +1,5 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 import { buildBullPrompt, BULL_SYSTEM } from '../prompts/bull.prompt';
 import { buildBearPrompt, BEAR_SYSTEM } from '../prompts/bear.prompt';
 import type { AnalystOutput } from './analyst';
@@ -41,6 +41,7 @@ export interface DebateOutput {
 
 export class ResearcherAgent {
   async run(analystOutputs: AnalystOutput[], collector: CollectorOutput): Promise<DebateOutput[]> {
+    const MODELS = await getModels();
     console.log(`[Researcher] Starting bull/bear debates for ${analystOutputs.length} tickers`);
 
     const debates = await Promise.all(
