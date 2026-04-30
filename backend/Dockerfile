@@ -28,5 +28,5 @@ COPY package*.json ./
 EXPOSE 4000
 
 # migrate deploy is safe and non-destructive: applies only new migrations, never drops existing data.
-# This ensures config (API keys, watchlist, etc.) is preserved across Docker rebuilds and restarts.
-CMD npx prisma migrate deploy && node dist/index.js
+# We first try to resolve the initial migration for existing databases (it will fail silently if already applied).
+CMD npx prisma migrate resolve --applied 20260430000000_init --preview-feature ; npx prisma migrate deploy && node dist/index.js
