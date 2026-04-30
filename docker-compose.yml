@@ -96,15 +96,10 @@ services:
 
   ollama:
     image: ollama/ollama
-    profiles:
-      - gpu
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
     volumes:
       - ./data/ollama:/root/.ollama
     networks:

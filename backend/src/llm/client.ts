@@ -78,7 +78,7 @@ export async function callLLM(
     { role: 'user', content: userContent },
   ];
 
-  const provider = process.env.LLM_PROVIDER || 'openrouter';
+  const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
   const delays = [1000, 2000, 4000];
 
   for (let attempt = 0; attempt <= 3; attempt++) {
