@@ -5,7 +5,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine AS production
 # Supprime la config par défaut
 RUN rm /etc/nginx/conf.d/default.conf
 # Copie le build
