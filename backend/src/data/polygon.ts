@@ -69,9 +69,12 @@ export async function getMarketSnapshot(): Promise<any[]> {
 
   try {
     const data = await polygonGet('/v2/snapshot/locale/us/markets/stocks/tickers') as {
-      results?: any[];
+      tickers?: any[];
+      results?: any[]; // kept for safety — some endpoint versions use results
     };
-    const results = data.results || [];
+    // Polygon V2 market snapshot returns `tickers`, not `results`
+    const results = data.tickers || data.results || [];
+    console.log(`[Polygon] Market snapshot: ${results.length} tickers fetched`);
     await cacheSet(cacheKey, results, TTL.OHLCV);
     return results;
   } catch (err) {
