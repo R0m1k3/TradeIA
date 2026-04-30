@@ -9,7 +9,9 @@
       "Bash(rtk git *)",
       "Bash(npx tsc *)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }
