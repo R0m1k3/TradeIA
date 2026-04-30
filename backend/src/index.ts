@@ -13,12 +13,7 @@ import configRoutes from './routes/config';
 import overrideRoutes from './routes/override';
 
 const app = Fastify({
-  logger: {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    },
-  },
+  logger: true,
 });
 
 async function main() {
