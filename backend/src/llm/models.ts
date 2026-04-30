@@ -14,7 +14,7 @@ const MODEL_DEFAULTS = {
  * This ensures that UI-driven model changes take effect immediately
  * without requiring a container restart.
  */
-export async function getModels(): Promise&lt;{ LIGHT: string; MID: string; STRONG: string }&gt; {
+export async function getModels(): Promise<{ LIGHT: string; MID: string; STRONG: string }> {
   const [light, mid, strong] = await Promise.all([
     getCredential('model_light', 'MODEL_LIGHT'),
     getCredential('model_mid', 'MODEL_MID'),

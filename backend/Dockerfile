@@ -22,5 +22,5 @@ COPY package*.json ./
 
 EXPOSE 4000
 
-# Commande résiliente : tente une migration propre, sinon force la synchro, puis démarre
-CMD (npx prisma migrate deploy || npx prisma db push --skip-generate) && node dist/index.js
+# db push is idempotent — works whether the schema exists or not (no _prisma_migrations table needed)
+CMD npx prisma db push --skip-generate && node dist/index.js
