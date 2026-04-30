@@ -16,7 +16,7 @@ services:
     build:
       context: ./backend
     environment:
-      - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5432/trading
+      - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
       - REDIS_URL=redis://redis:6379
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -48,10 +48,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: EXPOSE 4000
+      CMD ["sh", "-c", "until pg_isready -h postgres -p 5439 -U trading; do echo 'Waiting for postgres...'; sleep 1; done; npx prisma migrate deploy && node dist/index.js"]
     networks:
       - internal
     restart: unless-stopped
