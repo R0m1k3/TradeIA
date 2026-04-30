@@ -1,4 +1,6 @@
-version: '3.9'
+networks:
+  tradeia_net:
+    driver: bridge
 
 services:
   frontend:
@@ -6,14 +8,14 @@ services:
       context: ./frontend
       target: production
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
 
   backend:
     build:
       context: ./backend
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
@@ -55,7 +57,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
 
   redis:
@@ -69,7 +71,7 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
 
   gateway:
@@ -81,7 +83,7 @@ services:
       - frontend
       - backend
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
 
   ollama:
@@ -98,10 +100,5 @@ services:
     volumes:
       - ./data/ollama:/root/.ollama
     networks:
-      - nginx_default
+      - tradeia_net
     restart: unless-stopped
-
-
-networks:
-  nginx_default:
-    external: true
