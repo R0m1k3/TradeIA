@@ -98,7 +98,7 @@ export async function runPipeline(): Promise<void> {
     // Persist cycle log
     await prisma.cycleLog.create({
       data: {
-        payload: { debateOutputs, execResults, finalPortfolio },
+        payload: { debateOutputs, execResults, finalPortfolio } as any,
         ordersCount: execResults.length,
         alertsCount: 0,
         durationMs: duration,
