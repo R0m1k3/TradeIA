@@ -24,6 +24,6 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ['trade.ffnancy.fr'],
+    allowedHosts: true,
   },
 });
