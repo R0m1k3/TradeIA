@@ -62,6 +62,29 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     return { success: true, updated: Object.keys(body) };
   });
+
+  fastify.get('/llm-models', async () => {
+    const provider = (await prisma.config.findUnique({ where: { key: 'llm_provider' } }))?.value || process.env.LLM_PROVIDER || 'openrouter';
+    
+    if (provider === 'ollama') {
+      try {
+        const baseUrl = (await prisma.config.findUnique({ where: { key: 'ollama_base_url' } }))?.value || process.env.OLLAMA_BASE_URL || 'http://ollama:11434';
+        const { default: axios } = await import('axios');
+        const res = await axios.get(`${baseUrl}/api/tags`);
+        return (res.data.models || []).map((m: any) => m.name);
+      } catch {
+        return ['qwen2.5:7b', 'llama3.1:8b']; // Fallback
+      }
+    } else {
+      try {
+        const { default: axios } = await import('axios');
+        const res = await axios.get('https://openrouter.ai/api/v1/models');
+        return (res.data.data || []).map((m: any) => m.id).sort();
+      } catch {
+        return ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini']; // Fallback
+      }
+    }
+  });
 };
 
 export default configRoutes;

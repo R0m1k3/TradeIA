@@ -1,19 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConfigStore } from '../store/config.store';
 import { WatchlistEditor } from '../components/controls/WatchlistEditor';
 import { OverridePanel } from '../components/controls/OverridePanel';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
-const OPENROUTER_MODELS = [
-  'anthropic/claude-haiku-4-5',
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-opus-4',
-  'openai/gpt-4o-mini',
-  'openai/gpt-4o',
-];
-
-const OLLAMA_MODELS = ['qwen2.5:7b', 'qwen2.5:14b', 'qwen2.5:32b', 'llama3.1:8b', 'llama3.1:70b'];
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -80,8 +71,20 @@ export function Config() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
 
-  const models = config.llm_provider === 'ollama' ? OLLAMA_MODELS : OPENROUTER_MODELS;
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const res = await fetch(`${API}/config/llm-models`);
+        const data = await res.json();
+        setModels(data);
+      } catch (err) {
+        console.error('Failed to fetch models:', err);
+      }
+    }
+    fetchModels();
+  }, [config.llm_provider]);
 
   async function handleSave() {
     setSaving(true);
