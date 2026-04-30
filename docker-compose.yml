@@ -84,13 +84,14 @@ services:
     build:
       context: ./nginx
     ports:
-      - "51733:80"
+      - "51733:51733"
     depends_on:
       - frontend
       - backend
     networks:
-      - tradeia_net
-      - nginx_default
+      tradeia_net:
+      nginx_default:
+        ipv4_address: 172.20.0.26
     restart: unless-stopped
 
   ollama:
