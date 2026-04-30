@@ -123,9 +123,13 @@ export function Config() {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`${API}/health`);
-      if (res.ok) setTestResult('✓ Backend reachable');
-      else setTestResult('✗ Backend unreachable');
+      const res = await fetch(`${API}/config/test-llm`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestResult(`✓ ${data.message}`);
+      } else {
+        setTestResult(`✗ ${data.message || 'LLM error'}`);
+      }
     } catch {
       setTestResult('✗ Connection failed');
     }

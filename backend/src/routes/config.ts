@@ -164,6 +164,32 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   });
+
+  fastify.post('/test-llm', async (req, reply) => {
+    try {
+      const { getModels } = await import('../llm/models');
+      const { callLLM } = await import('../llm/client');
+      const models = await getModels();
+      
+      const start = Date.now();
+      const result = await callLLM('test-ping', models.LIGHT, 'You are a tester.', 'Say "OK"');
+      const duration = Date.now() - start;
+
+      return { 
+        success: true, 
+        message: `Connection successful (${duration}ms)`,
+        model: models.LIGHT,
+        response: result.content
+      };
+    } catch (err: any) {
+      console.error('[Config] LLM Test failed:', err.message);
+      reply.status(500);
+      return { 
+        success: false, 
+        message: err.message || 'Unknown error'
+      };
+    }
+  });
 };
 
 export default configRoutes;
