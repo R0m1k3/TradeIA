@@ -39,6 +39,8 @@ async function main() {
 
   initCredentials(prisma);
   await warmCredentialsCache();
+  const configCount = await prisma.config.count();
+  console.log(`[Main] Persistence check: ${configCount} configuration keys loaded from database.`);
 
   const server = await app.listen({ port: parseInt(process.env.PORT || '4000'), host: '0.0.0.0' });
   app.log.info(`Backend listening on ${server}`);
