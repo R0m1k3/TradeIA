@@ -36,7 +36,6 @@ services:
         condition: service_healthy
     networks:
       - nginx_default
-      - internal
     restart: unless-stopped
 
   postgres:
@@ -55,7 +54,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - internal
+      - nginx_default
     restart: unless-stopped
 
   redis:
@@ -69,7 +68,7 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - internal
+      - nginx_default
     restart: unless-stopped
 
   ollama:
@@ -86,7 +85,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     networks:
-      - internal
+      - nginx_default
     restart: unless-stopped
 
 volumes:
@@ -97,5 +96,3 @@ volumes:
 networks:
   nginx_default:
     external: true
-  internal:
-    driver: bridge
