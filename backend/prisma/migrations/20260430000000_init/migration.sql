@@ -46,3 +46,9 @@ CREATE TABLE "CycleLog" (
 
     CONSTRAINT "CycleLog_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE INDEX "Trade_ticker_idx" ON "Trade"("ticker");
+CREATE INDEX "Trade_createdAt_idx" ON "Trade"("createdAt");
+CREATE INDEX "Trade_closedAt_idx" ON "Trade"("closedAt");
+CREATE INDEX "CycleLog_createdAt_idx" ON "CycleLog"("createdAt");

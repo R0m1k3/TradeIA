@@ -27,5 +27,6 @@ COPY package*.json ./
 
 EXPOSE 4000
 
-# db push is idempotent — safe on first run AND on subsequent restarts (no _prisma_migrations needed)
-CMD npx prisma db push --skip-generate && node dist/index.js
+# migrate deploy is safe and non-destructive: applies only new migrations, never drops existing data.
+# This ensures config (API keys, watchlist, etc.) is preserved across Docker rebuilds and restarts.
+CMD npx prisma migrate deploy && node dist/index.js
