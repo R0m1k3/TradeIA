@@ -6,7 +6,7 @@ services:
       context: ./frontend
       target: production
     ports:
-      - "51733:4173"
+      - "51733:51733"
     environment:
       - VITE_WS_URL=wss://trade.ffnancy.fr/ws
       - VITE_API_URL=https://trade.ffnancy.fr/api

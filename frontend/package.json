@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --skipLibCheck || echo 'TS errors ignored' && vite build",
-    "preview": "vite preview --host --port 4173",
+    "preview": "vite preview --host --port 51733",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
