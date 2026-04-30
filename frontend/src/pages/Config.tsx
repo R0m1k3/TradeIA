@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useConfigStore } from '../store/config.store';
 import { WatchlistEditor } from '../components/controls/WatchlistEditor';
 import { OverridePanel } from '../components/controls/OverridePanel';
@@ -67,30 +67,55 @@ function ApiKeyInput({
 }
 
 export function Config() {
-  const { config, secretsConfigured, saveConfig, saveSecret } = useConfigStore();
+  const { config, secretsConfigured, fetchConfig, saveConfig, saveSecret } = useConfigStore();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   async function fetchModels() {
+    setLoadingModels(true);
     try {
       const res = await fetch(`${API}/config/llm-models`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setModels(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setModels(data);
+      }
     } catch (err) {
       console.error('Failed to fetch models:', err);
+    } finally {
+      setLoadingModels(false);
     }
   }
 
+  // On mount: first load config (to know the provider), then fetch models.
+  // This avoids the race condition where fetchModels runs before the provider
+  // or API key is known by the backend.
   useEffect(() => {
-    fetchModels();
+    fetchConfig().then(() => fetchModels());
+  }, []);
+
+  // Track previous provider to detect changes (cannot use state for this)
+  const prevProviderRef = useRef(config.llm_provider);
+  useEffect(() => {
+    if (config.llm_provider !== prevProviderRef.current) {
+      prevProviderRef.current = config.llm_provider;
+      fetchModels();
+    }
   }, [config.llm_provider]);
 
   async function handleSave() {
     setSaving(true);
-    await saveConfig(config);
-    await fetchModels(); // Re-fetch models with the new API key if needed
+    // Never send empty model values — they would overwrite saved values in DB.
+    const safeConfig: Partial<typeof config> = { ...config };
+    if (!safeConfig.model_light) delete safeConfig.model_light;
+    if (!safeConfig.model_mid) delete safeConfig.model_mid;
+    if (!safeConfig.model_strong) delete safeConfig.model_strong;
+    await saveConfig(safeConfig);
+    // Re-fetch models in case the API key was just set
+    await fetchModels();
     setSaving(false);
   }
 
@@ -153,7 +178,10 @@ export function Config() {
                 value={config.model_light}
                 onChange={(e) => saveConfig({ model_light: e.target.value })}
                 className={selectCls}
+                disabled={loadingModels}
               >
+                {loadingModels && <option value="">Loading models...</option>}
+                {!loadingModels && models.length === 0 && <option value="">No models available</option>}
                 {models.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </FormRow>
@@ -163,7 +191,10 @@ export function Config() {
                 value={config.model_mid}
                 onChange={(e) => saveConfig({ model_mid: e.target.value })}
                 className={selectCls}
+                disabled={loadingModels}
               >
+                {loadingModels && <option value="">Loading models...</option>}
+                {!loadingModels && models.length === 0 && <option value="">No models available</option>}
                 {models.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </FormRow>
@@ -173,7 +204,10 @@ export function Config() {
                 value={config.model_strong}
                 onChange={(e) => saveConfig({ model_strong: e.target.value })}
                 className={selectCls}
+                disabled={loadingModels}
               >
+                {loadingModels && <option value="">Loading models...</option>}
+                {!loadingModels && models.length === 0 && <option value="">No models available</option>}
                 {models.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </FormRow>

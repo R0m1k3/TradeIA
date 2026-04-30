@@ -85,16 +85,20 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
 
   saveSecret: async (key: string, value: string) => {
     try {
-      await fetch(`${API}/config`, {
+      const res = await fetch(`${API}/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [key]: value }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Optimistically update the flag, then re-fetch to confirm DB state
       set((state) => ({
         secretsConfigured: { ...state.secretsConfigured, [key]: value.length > 0 },
       }));
-    } catch {
-      // ignore
+      // Re-fetch full config to sync secretsConfigured from the source of truth (DB)
+      await get().fetchConfig();
+    } catch (err) {
+      console.error(`[Config] Failed to save secret ${key}:`, err);
     }
   },
 }));
