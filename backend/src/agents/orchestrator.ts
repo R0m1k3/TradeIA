@@ -5,7 +5,7 @@ import { StrategistAgent } from './strategist';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
 import { executeOrder, getPortfolioState, markToMarket } from '../broker/mock';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 const WATCHLIST = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,NVDA,TSLA').split(',').map((t) => t.trim());
 const PORTFOLIO_USD = parseFloat(process.env.PORTFOLIO_USD || '10000');

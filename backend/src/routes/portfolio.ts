@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { getPortfolioState } from '../broker/mock';
 
 const PORTFOLIO_USD = parseFloat(process.env.PORTFOLIO_USD || '10000');

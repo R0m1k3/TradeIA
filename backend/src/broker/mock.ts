@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
 import { getCurrentPrice } from '../data/alphavantage';
 

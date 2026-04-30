@@ -6,6 +6,7 @@ import { initWebSocket } from './websocket';
 import { initScheduler } from './scheduler';
 import { initQueue } from './queue';
 import { initCredentials, warmCredentialsCache } from './config/credentials';
+import { prisma } from './lib/prisma';
 import portfolioRoutes from './routes/portfolio';
 import signalsRoutes from './routes/signals';
 import configRoutes from './routes/config';
@@ -19,8 +20,6 @@ const app = Fastify({
     },
   },
 });
-
-export const prisma = new PrismaClient();
 
 async function main() {
   await app.register(cors, { origin: true });

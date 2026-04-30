@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { broadcastOverrideAck } from '../websocket';
 import { closeTrade } from '../broker/mock';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 function verifyAdmin(authHeader: string | undefined): boolean {
   if (!authHeader) return false;

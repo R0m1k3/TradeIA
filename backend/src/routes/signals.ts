@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 const signalsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', async () => {

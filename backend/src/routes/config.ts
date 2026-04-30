@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { invalidateCredential } from '../config/credentials';
 import { z } from 'zod';
 
