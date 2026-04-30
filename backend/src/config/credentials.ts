@@ -13,21 +13,23 @@ function prisma(): PrismaClient {
 }
 
 export async function getCredential(configKey: string, envFallback?: string): Promise<string> {
-  if (cache.has(configKey)) return cache.get(configKey)!;
+  if (cache.has(configKey) && cache.get(configKey) !== '') return cache.get(configKey)!;
 
   const row = await prisma().config.findUnique({ where: { key: configKey } });
-  if (row) {
-    cache.set(configKey, row.value);
-    return row.value;
+  if (row && row.value.trim() !== '') {
+    console.log(`[Credentials] Found ${configKey} in database`);
+    cache.set(configKey, row.value.trim());
+    return row.value.trim();
   }
 
-  if (envFallback && process.env[envFallback]) {
-    const val = process.env[envFallback]!;
+  if (envFallback && process.env[envFallback] && process.env[envFallback]?.trim() !== '') {
+    const val = process.env[envFallback]!.trim();
+    console.log(`[Credentials] Using ${configKey} from environment (${envFallback})`);
     cache.set(configKey, val);
     return val;
   }
 
-  cache.set(configKey, '');
+  console.warn(`[Credentials] No value found for ${configKey} (DB or ENV)`);
   return '';
 }
 
