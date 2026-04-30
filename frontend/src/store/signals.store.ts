@@ -49,7 +49,7 @@ export const useSignalsStore = create<SignalsStore>((set) => ({
     set((state) => ({
       alerts: [
         ...state.alerts.slice(-9),
-        { ...alert, id: crypto.randomUUID(), timestamp: new Date().toISOString() },
+        { ...alert, id: Math.random().toString(36).substring(2, 9), timestamp: new Date().toISOString() },
       ],
     })),
 

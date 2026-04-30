@@ -37,12 +37,12 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       <div className="flex items-center gap-3">
         <div>
           <div className="text-[10px] text-text-secondary uppercase tracking-wider">Portfolio</div>
-          <div className="font-syne font-bold text-base text-text-primary font-mono-data">
+          <div className="font-syne font-bold text-base text-text-primary font-mono">
             ${portfolio.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
 
-        <div className={`text-sm font-mono-data font-medium ${pnlPositive ? 'text-accent-green' : 'text-accent-red'}`}>
+        <div className={`text-sm font-mono font-medium ${pnlPositive ? 'text-accent-green' : 'text-accent-red'}`}>
           {pnlPositive ? '+' : ''}{portfolio.daily_pnl_pct.toFixed(2)}%
         </div>
       </div>
@@ -67,7 +67,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       {/* VIX */}
       <div className="flex items-center gap-2 hidden sm:flex">
         <div className="text-[10px] text-text-secondary uppercase tracking-wider">VIX</div>
-        <span className={`text-sm font-mono-data font-medium ${market.vix > 25 ? 'text-accent-red' : market.vix > 18 ? 'text-accent-amber' : 'text-accent-green'}`}>
+        <span className={`text-sm font-mono font-medium ${market.vix > 25 ? 'text-accent-red' : market.vix > 18 ? 'text-accent-amber' : 'text-accent-green'}`}>
           {market.vix.toFixed(1)}
         </span>
       </div>
@@ -75,7 +75,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       {/* Cash */}
       <div className="hidden lg:flex items-center gap-2">
         <div className="text-[10px] text-text-secondary uppercase tracking-wider">Cash</div>
-        <span className="text-sm font-mono-data text-text-primary">
+        <span className="text-sm font-mono text-text-primary">
           ${portfolio.cash_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
         </span>
       </div>
@@ -83,7 +83,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       {/* Positions count */}
       <div className="hidden lg:flex items-center gap-2">
         <div className="text-[10px] text-text-secondary uppercase tracking-wider">Positions</div>
-        <span className="text-sm font-mono-data text-text-primary">{portfolio.positions.length}</span>
+        <span className="text-sm font-mono text-text-primary">{portfolio.positions.length}</span>
       </div>
 
       <div className="ml-auto flex items-center gap-3">
