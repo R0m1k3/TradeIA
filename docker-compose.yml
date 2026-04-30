@@ -5,9 +5,11 @@ services:
     build:
       context: ./frontend
       target: production
+    ports:
+      - "51733:80"
     environment:
-      - VITE_WS_URL=ws://${DOMAIN:-localhost}/ws
-      - VITE_API_URL=http://${DOMAIN:-localhost}/api
+      - VITE_WS_URL=ws://${DOMAIN:-localhost}:44000/ws
+      - VITE_API_URL=http://${DOMAIN:-localhost}:44000/api
     networks:
       - nginx_default
     restart: unless-stopped
@@ -15,6 +17,8 @@ services:
   backend:
     build:
       context: ./backend
+    ports:
+      - "44000:4000"
     environment:
       - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
       - REDIS_URL=redis://redis:6379
@@ -28,6 +32,10 @@ services:
       - DAILY_LOSS_LIMIT_PCT=${DAILY_LOSS_LIMIT_PCT:-3}
       - WATCHLIST=${WATCHLIST:-AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META,JPM,BAC,GE}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - POLYGON_KEY=${POLYGON_KEY:-}
+      - FINNHUB_KEY=${FINNHUB_KEY:-}
+      - ALPHAVANTAGE_KEY=${ALPHAVANTAGE_KEY:-}
       - PORT=4000
     depends_on:
       postgres:
