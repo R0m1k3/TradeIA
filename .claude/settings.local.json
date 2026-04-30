@@ -11,7 +11,17 @@
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(python -c \"import graphify\")",
+      "Bash(pip install *)",
+      "Bash(python -c \"import sys; open\\('.graphify_python', 'w'\\).write\\(sys.executable\\)\")",
+      "Read(//usr/**)",
+      "Read(//c/Users/Bureau/AppData/Local/Programs/Python/**)",
+      "Bash(python3 -c \"import graphify\")",
+      "Bash(python3 -m pip install graphifyy -q)",
+      "Bash(python3 -c \"import sys; open\\('.graphify_python', 'w'\\).write\\(sys.executable\\)\")",
+      "Read(//c/Users/Bureau/AppData/Local/Microsoft/WindowsApps/**)",
+      "Bash(find /c -maxdepth 6 -name \"python.exe\" -type f)"
     ]
   }
 }
