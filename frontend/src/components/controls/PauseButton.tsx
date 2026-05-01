@@ -10,15 +10,10 @@ export function PauseButton() {
   async function toggle() {
     setLoading(true);
     const action = paused ? 'resume' : 'pause';
-    const password = prompt('Admin password:');
-    if (!password) { setLoading(false); return; }
 
     try {
       const res = await fetch(`${API}/override/${action}`, {
         method: 'POST',
-        headers: {
-          Authorization: `Basic ${btoa(`:${password}`)}`,
-        },
       });
       if (res.ok) setPaused(!paused);
     } catch {
