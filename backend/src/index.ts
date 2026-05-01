@@ -12,6 +12,7 @@ import signalsRoutes from './routes/signals';
 import configRoutes from './routes/config';
 import overrideRoutes from './routes/override';
 import orchestratorRoutes from './routes/orchestrator';
+import marketRoutes from './routes/market';
 
 const app = Fastify({
   logger: true,
@@ -34,6 +35,7 @@ async function main() {
   await app.register(configRoutes, { prefix: '/api/config' });
   await app.register(overrideRoutes, { prefix: '/api/override' });
   await app.register(orchestratorRoutes, { prefix: '/api/orchestrator' });
+  await app.register(marketRoutes, { prefix: '/api/market' });
 
   app.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
