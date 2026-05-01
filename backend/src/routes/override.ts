@@ -1,25 +1,10 @@
 import { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
 import { broadcastOverrideAck } from '../websocket';
 import { closeTrade } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 
-function verifyAdmin(authHeader: string | undefined): boolean {
-  if (!authHeader) return false;
-  const [scheme, credentials] = authHeader.split(' ');
-  if (scheme !== 'Basic') return false;
-  const decoded = Buffer.from(credentials || '', 'base64').toString('utf8');
-  const [, password] = decoded.split(':');
-  return password === (process.env.ADMIN_PASSWORD || 'changeme');
-}
-
 const overrideRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('preHandler', async (req, reply) => {
-    if (!verifyAdmin(req.headers.authorization)) {
-      reply.code(401).send({ error: 'Unauthorized' });
-    }
-  });
-
+  // Pause/Resume — no auth required
   fastify.post('/pause', async () => {
     await prisma.config.upsert({
       where: { key: 'system_paused' },
@@ -27,6 +12,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
       create: { key: 'system_paused', value: 'true' },
     });
     broadcastOverrideAck('PAUSE', 'SYSTEM');
+    console.log('[Override] System PAUSED');
     return { success: true, action: 'SYSTEM_PAUSED' };
   });
 
@@ -37,7 +23,27 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
       create: { key: 'system_paused', value: 'false' },
     });
     broadcastOverrideAck('RESUME', 'SYSTEM');
+    console.log('[Override] System RESUMED');
     return { success: true, action: 'SYSTEM_RESUMED' };
+  });
+
+  // Close/Block — require admin password
+  fastify.addHook('preHandler', async (req, reply) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      reply.code(401).send({ error: 'Unauthorized' });
+      return;
+    }
+    const [scheme, credentials] = authHeader.split(' ');
+    if (scheme !== 'Basic') {
+      reply.code(401).send({ error: 'Unauthorized' });
+      return;
+    }
+    const decoded = Buffer.from(credentials || '', 'base64').toString('utf8');
+    const [, password] = decoded.split(':');
+    if (password !== (process.env.ADMIN_PASSWORD || 'changeme')) {
+      reply.code(401).send({ error: 'Unauthorized' });
+    }
   });
 
   fastify.post('/close/:ticker', async (req, reply) => {
