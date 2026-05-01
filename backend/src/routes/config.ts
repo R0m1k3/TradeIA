@@ -96,16 +96,18 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (provider === 'ollama') {
       try {
-        const baseUrl = (await prisma.config.findUnique({ where: { key: 'ollama_base_url' } }))?.value
+        let baseUrl = (await prisma.config.findUnique({ where: { key: 'ollama_base_url' } }))?.value
           || process.env.OLLAMA_BASE_URL
           || 'http://ollama:11434';
-        const res = await axios.get(`${baseUrl}/api/tags`, { timeout: 5000 });
+        // Strip trailing slash
+        baseUrl = baseUrl.replace(/\/+$/, '');
+        const res = await axios.get(`${baseUrl}/api/tags`, { timeout: 15000 });
         const models = (res.data.models || []).map((m: any) => m.name);
         console.log(`[Config] Fetched ${models.length} Ollama models from ${baseUrl}`);
         return models;
       } catch (err: any) {
         console.error('[Config] Ollama models fetch failed:', err.message);
-        return ['qwen2.5:7b', 'llama3.1:8b', 'mistral:7b', 'phi3:mini'];
+        return [];
       }
     } else {
       // Try to get the API key to authenticate the request (expands available models)
