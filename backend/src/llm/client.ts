@@ -20,6 +20,32 @@ function stripMarkdownJson(raw: string): string {
   return raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 }
 
+// ── Concurrency limiter for Ollama (cloud models have rate limits) ──
+const MAX_CONCURRENT = 3;
+let activeCalls = 0;
+const callQueue: (() => void)[] = [];
+
+async function acquireSlot(): Promise<void> {
+  if (activeCalls < MAX_CONCURRENT) {
+    activeCalls++;
+    return;
+  }
+  return new Promise<void>((resolve) => {
+    callQueue.push(() => {
+      activeCalls++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeCalls--;
+  if (callQueue.length > 0) {
+    const next = callQueue.shift()!;
+    next();
+  }
+}
+
 async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LLMResponse> {
   const start = Date.now();
   const apiKey = await getCredential('openrouter_api_key', 'OPENROUTER_API_KEY');
@@ -58,7 +84,7 @@ async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMRes
       stream: false,
       options: { temperature: 0.1 },
     },
-    { timeout: 60_000 }
+    { timeout: 120_000 }
   );
 
   const content = response.data.message?.content || '';
@@ -79,9 +105,17 @@ export async function callLLM(
   ];
 
   const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
-  const delays = [1000, 2000, 4000];
+  const maxAttempts = provider === 'ollama' ? 2 : 3;
+  const delays = provider === 'ollama'
+    ? [2000, 4000]  // Ollama: longer delays, fewer retries (rate limits)
+    : [1000, 2000, 4000];
 
-  for (let attempt = 0; attempt <= 3; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Rate limiting for Ollama — max 3 concurrent calls
+    if (provider === 'ollama') {
+      await acquireSlot();
+    }
+
     try {
       const result =
         provider === 'ollama'
@@ -104,11 +138,11 @@ export async function callLLM(
       const axiosErr = err as AxiosError;
       const status = axiosErr.response?.status;
       console.error(
-        `[LLM] ${agentName} attempt ${attempt + 1}/3 failed — status ${status}: ${axiosErr.message}`
+        `[LLM] ${agentName} attempt ${attempt + 1}/${maxAttempts} failed — status ${status}: ${axiosErr.message}`
       );
 
       // Model fallback: if 401/403/429 (auth/rate limit), try smaller model
-      if (attempt === 2 && (status === 401 || status === 403 || status === 429)) {
+      if (attempt === maxAttempts - 2 && (status === 401 || status === 403 || status === 429)) {
         const fallbackModel = downgradeModel(model);
         if (fallbackModel !== model) {
           console.warn(`[LLM] Retrying ${agentName} with fallback model: ${fallbackModel}`);
@@ -124,10 +158,14 @@ export async function callLLM(
         }
       }
 
-      if (attempt < 3) {
+      if (attempt < maxAttempts - 1) {
         await sleep(delays[attempt] || 4000);
       } else {
-        throw new Error(`LLM call failed after 3 retries for agent ${agentName}: ${axiosErr.message}`);
+        throw new Error(`LLM call failed after ${maxAttempts} retries for agent ${agentName}: ${axiosErr.message}`);
+      }
+    } finally {
+      if (provider === 'ollama') {
+        releaseSlot();
       }
     }
   }
@@ -136,6 +174,13 @@ export async function callLLM(
 }
 
 function downgradeModel(model: string): string {
+  // Ollama cloud models: downgrade pro → flash
+  if (model.includes('pro')) return model.replace('pro', 'flash');
+  if (model.includes('glm-5.1')) return 'deepseek-v4-flash:cloud';
+  if (model.includes('kimi')) return 'deepseek-v4-flash:cloud';
+  if (model.includes('gemma4')) return 'deepseek-v4-flash:cloud';
+  if (model.includes('qwen3.6')) return 'deepseek-v4-flash:cloud';
+  // OpenRouter: downgrade as before
   if (model.includes('opus')) return model.replace(/opus[^/]*/, 'sonnet-4-6');
   if (model.includes('sonnet')) return model.replace(/sonnet[^/]*/, 'haiku-4-5');
   return model;

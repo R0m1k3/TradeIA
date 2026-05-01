@@ -41,13 +41,14 @@ export interface DebateOutput {
 
 export class ResearcherAgent {
   async run(analystOutputs: AnalystOutput[], collector: CollectorOutput): Promise<DebateOutput[]> {
-    const MODELS = await getModels();
     console.log(`[Researcher] Starting bull/bear debates for ${analystOutputs.length} tickers`);
 
-    const debates = await Promise.all(
-      analystOutputs
-        .filter((a) => a.confidence > 0 && !a.skip_reason)
-        .map(async (analysis) => {
+    // Process tickers sequentially to avoid overwhelming Ollama rate limits.
+    // Bull + bear for each ticker still run in parallel (2 calls), but tickers are sequential.
+    const validAnalyses = analystOutputs.filter((a) => a.confidence > 0 && !a.skip_reason);
+    const debates: (DebateOutput | null)[] = [];
+
+    for (const analysis of validAnalyses) {
           const tickerData = collector.tickers[analysis.ticker];
           if (!tickerData) return null;
 
@@ -100,15 +101,14 @@ export class ResearcherAgent {
 
           const debate_score = bull.conviction - bear.conviction;
 
-          return {
+          debates.push({
             ticker: analysis.ticker,
             bull,
             bear,
             debate_score,
             analyst_output: analysis,
-          } as DebateOutput;
-        })
-    );
+          } as DebateOutput);
+    }
 
     const validDebates = debates.filter((d): d is DebateOutput => d !== null);
     console.log(`[Researcher] Completed ${validDebates.length} debates`);
