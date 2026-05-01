@@ -117,13 +117,15 @@ export class ResearcherAgent {
 
   private async runBull(data: Parameters<typeof buildBullPrompt>[0]): Promise<BullOutput> {
     const prompt = buildBullPrompt(data);
-    const response = await callLLM('bull-researcher', MODELS.MID, BULL_SYSTEM, prompt);
+    const models = await getModels();
+    const response = await callLLM('bull-researcher', models.MID, BULL_SYSTEM, prompt);
     return parseJsonResponse<BullOutput>(response.content);
   }
 
   private async runBear(data: Parameters<typeof buildBearPrompt>[0]): Promise<BearOutput> {
     const prompt = buildBearPrompt(data);
-    const response = await callLLM('bear-researcher', MODELS.MID, BEAR_SYSTEM, prompt);
+    const models = await getModels();
+    const response = await callLLM('bear-researcher', models.MID, BEAR_SYSTEM, prompt);
     return parseJsonResponse<BearOutput>(response.content);
   }
 }

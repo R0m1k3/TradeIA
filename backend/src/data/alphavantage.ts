@@ -23,7 +23,7 @@ export interface Fundamentals {
 }
 
 async function avGet(params: Record<string, string>): Promise<Record<string, unknown>> {
-  const key = await getCredential('alpha_vantage_key', 'ALPHA_VANTAGE_KEY') || 'demo';
+  const key = await getCredential('alpha_vantage_key', 'ALPHA_VANTAGE_KEY') || await getCredential('alpha_vantage_key', 'ALPHAVANTAGE_KEY') || 'demo';
   const response = await axios.get(BASE, {
     params: { ...params, apikey: key },
     timeout: 15_000,

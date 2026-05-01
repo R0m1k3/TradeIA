@@ -9,7 +9,7 @@ import { executeOrder, getPortfolioState, markToMarket } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 
-const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,NVDA,TSLA').split(',').map((t) => t.trim());
+const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META,JPM,BAC,GE,AVGO,ORCL,CRM,AMD,QCOM,SBUX').split(',').map((t) => t.trim());
 
 let isRunning = false;
 
@@ -38,7 +38,7 @@ export async function runPipeline(): Promise<void> {
     await markToMarket();
 
     // Step 2: Discovery (IA selects tickers)
-    reporter.updateAgent('collector', { status: 'scanning' });
+    reporter.updateAgent('collector', { status: 'running' });
     const discovery = new DiscoveryAgent();
     let tickers = await discovery.run();
     

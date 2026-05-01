@@ -1,6 +1,7 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { buildAnalystPrompt, ANALYST_SYSTEM } from '../prompts/analyst.prompt';
+import { compute4HBias, compute15mSignal, computeTradeType, computeLevels, type IndicatorValues } from '../data/indicators';
 import type { CollectorOutput } from './collector';
 
 export interface AnalystOutput {
@@ -36,13 +37,59 @@ export class AnalystAgent {
           return;
         }
 
+        const indicators: IndicatorValues | null = (data as any).indicators ?? null;
+
+        // Deterministic fallback when no LLM available or indicators are pre-computed
+        if (indicators) {
+          const deterministic = this.deterministicAnalysis(ticker, data.current_price, indicators);
+          // Try LLM for qualitative interpretation, fall back to deterministic
+          try {
+            const prompt = buildAnalystPrompt({
+              ticker,
+              current_price: data.current_price,
+              indicators,
+              fundamentals: data.fundamentals,
+              news: data.news,
+              sentiment: data.sentiment,
+            });
+
+            const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
+            const parsed = parseJsonResponse<{ analyses: AnalystOutput[] }>(response.content);
+
+            if (parsed.analyses && parsed.analyses.length > 0) {
+              // Validate LLM output against deterministic values
+              for (const analysis of parsed.analyses) {
+                if (analysis.confidence <= 0) {
+                  analysis.skip_reason = analysis.skip_reason || 'LLM low confidence';
+                }
+                results.push(analysis);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn(`[Analyst] LLM failed for ${ticker}, using deterministic:`, (err as Error).message);
+          }
+
+          // Deterministic fallback
+          results.push(deterministic);
+          return;
+        }
+
+        // No indicators at all — try LLM with raw data
         try {
           const prompt = buildAnalystPrompt({
             ticker,
-            ohlcv_15m: data.ohlcv_15m,
-            ohlcv_1h: data.ohlcv_1h,
-            ohlcv_4h: data.ohlcv_4h,
             current_price: data.current_price,
+            indicators: {
+              rsi_14: null, rsi_1h: null, macd_signal: 'neutral', macd_histogram: null,
+              ema_9: null, ema_21: null, ema_50: null, ema_200: null,
+              atr_14: null, adx: null,
+              bb_upper: null, bb_middle: null, bb_lower: null,
+              volume_ratio: null, support_levels: [], resistance_levels: [],
+            },
+            fundamentals: data.fundamentals,
+            news: data.news,
+            sentiment: data.sentiment,
           });
 
           const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
@@ -70,7 +117,7 @@ export class AnalystAgent {
             key_levels: { support: [], resistance: [] },
             candle_pattern: 'unknown',
             confidence: 0,
-            skip_reason: `Analysis error: ${String(err).slice(0, 100)}`,
+            skip_reason: `No indicators: ${String(err).slice(0, 100)}`,
           });
         }
       })
@@ -78,5 +125,55 @@ export class AnalystAgent {
 
     console.log(`[Analyst] Completed: ${results.length} analyses`);
     return results;
+  }
+
+  /** Fully deterministic analysis from pre-computed indicators — no LLM needed */
+  private deterministicAnalysis(ticker: string, currentPrice: number, indicators: IndicatorValues): AnalystOutput {
+    const bias_4h = compute4HBias(indicators);
+    const signal_15m = compute15mSignal(indicators);
+    const trade_type = computeTradeType(indicators);
+    const levels = computeLevels(currentPrice, indicators.atr_14, signal_15m);
+
+    // Determine 1h bias from RSI + MACD
+    let bias_1h: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+    if (indicators.rsi_1h !== null) {
+      if (indicators.rsi_1h < 40 && indicators.macd_signal === 'bullish') bias_1h = 'BULLISH';
+      else if (indicators.rsi_1h > 60 && indicators.macd_signal === 'bearish') bias_1h = 'BEARISH';
+    }
+
+    // Confidence based on alignment
+    let confidence = 30; // base
+    if (bias_4h === bias_1h && bias_4h !== 'NEUTRAL') confidence += 25;
+    if (signal_15m !== 'NEUTRAL' && signal_15m === (bias_4h === 'BULLISH' ? 'BUY' : 'SELL')) confidence += 20;
+    if (indicators.volume_ratio !== null && indicators.volume_ratio > 1.5) confidence += 10;
+    if (indicators.adx !== null && indicators.adx > 25) confidence += 10;
+    confidence = Math.min(confidence, 95);
+
+    // Detect candle patterns from Bollinger Band position
+    let candle_pattern = 'none';
+    if (currentPrice < (indicators.bb_lower ?? 0) && currentPrice > 0) candle_pattern = 'below_lower_band';
+    else if (currentPrice > (indicators.bb_upper ?? 0)) candle_pattern = 'above_upper_band';
+    else if (indicators.rsi_14 !== null && indicators.rsi_14 < 30) candle_pattern = 'oversold';
+    else if (indicators.rsi_14 !== null && indicators.rsi_14 > 70) candle_pattern = 'overbought';
+
+    return {
+      ticker,
+      bias_4h,
+      bias_1h,
+      signal_15m,
+      trade_type,
+      entry_price: levels.entry,
+      stop_loss: levels.stop_loss,
+      take_profit: levels.take_profit,
+      atr: indicators.atr_14 ?? currentPrice * 0.01,
+      rsi_15m: indicators.rsi_14 ?? 50,
+      rsi_1h: indicators.rsi_1h ?? 50,
+      macd_signal: indicators.macd_signal,
+      volume_ratio: indicators.volume_ratio ?? 1,
+      key_levels: { support: indicators.support_levels, resistance: indicators.resistance_levels },
+      candle_pattern,
+      confidence,
+      skip_reason: null,
+    };
   }
 }

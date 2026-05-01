@@ -106,6 +106,24 @@ export async function callLLM(
       console.error(
         `[LLM] ${agentName} attempt ${attempt + 1}/3 failed — status ${status}: ${axiosErr.message}`
       );
+
+      // Model fallback: if 401/403/429 (auth/rate limit), try smaller model
+      if (attempt === 2 && (status === 401 || status === 403 || status === 429)) {
+        const fallbackModel = downgradeModel(model);
+        if (fallbackModel !== model) {
+          console.warn(`[LLM] Retrying ${agentName} with fallback model: ${fallbackModel}`);
+          try {
+            const result = provider === 'ollama'
+              ? await callOllama(fallbackModel, messages)
+              : await callOpenRouter(fallbackModel, messages);
+            console.log(`[LLM] ${agentName} succeeded with fallback model ${fallbackModel}`);
+            return result;
+          } catch (fallbackErr) {
+            throw new Error(`LLM call failed for agent ${agentName} (tried ${model} + ${fallbackModel}): ${(fallbackErr as Error).message}`);
+          }
+        }
+      }
+
       if (attempt < 3) {
         await sleep(delays[attempt] || 4000);
       } else {
@@ -115,6 +133,12 @@ export async function callLLM(
   }
 
   throw new Error('Unreachable');
+}
+
+function downgradeModel(model: string): string {
+  if (model.includes('opus')) return model.replace(/opus[^/]*/, 'sonnet-4-6');
+  if (model.includes('sonnet')) return model.replace(/sonnet[^/]*/, 'haiku-4-5');
+  return model;
 }
 
 export function parseJsonResponse<T>(content: string): T {

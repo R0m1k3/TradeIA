@@ -78,8 +78,21 @@ export async function getMarketContext(): Promise<{
   const cached = await cacheGet<{ vix: number; fear_greed: number; nasdaq_direction: string }>(cacheKey);
   if (cached) return cached;
 
-  // Return sensible defaults when API is unavailable
-  const result = { vix: 18, fear_greed: 50, nasdaq_direction: 'neutral' };
+  // Fetch real data from Yahoo Finance + CNN
+  const { getYahooVIX, getFearAndGreed, getNasdaqDirection } = await import('./yahoo');
+  const [vix, fearGreed, nasdaqDir] = await Promise.allSettled([
+    getYahooVIX(),
+    getFearAndGreed(),
+    getNasdaqDirection(),
+  ]);
+
+  const result = {
+    vix: vix.status === 'fulfilled' && vix.value ? vix.value : 18,
+    fear_greed: fearGreed.status === 'fulfilled' && fearGreed.value ? fearGreed.value : 50,
+    nasdaq_direction: nasdaqDir.status === 'fulfilled' ? nasdaqDir.value : 'neutral',
+  };
+
+  console.log(`[Market] VIX=${result.vix} FearGreed=${result.fear_greed} Nasdaq=${result.nasdaq_direction}`);
   await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
   return result;
 }

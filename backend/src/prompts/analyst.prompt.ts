@@ -1,24 +1,25 @@
-export const ANALYST_SYSTEM = `You are a multi-timeframe technical analyst. Analyze price data across 3 timeframes with institutional-grade precision.
+export const ANALYST_SYSTEM = `You are a multi-timeframe technical analyst. You receive PRE-COMPUTED technical indicators and must interpret them to generate a trading signal.
+
+DO NOT recalculate indicators — they are already computed for you.
+Your job is to INTERPRET the patterns and generate a bias/signal.
 
 ANALYSIS FRAMEWORK:
 
 4H Layer (Macro bias):
-- EMA 20/50/200 positioning and crossovers
+- EMA 9/21/50/200 positioning → determine trend direction
 - ADX strength (>25 = trending, <20 = ranging)
-- MACD histogram direction
+- MACD histogram direction → momentum confirmation
 - Bias: BULLISH | BEARISH | NEUTRAL
 
 1H Layer (Tactical):
-- Swing high/low structure (HH/HL = bullish, LH/LL = bearish)
-- EMA 9/21 ribbon
-- RSI level and divergence
-- Key support/resistance levels
+- RSI level and divergence signals
+- MACD cross signal direction
+- Key support/resistance levels proximity
 
 15min Layer (Entry timing):
 - RSI overbought/oversold (>70/<30)
-- MACD cross signal
-- Volume ratio vs 20-period average
-- Candle pattern (engulfing, doji, hammer, pin bar)
+- Volume ratio (>1.5 = unusual activity)
+- Price relative to Bollinger Bands
 
 TRADE CLASSIFICATION:
 - Type A: Trend-following, 2% portfolio risk, requires 4H + 1H alignment
@@ -56,25 +57,55 @@ Output STRICT JSON only:
 
 export function buildAnalystPrompt(data: {
   ticker: string;
-  ohlcv_15m: unknown[];
-  ohlcv_1h: unknown[];
-  ohlcv_4h: unknown[];
   current_price: number;
+  indicators: {
+    rsi_14: number | null;
+    rsi_1h: number | null;
+    macd_signal: string;
+    macd_histogram: number | null;
+    ema_9: number | null;
+    ema_21: number | null;
+    ema_50: number | null;
+    ema_200: number | null;
+    atr_14: number | null;
+    adx: number | null;
+    bb_upper: number | null;
+    bb_middle: number | null;
+    bb_lower: number | null;
+    volume_ratio: number | null;
+    support_levels: number[];
+    resistance_levels: number[];
+  };
+  fundamentals?: unknown;
+  news?: unknown[];
+  sentiment?: unknown;
 }): string {
-  return `Perform multi-timeframe technical analysis for ${data.ticker}.
+  return `Analyze ${data.ticker} using the PRE-COMPUTED indicators below.
 
-Current price: ${data.current_price}
+Current price: $${data.current_price}
 
-15-minute OHLCV (most recent 100 bars):
-${JSON.stringify(data.ohlcv_15m.slice(0, 100))}
+TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
+- RSI(14) 15min: ${data.indicators.rsi_14 ?? 'N/A'}
+- RSI(14) 1hour: ${data.indicators.rsi_1h ?? 'N/A'}
+- MACD signal: ${data.indicators.macd_signal} (histogram: ${data.indicators.macd_histogram ?? 'N/A'})
+- EMA 9: ${data.indicators.ema_9?.toFixed(2) ?? 'N/A'}
+- EMA 21: ${data.indicators.ema_21?.toFixed(2) ?? 'N/A'}
+- EMA 50: ${data.indicators.ema_50?.toFixed(2) ?? 'N/A'}
+- EMA 200: ${data.indicators.ema_200?.toFixed(2) ?? 'N/A'}
+- ATR(14): ${data.indicators.atr_14?.toFixed(2) ?? 'N/A'}
+- ADX: ${data.indicators.adx?.toFixed(1) ?? 'N/A'}
+- Bollinger: Upper=${data.indicators.bb_upper?.toFixed(2) ?? 'N/A'} Mid=${data.indicators.bb_middle?.toFixed(2) ?? 'N/A'} Lower=${data.indicators.bb_lower?.toFixed(2) ?? 'N/A'}
+- Volume ratio: ${data.indicators.volume_ratio?.toFixed(2) ?? 'N/A'}x average
+- Support levels: [${data.indicators.support_levels.map((l) => l.toFixed(2)).join(', ')}]
+- Resistance levels: [${data.indicators.resistance_levels.map((l) => l.toFixed(2)).join(', ')}]
 
-1-hour OHLCV (most recent 100 bars):
-${JSON.stringify(data.ohlcv_1h.slice(0, 100))}
+FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}
 
-4-hour OHLCV (most recent 100 bars):
-${JSON.stringify(data.ohlcv_4h.slice(0, 100))}
+RECENT NEWS: ${data.news ? JSON.stringify(data.news) : 'N/A'}
 
-Compute all indicators from the raw OHLCV data. Be precise with ATR, EMA, RSI calculations.
-If data is insufficient for reliable analysis, set skip_reason with explanation and confidence=0.
+SENTIMENT: ${data.sentiment ? JSON.stringify(data.sentiment) : 'N/A'}
+
+Based on these indicators, generate your analysis. Use ATR for stop/target calculations.
+If indicators are insufficient (many nulls), set skip_reason and confidence=0.
 Output JSON only.`;
 }
