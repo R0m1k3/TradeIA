@@ -125,10 +125,13 @@ export function Config() {
     try {
       const res = await fetch(`${API}/config/test-llm`, { method: 'POST' });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setTestResult(`✓ ${data.message}`);
+      if (data.success) {
+        const modelsInfo = data.models_available?.length > 0
+          ? ` (${data.models_available.length} models: ${data.models_available.slice(0, 3).join(', ')}${data.models_available.length > 3 ? '...' : ''})`
+          : '';
+        setTestResult(`✓ ${data.message} — ${data.provider}/${data.model}${modelsInfo}`);
       } else {
-        setTestResult(`✗ ${data.message || 'LLM error'}`);
+        setTestResult(`✗ ${data.message}`);
       }
     } catch {
       setTestResult('✗ Connection failed');

@@ -175,7 +175,49 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       const models = await getModels();
       const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
 
-      // Use the lightest available model for testing
+      // For Ollama: verify connection first, then pick a valid model
+      if (provider === 'ollama') {
+        const baseUrl = (await getCredential('ollama_base_url', 'OLLAMA_BASE_URL') || 'http://ollama:11434').replace(/\/+$/, '');
+
+        // Step 1: check Ollama is reachable
+        try {
+          const tagsRes = await axios.get(`${baseUrl}/api/tags`, { timeout: 10000 });
+          const availableModels: string[] = (tagsRes.data.models || []).map((m: any) => m.name);
+
+          if (availableModels.length === 0) {
+            return { success: false, message: `Ollama reachable at ${baseUrl} but no models installed. Run: ollama pull qwen2.5:7b`, provider, models_available: [] };
+          }
+
+          // Step 2: use configured model if it exists, otherwise pick the first available
+          let testModel = models.LIGHT;
+          if (!availableModels.includes(testModel)) {
+            testModel = availableModels[0];
+            console.log(`[Config] Configured model ${models.LIGHT} not found, using ${testModel}`);
+          }
+
+          // Step 3: test chat
+          const start = Date.now();
+          const result = await callLLM('test-ping', testModel, 'You are a tester.', 'Say "OK"');
+          const duration = Date.now() - start;
+
+          return {
+            success: true,
+            message: `Ollama connected (${duration}ms)`,
+            provider,
+            model: testModel,
+            models_available: availableModels,
+            response: result.content,
+          };
+        } catch (connErr: any) {
+          const msg = connErr.code === 'ECONNREFUSED' ? `Cannot reach ${baseUrl}` :
+                      connErr.code === 'ETIMEDOUT' ? `Timeout connecting to ${baseUrl}` :
+                      connErr.response?.status ? `HTTP ${connErr.response.status} from ${baseUrl}` :
+                      connErr.message;
+          return { success: false, message: `Ollama connection failed: ${msg}`, provider };
+        }
+      }
+
+      // OpenRouter test
       const testModel = models.LIGHT;
       console.log(`[Config] Testing LLM: provider=${provider} model=${testModel}`);
 
@@ -188,7 +230,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
         message: `Connection successful (${duration}ms)`,
         provider,
         model: testModel,
-        response: result.content
+        response: result.content,
       };
     } catch (err: any) {
       console.error('[Config] LLM Test failed:', err.message);
