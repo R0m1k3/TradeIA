@@ -1,5 +1,5 @@
 import { callLLM, parseJsonResponse } from '../llm/client';
-import { MODELS } from '../llm/models';
+import { getModels } from '../llm/models';
 import { getIntraday, getDaily, getFundamentals, getCurrentPrice } from '../data/alphavantage';
 import { getOptionsData, getDailyVolume } from '../data/polygon';
 import { getTickerNews, getSentiment, getMarketContext } from '../data/finnhub';
@@ -186,7 +186,8 @@ export class CollectorAgent {
       const prompt = buildCollectorPrompt({ tickers: watchlist, rawData, marketData: market });
 
       try {
-        const response = await callLLM('collector', MODELS.LIGHT, COLLECTOR_SYSTEM, prompt);
+        const models = await getModels();
+        const response = await callLLM('collector', models.LIGHT, COLLECTOR_SYSTEM, prompt);
         const parsed = parseJsonResponse<CollectorOutput>(response.content);
         // Merge locally-computed indicators into LLM output (LLM may miss things)
         for (const ticker of Object.keys(rawData)) {

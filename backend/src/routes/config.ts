@@ -171,23 +171,30 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const { getModels } = await import('../llm/models');
       const { callLLM } = await import('../llm/client');
+      const { getCredential } = await import('../config/credentials');
       const models = await getModels();
-      
+      const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
+
+      // Use the lightest available model for testing
+      const testModel = models.LIGHT;
+      console.log(`[Config] Testing LLM: provider=${provider} model=${testModel}`);
+
       const start = Date.now();
-      const result = await callLLM('test-ping', models.LIGHT, 'You are a tester.', 'Say "OK"');
+      const result = await callLLM('test-ping', testModel, 'You are a tester.', 'Say "OK"');
       const duration = Date.now() - start;
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: `Connection successful (${duration}ms)`,
-        model: models.LIGHT,
+        provider,
+        model: testModel,
         response: result.content
       };
     } catch (err: any) {
       console.error('[Config] LLM Test failed:', err.message);
       reply.status(500);
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: err.message || 'Unknown error'
       };
     }
