@@ -3,8 +3,17 @@ import { broadcastOverrideAck } from '../websocket';
 import { closeTrade } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 
+function verifyAdmin(authHeader: string | undefined): boolean {
+  if (!authHeader) return false;
+  const [scheme, credentials] = authHeader.split(' ');
+  if (scheme !== 'Basic') return false;
+  const decoded = Buffer.from(credentials || '', 'base64').toString('utf8');
+  const [, password] = decoded.split(':');
+  return password === (process.env.ADMIN_PASSWORD || 'changeme');
+}
+
 const overrideRoutes: FastifyPluginAsync = async (fastify) => {
-  // Pause/Resume — no auth required
+  // Pause — no auth
   fastify.post('/pause', async () => {
     await prisma.config.upsert({
       where: { key: 'system_paused' },
@@ -16,6 +25,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true, action: 'SYSTEM_PAUSED' };
   });
 
+  // Resume — no auth
   fastify.post('/resume', async () => {
     await prisma.config.upsert({
       where: { key: 'system_paused' },
@@ -27,26 +37,14 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true, action: 'SYSTEM_RESUMED' };
   });
 
-  // Close/Block — require admin password
-  fastify.addHook('preHandler', async (req, reply) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      reply.code(401).send({ error: 'Unauthorized' });
-      return;
-    }
-    const [scheme, credentials] = authHeader.split(' ');
-    if (scheme !== 'Basic') {
-      reply.code(401).send({ error: 'Unauthorized' });
-      return;
-    }
-    const decoded = Buffer.from(credentials || '', 'base64').toString('utf8');
-    const [, password] = decoded.split(':');
-    if (password !== (process.env.ADMIN_PASSWORD || 'changeme')) {
-      reply.code(401).send({ error: 'Unauthorized' });
-    }
-  });
-
-  fastify.post('/close/:ticker', async (req, reply) => {
+  // Close — auth required
+  fastify.post('/close/:ticker', {
+    preHandler: async (req, reply) => {
+      if (!verifyAdmin(req.headers.authorization)) {
+        reply.code(401).send({ error: 'Unauthorized' });
+      }
+    },
+  }, async (req, reply) => {
     const { ticker } = req.params as { ticker: string };
 
     const openTrade = await prisma.trade.findFirst({
@@ -63,7 +61,14 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true, action: 'POSITION_CLOSED', ticker };
   });
 
-  fastify.post('/block/:ticker', async (req) => {
+  // Block — auth required
+  fastify.post('/block/:ticker', {
+    preHandler: async (req, reply) => {
+      if (!verifyAdmin(req.headers.authorization)) {
+        reply.code(401).send({ error: 'Unauthorized' });
+      }
+    },
+  }, async (req) => {
     const { ticker } = req.params as { ticker: string };
     await prisma.config.upsert({
       where: { key: `blocked:${ticker}` },
@@ -74,7 +79,14 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true, action: 'TICKER_BLOCKED', ticker };
   });
 
-  fastify.post('/unblock/:ticker', async (req) => {
+  // Unblock — auth required
+  fastify.post('/unblock/:ticker', {
+    preHandler: async (req, reply) => {
+      if (!verifyAdmin(req.headers.authorization)) {
+        reply.code(401).send({ error: 'Unauthorized' });
+      }
+    },
+  }, async (req) => {
     const { ticker } = req.params as { ticker: string };
     await prisma.config.upsert({
       where: { key: `blocked:${ticker}` },

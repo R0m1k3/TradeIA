@@ -1,12 +1,13 @@
 import { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { getPortfolioState } from '../broker/mock';
-
-const PORTFOLIO_USD = parseFloat(process.env.PORTFOLIO_USD || '10000');
+import { getCredential } from '../config/credentials';
 
 const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', async () => {
-    const state = await getPortfolioState(PORTFOLIO_USD);
+    const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
+    const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
+    const state = await getPortfolioState(portfolioUsd);
     return state;
   });
 
