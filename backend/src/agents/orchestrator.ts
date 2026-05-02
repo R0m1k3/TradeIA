@@ -9,6 +9,7 @@ import { executeOrder, getPortfolioState, markToMarket, closeTrade } from '../br
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 import { broadcastAlert } from '../websocket';
+import { getNasdaqStatus } from '../routes/market';
 
 const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
 
@@ -199,6 +200,13 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
 export async function runPipeline(): Promise<void> {
   if (isRunning) {
     console.log('[Orchestrator] Pipeline already running, skipping cycle');
+    return;
+  }
+
+  // Guard: skip if market is closed
+  const nasdaq = getNasdaqStatus();
+  if (!nasdaq.isOpen) {
+    console.log(`[Orchestrator] Market closed — ${nasdaq.nextOpen || 'weekend'}. Skipping pipeline.`);
     return;
   }
 
