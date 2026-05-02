@@ -29,6 +29,7 @@ export interface MarketSentiment {
 }
 
 // Track which endpoints returned 403 so we stop retrying
+// Check before even making the request to avoid parallel 403 spam
 const endpoint403 = new Set<string>();
 
 export async function getTickerNews(ticker: string): Promise<NewsItem[]> {
@@ -40,7 +41,7 @@ export async function getTickerNews(ticker: string): Promise<NewsItem[]> {
   try {
     const { data, status } = await finnhubGet('/company-news', { symbol: ticker, from: new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
     if (status === 403 || status === 401) {
-      console.warn(`[Finnhub] getTickerNews 403 — plan limit, disabling`);
+      if (!endpoint403.has('news')) console.warn(`[Finnhub] getTickerNews 403 — plan limit, disabling for session`);
       endpoint403.add('news');
       return [];
     }
@@ -66,8 +67,8 @@ export async function getSentiment(ticker: string): Promise<MarketSentiment> {
   try {
     const { data, status } = await finnhubGet('/news-sentiment', { symbol: ticker });
     if (status === 403 || status === 401) {
+      if (!endpoint403.has('sentiment')) console.warn(`[Finnhub] getSentiment 403 — plan limit, disabling for session`);
       endpoint403.add('sentiment');
-      console.warn(`[Finnhub] getSentiment 403 — plan limit, disabling for all tickers`);
       return { sentiment_score: 0, buzz_score: 0 };
     }
     if (status === 429) {

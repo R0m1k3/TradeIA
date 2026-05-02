@@ -16,6 +16,7 @@ function unixToISO(ts: number): string {
 // Fetch a crumb from Yahoo to authenticate v8/v10 endpoints
 let cachedCrumb: string | null = null;
 let crumbExpiry = 0;
+let crumbLogged = false;
 
 async function getYahooCrumb(): Promise<string | null> {
   if (cachedCrumb && Date.now() < crumbExpiry) return cachedCrumb;
@@ -23,16 +24,18 @@ async function getYahooCrumb(): Promise<string | null> {
     const sessionRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
       headers: YAHOO_HEADERS,
       timeout: 10_000,
-      withCredentials: true,
     });
     if (typeof sessionRes.data === 'string' && sessionRes.data.length > 5) {
       cachedCrumb = sessionRes.data;
-      crumbExpiry = Date.now() + 3600_000; // Cache for 1h
+      crumbExpiry = Date.now() + 3600_000;
       console.log('[Yahoo] Got crumb for authenticated requests');
       return cachedCrumb;
     }
   } catch {
-    console.warn('[Yahoo] Could not get crumb — will try without auth');
+    if (!crumbLogged) {
+      console.warn('[Yahoo] Could not get crumb — fundamentals unavailable without auth');
+      crumbLogged = true;
+    }
   }
   return null;
 }
@@ -148,41 +151,69 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
     pe: null, eps: null, revenue_growth: null, debt_equity: null, earnings_date: null, market_cap: null,
   };
 
-  try {
-    const crumb = await getYahooCrumb();
-    const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings' };
-    if (crumb) params.crumb = crumb;
+  // Try quoteSummary with crumb first
+  const crumb = await getYahooCrumb();
+  if (crumb) {
+    try {
+      const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings', crumb };
+      const response = await axios.get(`${SUMMARY}/${ticker}`, {
+        params,
+        headers: YAHOO_HEADERS,
+        timeout: 15_000,
+        validateStatus: () => true,
+      });
 
-    const response = await axios.get(`${SUMMARY}/${ticker}`, {
-      params,
+      if (response.status === 200) {
+        const stats = response.data?.quoteSummary?.result?.[0];
+        if (stats) {
+          const result: Fundamentals = {
+            pe: stats.defaultKeyStatistics?.forwardPE?.raw ?? null,
+            eps: stats.defaultKeyStatistics?.trailingEps?.raw ?? null,
+            revenue_growth: stats.financialData?.revenueGrowth?.raw ?? null,
+            debt_equity: stats.financialData?.debtToEquity ?? null,
+            earnings_date: stats.earnings?.financialsChart?.quarterly?.[0]?.date ?? null,
+            market_cap: stats.defaultKeyStatistics?.enterpriseValue?.raw ?? null,
+          };
+          await cacheSet(cacheKey, result, TTL.FUNDAMENTALS);
+          return result;
+        }
+      }
+    } catch {
+      // quoteSummary failed, fall through
+    }
+  }
+
+  // Fallback: extract what we can from v8 chart metadata (market cap via price)
+  try {
+    const chartParams: Record<string, string> = { interval: '1d', range: '1d' };
+    if (crumb) chartParams.crumb = crumb;
+
+    const response = await axios.get(`${BASE}/${ticker}`, {
+      params: chartParams,
       headers: YAHOO_HEADERS,
-      timeout: 15_000,
+      timeout: 10_000,
       validateStatus: () => true,
     });
 
-    if (response.status === 401 || response.status === 404) {
-      // Cache empty result to avoid hammering Yahoo with 401s
-      console.warn(`[Yahoo] getFundamentals ${ticker}: HTTP ${response.status} — caching empty`);
+    if (response.status !== 200) {
       await cacheSet(cacheKey, empty, TTL.FUNDAMENTALS);
       return empty;
     }
 
-    const stats = response.data?.quoteSummary?.result?.[0];
-    if (!stats) return empty;
-
+    const meta = response.data?.chart?.result?.[0]?.meta;
     const result: Fundamentals = {
-      pe: stats.defaultKeyStatistics?.forwardPE?.raw ?? null,
-      eps: stats.defaultKeyStatistics?.trailingEps?.raw ?? null,
-      revenue_growth: stats.financialData?.revenueGrowth?.raw ?? null,
-      debt_equity: stats.financialData?.debtToEquity ?? null,
-      earnings_date: stats.earnings?.financialsChart?.quarterly?.[0]?.date ?? null,
-      market_cap: stats.defaultKeyStatistics?.enterpriseValue?.raw ?? null,
+      pe: null,
+      eps: null,
+      revenue_growth: null,
+      debt_equity: null,
+      earnings_date: null,
+      market_cap: meta?.marketCap ?? null,
     };
 
     await cacheSet(cacheKey, result, TTL.FUNDAMENTALS);
     return result;
-  } catch (err) {
-    console.warn(`[Yahoo] getFundamentals ${ticker} failed: ${(err as Error).message}`);
+  } catch {
+    await cacheSet(cacheKey, empty, TTL.FUNDAMENTALS);
     return empty;
   }
 }
