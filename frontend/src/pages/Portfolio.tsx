@@ -1,170 +1,362 @@
-import { useState, useMemo } from 'react';
-import { CandlestickChart } from '../components/charts/CandlestickChart';
+import { useState } from 'react';
+import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
-import type { OHLCVBar } from '../types';
+import { PortfolioChart } from '../components/charts/PortfolioChart';
+import { getTickerName } from '../data/tickerNames';
+import type { Trade } from '../types';
 
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
 }
 
-const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'BTC', 'ETH', 'SOL'];
+const CLOSE_REASON_ICONS: Record<string, string> = {
+  TP: '✓',
+  SL: '✗',
+  MANUAL: '⊘',
+  STRUCTURE_BREAK: '⊗',
+  CIRCUIT_BREAKER: '🚨',
+};
 
-function BigCandles({ candles }: { candles: { o: number; h: number; l: number; c: number }[] }) {
-  const w = 1000, h = 360, pad = 28;
-  const min = Math.min(...candles.map((c) => c.l));
-  const max = Math.max(...candles.map((c) => c.h));
-  const r = max - min || 1;
-  const cw = (w - pad * 2) / candles.length;
-  const ys = (v: number) => pad + (1 - (v - min) / r) * (h - pad * 2);
-  const ma20 = candles.map((_, i) => {
-    const slice = candles.slice(Math.max(0, i - 19), i + 1);
-    return slice.reduce((a, c) => a + c.c, 0) / slice.length;
-  });
+const CLOSE_REASON_LABELS: Record<string, string> = {
+  TP: 'Objectif atteint',
+  SL: 'Stop-loss déclenché',
+  MANUAL: 'Fermeture manuelle',
+  CIRCUIT_BREAKER: 'Circuit breaker',
+};
+
+function PositionCard({ position, signal }: {
+  position: {
+    ticker: string;
+    quantity: number;
+    entryPrice: number;
+    currentPrice: number;
+    sizeUsd: number;
+    pnlUsd: number;
+    pnlPct: number;
+    stopLoss: number;
+    takeProfit: number;
+  };
+  signal?: { debate_score: number; bull_conviction: number; bear_conviction: number; confidence: number; reasoning: string } | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const pnlPositive = position.pnlUsd >= 0;
+  const riskAmount = position.entryPrice - position.stopLoss;
+  const gainAmount = position.takeProfit - position.entryPrice;
+  const rr = riskAmount > 0 ? (gainAmount / riskAmount).toFixed(1) : '—';
+
+  const currentGain = position.currentPrice - position.entryPrice;
+  const trailingStatus = riskAmount > 0 ? (
+    currentGain >= 2 * riskAmount ? 'Profit verrouillé (+1R)' :
+    currentGain >= riskAmount ? 'Stop au break-even' :
+    'Stop initial'
+  ) : null;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
-      {[0.2, 0.4, 0.6, 0.8].map((p) => (
-        <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="var(--rule)" strokeWidth="1" strokeDasharray="2 4" />
-      ))}
-      {candles.map((c, i) => {
-        const up = c.c >= c.o;
-        const x = pad + i * cw + cw / 2;
-        const color = up ? 'var(--accent)' : 'var(--danger)';
-        return (
-          <g key={i}>
-            <line x1={x} x2={x} y1={ys(c.h)} y2={ys(c.l)} stroke={color} strokeWidth="1" />
-            <rect x={x - cw * 0.32} y={ys(Math.max(c.o, c.c))} width={cw * 0.64} height={Math.max(1, Math.abs(ys(c.o) - ys(c.c)))} fill={color} />
-          </g>
-        );
-      })}
-      <polyline points={ma20.map((v, i) => `${pad + i * cw + cw / 2},${ys(v)}`).join(' ')} fill="none" stroke="var(--info)" strokeWidth="1.5" opacity="0.8" />
-      {[min, (min + max) / 2, max].map((v, i) => (
-        <text key={i} x={w - pad + 4} y={ys(v) + 3} fill="var(--ink-3)" fontFamily="var(--mono)" fontSize="9">${v.toFixed(2)}</text>
-      ))}
-    </svg>
+    <div className="card" style={{ borderLeft: `3px solid ${pnlPositive ? 'var(--accent)' : 'var(--danger)'}` }}>
+      <div
+        style={{ padding: 16, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{position.ticker}</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{getTickerName(position.ticker)}</span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+              {position.quantity.toFixed(4)} actions @ ${position.entryPrice.toFixed(2)}
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <div style={{ textAlign: 'right' }}>
+            <p className="label" style={{ marginBottom: 2 }}>P&L</p>
+            <p className={`mono ${pnlPositive ? 'up' : 'down'}`} style={{ fontWeight: 600, fontSize: 14 }}>
+              {pnlPositive ? '+' : ''}${position.pnlUsd.toFixed(2)}
+            </p>
+            <p className={`mono ${pnlPositive ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
+              {pnlPositive ? '+' : ''}{position.pnlPct.toFixed(2)}%
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p className="label" style={{ marginBottom: 2 }}>Prix actuel</p>
+            <p className="mono" style={{ fontSize: 14 }}>${position.currentPrice.toFixed(2)}</p>
+          </div>
+          <span style={{ color: 'var(--ink-4)', fontSize: 14, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--rule)' }}>
+          {/* Progression Stop/TP */}
+          <div style={{ marginTop: 16 }}>
+            <p className="label">Progression du trade</p>
+            <div style={{ position: 'relative', height: 24, background: 'var(--bg-elev-2)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, height: '100%',
+                background: 'var(--danger-soft)',
+                width: `${(riskAmount / (riskAmount + gainAmount)) * 100}%`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--danger)' }}>Stop ${position.stopLoss.toFixed(0)}</span>
+              </div>
+              <div style={{
+                position: 'absolute', right: 0, top: 0, height: '100%',
+                background: 'var(--accent-soft)',
+                width: `${(gainAmount / (riskAmount + gainAmount)) * 100}%`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--accent)' }}>TP ${position.takeProfit.toFixed(0)}</span>
+              </div>
+              {(() => {
+                const range = position.takeProfit - position.stopLoss;
+                const pos = ((position.currentPrice - position.stopLoss) / range) * 100;
+                const clamped = Math.max(2, Math.min(98, pos));
+                return <div style={{ position: 'absolute', top: 0, height: '100%', width: 2, background: '#fff', left: `${clamped}%` }} />;
+              })()}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>R/R : 1:{rr}</span>
+              {trailingStatus && <span className="mono" style={{ fontSize: 10, color: 'var(--warn)' }}>{trailingStatus}</span>}
+              <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>Investi : ${position.sizeUsd.toFixed(0)}</span>
+            </div>
+          </div>
+
+          {/* Raisonnement IA */}
+          {signal && (
+            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6 }}>
+              <p className="label" style={{ marginBottom: 8 }}>Pourquoi ce trade ?</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--accent)', fontSize: 14 }}>🟢</span>
+                  <div>
+                    <p style={{ fontSize: 10, color: 'var(--ink-3)' }}>Camp haussier</p>
+                    <p className="mono up" style={{ fontSize: 13, fontWeight: 600 }}>{signal.bull_conviction}/10</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--danger)', fontSize: 14 }}>🔴</span>
+                  <div>
+                    <p style={{ fontSize: 10, color: 'var(--ink-3)' }}>Camp baissier</p>
+                    <p className="mono down" style={{ fontSize: 13, fontWeight: 600 }}>{signal.bear_conviction}/10</p>
+                  </div>
+                </div>
+              </div>
+              {signal.reasoning && (
+                <p style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, borderTop: '1px solid var(--rule)', paddingTop: 8, marginTop: 8 }}>
+                  {signal.reasoning}
+                </p>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>Confiance IA :</span>
+                <div style={{ flex: 1, height: 4, background: 'var(--rule)', borderRadius: 2 }}>
+                  <div style={{ height: 4, borderRadius: 2, background: 'var(--accent)', width: `${signal.confidence}%` }} />
+                </div>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--accent)' }}>{signal.confidence}%</span>
+              </div>
+            </div>
+          )}
+
+          {!signal && (
+            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6 }}>
+              <p style={{ fontSize: 11, color: 'var(--ink-3)' }}>Raisonnement IA non disponible pour ce cycle (trade d'un cycle précédent).</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-function VolBars({ candles }: { candles: { v: number; c: number; o: number }[] }) {
-  const w = 1000, h = 60, pad = 28;
-  const max = Math.max(...candles.map((c) => c.v));
-  const cw = (w - pad * 2) / candles.length;
+function TradeRow({ trade }: { trade: Trade }) {
+  const pnlPositive = (trade.pnlUsd || 0) >= 0;
+  const icon = trade.closeReason ? CLOSE_REASON_ICONS[trade.closeReason] || '?' : '?';
+  const reasonLabel = trade.closeReason ? CLOSE_REASON_LABELS[trade.closeReason] || trade.closeReason : '?';
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
-      {candles.map((c, i) => {
-        const up = c.c >= c.o;
-        const bh = (c.v / max) * (h - 8);
-        return <rect key={i} x={pad + i * cw + cw * 0.18} y={h - bh - 4} width={cw * 0.64} height={bh} fill={up ? 'var(--accent)' : 'var(--danger)'} opacity="0.5" />;
-      })}
-    </svg>
+    <tr style={{ borderBottom: '1px solid var(--rule)' }}>
+      <td className="mono" style={{ padding: '10px 12px', fontWeight: 600, fontSize: 12 }}>{trade.ticker}</td>
+      <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--ink-3)' }}>{getTickerName(trade.ticker)}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>${trade.filledPrice.toFixed(2)}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>${trade.closePrice?.toFixed(2) || '—'}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>{trade.quantity.toFixed(4)}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: pnlPositive ? 'var(--accent)' : 'var(--danger)' }}>
+        {pnlPositive ? '+' : ''}${(trade.pnlUsd || 0).toFixed(2)}
+      </td>
+      <td style={{ padding: '10px 12px' }}>
+        <span
+          className="mono"
+          title={reasonLabel}
+          style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4,
+            color: trade.closeReason === 'TP' ? 'var(--accent)' : trade.closeReason === 'SL' ? 'var(--danger)' : 'var(--warn)',
+            background: trade.closeReason === 'TP' ? 'var(--accent-soft)' : trade.closeReason === 'SL' ? 'var(--danger-soft)' : 'var(--warn-soft)',
+          }}
+        >
+          {icon} {reasonLabel}
+        </span>
+      </td>
+      <td style={{ padding: '10px 12px' }}>
+        <span className="mono" style={{ fontSize: 11, color: trade.bullConviction > trade.bearConviction ? 'var(--accent)' : 'var(--danger)' }}>
+          {trade.bullConviction > trade.bearConviction ? '🟢 Haussier' : '🔴 Baissier'}
+        </span>
+      </td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 10, color: 'var(--ink-3)' }}>
+        {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString('fr-FR') : '—'}
+      </td>
+    </tr>
   );
 }
 
 export function Portfolio() {
-  const [sym, setSym] = useState('AAPL');
+  const { portfolio, history } = usePortfolioStore();
   const { signals } = useSignalsStore();
+  const [tab, setTab] = useState<'open' | 'history'>('open');
 
-  const candles = useMemo(() => {
-    const arr = [];
-    let p = 224;
-    for (let i = 0; i < 100; i++) {
-      const o = p;
-      const c = o + (Math.sin(i * 0.3) * 2.5 + (Math.random() - 0.5) * 1.6);
-      arr.push({ o, h: Math.max(o, c) + Math.random() * 1.4, l: Math.min(o, c) - Math.random() * 1.4, c, v: 800 + Math.random() * 1200 });
-      p = c;
-    }
-    return arr;
-  }, [sym]);
-
-  const last = candles[candles.length - 1].c;
-  const prev = candles[candles.length - 2].c;
-  const chg = ((last - prev) / prev) * 100;
+  const startingValue = portfolio.initial_capital || 10000;
+  const totalPnl = portfolio.total_usd - startingValue;
+  const totalPnlPct = (totalPnl / startingValue) * 100;
+  const investedUsd = portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0);
+  const unrealizedPnl = portfolio.positions.reduce((s, p) => s + p.pnlUsd, 0);
 
   return (
     <div className="page">
       <div className="flex between center" style={{ marginBottom: 22 }}>
         <div>
-          <h1 className="h1">Graphiques</h1>
+          <h1 className="h1">Portefeuille</h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
-            Cours détaillés et analyse technique sur l'actif sélectionné.
+            Suivi des positions, P&L et décisions des agents IA.
           </div>
         </div>
       </div>
 
-      {/* Symbol switcher */}
-      <div className="flex gap-2 wrap" style={{ marginBottom: 12 }}>
-        {symbols.map((s) => (
+      {/* Portfolio value + chart */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+            <div>
+              <p className="label">Valeur totale</p>
+              <p className="mono" style={{ fontSize: 28, fontWeight: 600 }}>
+                ${portfolio.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="mono" style={{ fontSize: 13, color: totalPnlPct >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%
+                {' '}({totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)})
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p className="label">Régime de risque</p>
+              <p style={{
+                fontWeight: 600, fontSize: 14,
+                color: portfolio.risk_regime === 'NORMAL' ? 'var(--accent)' :
+                       portfolio.risk_regime === 'ELEVATED' ? 'var(--warn)' : 'var(--danger)',
+              }}>
+                {portfolio.risk_regime}
+              </p>
+            </div>
+          </div>
+          <PortfolioChart history={history} startingValue={startingValue} />
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      {portfolio.positions.length > 0 && (
+        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="card">
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <p className="label">Capital investi</p>
+              <p className="mono" style={{ fontSize: 18, fontWeight: 600 }}>${investedUsd.toFixed(0)}</p>
+              <p className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                {((investedUsd / portfolio.total_usd) * 100).toFixed(1)}% du portefeuille
+              </p>
+            </div>
+          </div>
+          <div className="card">
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <p className="label">P&L non-réalisé</p>
+              <p className="mono" style={{ fontSize: 18, fontWeight: 600, color: unrealizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                {unrealizedPnl >= 0 ? '+' : ''}${unrealizedPnl.toFixed(2)}
+              </p>
+            </div>
+          </div>
+          <div className="card">
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <p className="label">Liquidités dispo</p>
+              <p className="mono" style={{ fontSize: 18, fontWeight: 600 }}>${portfolio.cash_usd.toFixed(0)}</p>
+              <p style={{ fontSize: 11, color: 'var(--ink-3)' }}>pour de nouveaux trades</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--rule)', marginBottom: 12 }}>
+        {(['open', 'history'] as const).map((t) => (
           <button
-            key={s}
-            onClick={() => setSym(s)}
+            key={t}
+            onClick={() => setTab(t)}
             style={{
-              padding: '6px 14px', fontSize: 12, fontFamily: 'var(--mono)', fontWeight: 600,
-              border: '1px solid var(--rule)',
-              background: sym === s ? 'var(--accent-soft)' : 'var(--bg-elev)',
-              color: sym === s ? 'var(--accent)' : 'var(--ink-2)',
-              borderRadius: 6, cursor: 'pointer',
+              padding: '8px 16px', fontSize: 12, fontFamily: 'var(--mono)',
+              border: 'none', background: 'none', cursor: 'pointer',
+              borderBottom: t === tab ? '2px solid var(--accent)' : '2px solid transparent',
+              color: t === tab ? 'var(--ink)' : 'var(--ink-3)',
+              fontWeight: t === tab ? 600 : 400,
             }}
           >
-            {s}
+            {t === 'open' ? `Ouvertes (${portfolio.positions.length})` : `Historique (${history.length})`}
           </button>
         ))}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 320px', gap: 12 }}>
-        <div className="card">
-          <div className="card-h">
-            <div className="flex gap-3 center">
-              <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>{sym}</span>
-              <span className="mono" style={{ fontSize: 22 }}>${last.toFixed(2)}</span>
-              <span className={`badge ${chg >= 0 ? 'badge-up' : 'badge-down'}`}>{chg >= 0 ? '+' : ''}{chg.toFixed(2)}%</span>
+      {/* Open positions */}
+      {tab === 'open' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {portfolio.positions.length === 0 ? (
+            <div className="card">
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+                Aucune position ouverte — le système IA attend les prochaines opportunités
+              </div>
             </div>
-            <div className="flex gap-2">
-              {['1m', '5m', '15m', '1h', '4h', '1d', '1w'].map((tf, i) => (
-                <button key={tf} style={{ padding: '4px 10px', fontSize: 11, fontFamily: 'var(--mono)', border: '1px solid var(--rule)', background: i === 5 ? 'var(--accent-soft)' : 'transparent', color: i === 5 ? 'var(--accent)' : 'var(--ink-3)', borderRadius: 4, cursor: 'pointer' }}>{tf}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ padding: 16, height: 380 }}>
-            <BigCandles candles={candles} />
-          </div>
-          <div className="card-h" style={{ borderTop: '1px solid var(--rule)', borderBottom: 'none' }}>
-            <span className="eyebrow">Volume</span>
-            <span className="card-h-meta">moyenne 20j : 1.2k</span>
-          </div>
-          <div style={{ padding: '8px 16px 16px', height: 80 }}>
-            <VolBars candles={candles} />
-          </div>
+          ) : (
+            portfolio.positions.map((p) => {
+              const signal = signals.find((s) => s.ticker === p.ticker) || null;
+              return <PositionCard key={p.ticker} position={p} signal={signal} />;
+            })
+          )}
         </div>
+      )}
 
-        {/* Side panel */}
-        <div className="flex col gap-3">
-          <div className="card">
-            <div className="card-h"><div className="card-h-title">Contexte de marché</div></div>
-            <div style={{ padding: 16 }}>
-              {[
-                ['Tendance 4h', 'Haussière', 'var(--accent)'],
-                ['RSI 14', '58.2', 'var(--ink)'],
-                ['MACD', '+0.84', 'var(--accent)'],
-                ['Volatilité 20j', '18.4%', 'var(--warn)'],
-                ['Support', '$226.50', 'var(--ink)'],
-                ['Résistance', '$240.00', 'var(--ink)'],
-              ].map(([k, v, c], i) => (
-                <div key={k as string} className="flex between" style={{ padding: '10px 0', borderTop: i > 0 ? '1px solid var(--rule)' : 'none', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{k as string}</span>
-                  <span className="mono" style={{ fontSize: 13, color: c as string, fontWeight: 500 }}>{v as string}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-h"><div className="card-h-title">Analyse en cours</div></div>
-            <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>Modérateur</div>
-              <p style={{ marginBottom: 12 }}>Setup haussier confirmé sur 4h. RSI neutre, MACD positif, volume au-dessus de la moyenne 20j.</p>
-              <p>Position recommandée : <strong style={{ color: 'var(--accent)' }}>LONG 2.4%</strong> du book. Stop suggéré <span className="mono">$226.50</span>. Cible <span className="mono">$240.00</span>.</p>
-            </div>
+      {/* Trade history */}
+      {tab === 'history' && (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--rule)' }}>
+                  {['Ticker', 'Entreprise', 'Entrée', 'Sortie', 'Qté', 'P&L', 'Résultat', 'Camp gagnant', 'Date'].map((h) => (
+                    <th key={h} style={{
+                      textAlign: 'left', padding: '8px 12px', fontSize: 10,
+                      color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em',
+                      fontWeight: 400,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {history.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>
+                      Aucun trade fermé
+                    </td>
+                  </tr>
+                ) : (
+                  history.map((t) => <TradeRow key={t.id} trade={t} />)
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

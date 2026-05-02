@@ -6,7 +6,7 @@ const NAV = [
   { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
   { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
-  { id: 'portfolio' as Page, label: 'Graphiques', sub: 'Cours & analyse', icon: IcChart },
+  { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },
   { id: 'config' as Page, label: 'Configuration', sub: 'Stratégie & système', icon: IcConfig },
 ];
 
