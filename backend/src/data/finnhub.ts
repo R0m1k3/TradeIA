@@ -69,6 +69,54 @@ export async function getSentiment(ticker: string): Promise<MarketSentiment> {
   }
 }
 
+export interface EarningsEvent {
+  symbol: string;
+  date: string;      // 'YYYY-MM-DD'
+  epsEstimate: number | null;
+  revenueEstimate: number | null;
+}
+
+/** Retourne les earnings dans les 7 prochains jours */
+export async function getUpcomingEarnings(watchlist: string[]): Promise<Record<string, EarningsEvent>> {
+  const cacheKey = 'finnhub:earnings_calendar';
+  const cached = await cacheGet<Record<string, EarningsEvent>>(cacheKey);
+  if (cached) return cached;
+
+  const result: Record<string, EarningsEvent> = {};
+
+  try {
+    const from = new Date().toISOString().slice(0, 10);
+    const to = new Date(Date.now() + 7 * 86400 * 1000).toISOString().slice(0, 10);
+    const data = await finnhubGet('/calendar/earnings', { from, to }) as {
+      earningsCalendar?: Array<{
+        symbol: string;
+        date: string;
+        epsEstimate: number | null;
+        revenueEstimate: number | null;
+      }>;
+    };
+
+    const calendar = data.earningsCalendar || [];
+    const watchSet = new Set(watchlist.map((t) => t.toUpperCase()));
+
+    for (const event of calendar) {
+      if (watchSet.has(event.symbol?.toUpperCase())) {
+        result[event.symbol] = {
+          symbol: event.symbol,
+          date: event.date,
+          epsEstimate: event.epsEstimate ?? null,
+          revenueEstimate: event.revenueEstimate ?? null,
+        };
+      }
+    }
+  } catch (err) {
+    console.error('[Finnhub] getUpcomingEarnings error:', err);
+  }
+
+  await cacheSet(cacheKey, result, TTL.EARNINGS);
+  return result;
+}
+
 export async function getMarketContext(): Promise<{
   vix: number;
   fear_greed: number;

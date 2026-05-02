@@ -41,6 +41,47 @@ const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
     });
     return cycles;
   });
+
+  fastify.get('/ai-performance', async () => {
+    try {
+      const all = await (prisma as any).agentPrediction.findMany({
+        where: { resolvedAt: { not: null } },
+      });
+
+      if (all.length === 0) {
+        return { total: 0, resolved: 0, correct: 0, win_rate: 0, by_direction: { BUY: { total: 0, correct: 0 }, SELL: { total: 0, correct: 0 }, HOLD: { total: 0, correct: 0 } } };
+      }
+
+      const byDir: Record<string, { total: number; correct: number }> = {
+        BUY: { total: 0, correct: 0 },
+        SELL: { total: 0, correct: 0 },
+        HOLD: { total: 0, correct: 0 },
+      };
+
+      let correctTotal = 0;
+      for (const p of all) {
+        const dir = p.predictedDirection as string;
+        if (!byDir[dir]) byDir[dir] = { total: 0, correct: 0 };
+        byDir[dir].total++;
+        if (p.correct) {
+          byDir[dir].correct++;
+          correctTotal++;
+        }
+      }
+
+      const totalAll = await (prisma as any).agentPrediction.count();
+
+      return {
+        total: totalAll,
+        resolved: all.length,
+        correct: correctTotal,
+        win_rate: all.length > 0 ? (correctTotal / all.length) * 100 : 0,
+        by_direction: byDir,
+      };
+    } catch {
+      return { total: 0, resolved: 0, correct: 0, win_rate: 0, by_direction: { BUY: { total: 0, correct: 0 }, SELL: { total: 0, correct: 0 }, HOLD: { total: 0, correct: 0 } } };
+    }
+  });
 };
 
 export default portfolioRoutes;

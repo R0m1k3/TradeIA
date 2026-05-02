@@ -53,3 +53,23 @@ model CycleLog {
 
   @@index([createdAt])
 }
+
+model AgentPrediction {
+  id                 String    @id @default(uuid())
+  cycleId            String
+  ticker             String
+  predictedDirection String    // 'BUY' | 'SELL' | 'HOLD'
+  confidence         Int
+  debateScore        Int
+  bullConviction     Int
+  bearConviction     Int
+  priceAtPrediction  Float
+  actualReturn5d     Float?    // rempli 5 jours après
+  correct            Boolean?  // basé sur actualReturn5d vs predictedDirection
+  resolvedAt         DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([ticker])
+  @@index([createdAt])
+  @@index([resolvedAt])
+}

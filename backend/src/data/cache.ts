@@ -36,6 +36,9 @@ export const TTL = {
   NEWS: 1800,
   OPTIONS: 3600,
   MARKET_CONTEXT: 300,
+  MACRO: 3600,       // FRED data — rafraîchi toutes les heures
+  SECTOR: 300,       // Biais sectoriels — même cadence que marché
+  EARNINGS: 21600,   // Calendrier earnings — 6h
 } as const;
 
 export { redis };

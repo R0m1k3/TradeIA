@@ -101,10 +101,31 @@ export async function markToMarket(): Promise<void> {
     const currentPrice = await getCurrentPrice(trade.ticker);
     if (!currentPrice) continue;
 
-    const pnlUsd = (currentPrice - trade.filledPrice) * trade.quantity;
+    // Trailing stop logic — déplacer le stop selon progression
+    const riskDistance = trade.filledPrice - trade.stopLoss;
+    const gain = currentPrice - trade.filledPrice;
+    let newStop = trade.stopLoss;
 
-    // Check stop loss
-    if (currentPrice <= trade.stopLoss) {
+    if (riskDistance > 0) {
+      if (gain >= 2 * riskDistance) {
+        // +2R atteint → stop à +1R (lock profit)
+        newStop = Math.max(trade.stopLoss, trade.filledPrice + riskDistance);
+      } else if (gain >= riskDistance) {
+        // +1R atteint → stop au break-even
+        newStop = Math.max(trade.stopLoss, trade.filledPrice);
+      }
+
+      if (newStop > trade.stopLoss) {
+        await prisma.trade.update({
+          where: { id: trade.id },
+          data: { stopLoss: newStop },
+        });
+        console.log(`[Broker] Trailing stop ${trade.ticker}: ${trade.stopLoss.toFixed(2)} → ${newStop.toFixed(2)}`);
+      }
+    }
+
+    // Check stop loss (against updated stop)
+    if (currentPrice <= newStop) {
       await closeTrade(trade.id, currentPrice, 'SL');
       continue;
     }
@@ -164,7 +185,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
     where: { closedAt: { gte: today }, pnlUsd: { not: null } },
   });
 
-  const dailyPnl = todayTrades.reduce((sum, t) => sum + (t.pnlUsd || 0), 0);
+  const realizedDailyPnl = todayTrades.reduce((sum, t) => sum + (t.pnlUsd || 0), 0);
 
   // Calculate realized P&L from all closed trades to get actual capital
   const closedTrades = await prisma.trade.findMany({ where: { closedAt: { not: null }, pnlUsd: { not: null } } });
@@ -191,6 +212,10 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
       };
     })
   );
+
+  // P&L journalier = trades fermés aujourd'hui + unrealized sur positions ouvertes
+  const unrealizedPnl = positions.reduce((s, p) => s + p.pnlUsd, 0);
+  const dailyPnl = realizedDailyPnl + unrealizedPnl;
 
   const totalUsd = cashUsd + positions.reduce((s, p) => s + p.sizeUsd + p.pnlUsd, 0);
   const dailyPnlPct = (dailyPnl / actualCapital) * 100;

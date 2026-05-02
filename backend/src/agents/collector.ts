@@ -2,14 +2,18 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { getIntraday, getDaily, getFundamentals, getCurrentPrice } from '../data/alphavantage';
 import { getOptionsData, getDailyVolume } from '../data/polygon';
-import { getTickerNews, getSentiment, getMarketContext } from '../data/finnhub';
+import { getTickerNews, getSentiment, getMarketContext, getUpcomingEarnings } from '../data/finnhub';
 import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../data/yahoo';
-import { computeIndicators, compute4HBias, compute15mSignal, computeTradeType, computeLevels, type IndicatorValues } from '../data/indicators';
+import { computeIndicators, type IndicatorValues } from '../data/indicators';
+import { getMacroData, type MacroData } from '../data/fred';
+import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
 import { buildCollectorPrompt, COLLECTOR_SYSTEM } from '../prompts/collector.prompt';
 
 export interface TickerData {
   data_quality: 'ok' | 'stale' | 'partial' | 'missing';
   earnings_blackout: boolean;
+  upcoming_earnings?: unknown;
+  sector?: string;
   current_price: number;
   ohlcv_15m: unknown[];
   ohlcv_1h: unknown[];
@@ -29,6 +33,8 @@ export interface CollectorOutput {
     fear_greed: number;
     nasdaq_direction: string;
     fed_next_meeting: string;
+    macro: MacroData;
+    sector_biases: Record<string, SectorBias>;
   };
   collected_at: string;
 }
@@ -104,7 +110,17 @@ export class CollectorAgent {
     console.log(`[Collector] Fetching data for: ${watchlist.join(', ')}`);
 
     try {
-      const market = await getMarketContext();
+      // Données marché + macro + secteurs + earnings en parallèle
+      const [market, macro, sectorBiases, earningsCalendar] = await Promise.all([
+        getMarketContext(),
+        getMacroData(),
+        getSectorBiases(),
+        getUpcomingEarnings(watchlist),
+      ]);
+
+      console.log(`[Collector] Macro: ${macro.summary}`);
+      console.log(`[Collector] Earnings à venir: ${Object.keys(earningsCalendar).join(', ') || 'aucun'}`);
+
       const rawData: Record<string, unknown> = {};
 
       await Promise.all(
@@ -140,10 +156,21 @@ export class CollectorAgent {
               ohlcv4h as any[],
             );
 
-            const earningsDate = (funds as { earnings_date?: string | null })?.earnings_date;
-            const earningsBlackout = earningsDate
-              ? Math.abs(new Date(earningsDate).getTime() - Date.now()) < 48 * 3600 * 1000
-              : false;
+            // Earnings blackout: soit depuis le calendrier Finnhub (fiable), soit depuis les fundamentals
+            const upcomingEarning = earningsCalendar[ticker];
+            let earningsBlackout = false;
+            if (upcomingEarning) {
+              const earningsTs = new Date(upcomingEarning.date).getTime();
+              const hoursUntil = (earningsTs - Date.now()) / 3600000;
+              earningsBlackout = hoursUntil >= -24 && hoursUntil <= 48; // 24h après jusqu'à 48h avant
+            } else {
+              const earningsDate = (funds as { earnings_date?: string | null })?.earnings_date;
+              earningsBlackout = earningsDate
+                ? Math.abs(new Date(earningsDate).getTime() - Date.now()) < 48 * 3600 * 1000
+                : false;
+            }
+
+            const sector = getTickerSector(ticker);
 
             let quality: 'ok' | 'stale' | 'partial' | 'missing' = 'ok';
             if (!p || ohlcv15.length === 0) quality = 'missing';
@@ -152,6 +179,8 @@ export class CollectorAgent {
             rawData[ticker] = {
               data_quality: quality,
               earnings_blackout: earningsBlackout,
+              upcoming_earnings: upcomingEarning || null,
+              sector,
               current_price: p || 0,
               ohlcv_15m: ohlcv15,
               ohlcv_1h: ohlcv1h,
@@ -189,19 +218,34 @@ export class CollectorAgent {
         const models = await getModels();
         const response = await callLLM('collector', models.LIGHT, COLLECTOR_SYSTEM, prompt);
         const parsed = parseJsonResponse<CollectorOutput>(response.content);
-        // Merge locally-computed indicators into LLM output (LLM may miss things)
+        // Merge locally-computed indicators + metadata into LLM output
         for (const ticker of Object.keys(rawData)) {
-          const localIndicators = (rawData[ticker] as any).indicators as IndicatorValues | null;
-          if (localIndicators && parsed.tickers?.[ticker]) {
-            parsed.tickers[ticker].indicators = localIndicators;
+          const local = rawData[ticker] as any;
+          if (parsed.tickers?.[ticker]) {
+            if (local.indicators) parsed.tickers[ticker].indicators = local.indicators;
+            if (local.upcoming_earnings) parsed.tickers[ticker].upcoming_earnings = local.upcoming_earnings;
+            if (local.sector) parsed.tickers[ticker].sector = local.sector;
+            if (typeof local.earnings_blackout === 'boolean') parsed.tickers[ticker].earnings_blackout = local.earnings_blackout;
           }
         }
+        parsed.market = {
+          ...parsed.market,
+          macro,
+          sector_biases: sectorBiases,
+        };
         return parsed;
       } catch (err) {
         console.warn('[Collector] LLM parsing failed, using raw data with local indicators:', err);
         return {
           tickers: rawData as Record<string, TickerData>,
-          market: { vix: market.vix, fear_greed: market.fear_greed, nasdaq_direction: market.nasdaq_direction, fed_next_meeting: '' },
+          market: {
+            vix: market.vix,
+            fear_greed: market.fear_greed,
+            nasdaq_direction: market.nasdaq_direction,
+            fed_next_meeting: '',
+            macro,
+            sector_biases: sectorBiases,
+          },
           collected_at: new Date().toISOString(),
         };
       }

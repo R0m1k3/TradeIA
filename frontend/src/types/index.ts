@@ -24,6 +24,21 @@ export interface Portfolio {
   positions: Position[];
 }
 
+export interface MacroData {
+  fed_funds_rate: number | null;
+  yield_curve: number | null;
+  cpi_yoy: number | null;
+  macro_regime: 'EXPANSIF' | 'NEUTRE' | 'RESTRICTIF';
+  summary: string;
+}
+
+export interface SectorBias {
+  sector: string;
+  etf: string;
+  direction: 'bullish' | 'bearish' | 'neutral';
+  change_pct: number;
+}
+
 export interface MarketContext {
   vix: number;
   fear_greed: number;
@@ -34,6 +49,15 @@ export interface MarketContext {
     nextOpen: string;
     nextClose: string;
   };
+  macro?: MacroData;
+  sector_biases?: Record<string, SectorBias>;
+}
+
+export interface AgentTimelineEvent {
+  agent: string;
+  status: 'running' | 'ok' | 'error';
+  timestamp: string;
+  label: string;
 }
 
 export interface SignalItem {
