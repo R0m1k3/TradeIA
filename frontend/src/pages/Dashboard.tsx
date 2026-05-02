@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
+import { useConfigStore } from '../store/config.store';
 import { KpiCard } from '../components/cards/KpiCard';
 import { SignalFeed } from '../components/cards/SignalFeed';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
@@ -30,6 +31,98 @@ const AGENT_ICONS: Record<string, string> = {
 
 interface DashboardProps {
   onNavigate: (page: Page) => void;
+}
+
+function SetupGuide({ onGoConfig }: { onGoConfig: () => void }) {
+  const { secretsConfigured } = useConfigStore();
+  const { signals } = useSignalsStore();
+  const [dismissed, setDismissed] = useState(false);
+
+  const hasLLM = secretsConfigured.openrouter_api_key;
+  const hasMarketData = secretsConfigured.alpha_vantage_key || secretsConfigured.polygon_key || secretsConfigured.finnhub_key;
+  const hasRun = signals.length > 0;
+
+  if (dismissed || (hasLLM && hasRun)) return null;
+
+  const steps = [
+    {
+      done: hasLLM,
+      num: 1,
+      title: 'Clé API OpenRouter',
+      desc: 'Nécessaire pour activer les agents IA. Créez un compte gratuit sur openrouter.ai puis collez votre clé dans Configuration.',
+      action: !hasLLM ? onGoConfig : undefined,
+      actionLabel: 'Aller à Configuration →',
+    },
+    {
+      done: hasMarketData,
+      num: 2,
+      title: 'Données de marché (optionnel)',
+      desc: 'Alpha Vantage, Polygon ou Finnhub enrichissent l\'analyse. Sans clé, Yahoo Finance est utilisé en fallback.',
+      action: !hasMarketData ? onGoConfig : undefined,
+      actionLabel: 'Configurer →',
+    },
+    {
+      done: hasRun,
+      num: 3,
+      title: 'Lancer la première analyse',
+      desc: 'Une fois configuré, cliquez sur "Forcer l\'analyse IA" ci-dessous. Les agents analyseront chaque action de votre liste.',
+      action: undefined,
+      actionLabel: undefined,
+    },
+  ];
+
+  const doneCount = steps.filter((s) => s.done).length;
+
+  return (
+    <div className="bg-bg-surface border border-accent-blue/30 rounded-lg p-4 relative">
+      <button
+        onClick={() => setDismissed(true)}
+        className="absolute top-3 right-3 text-text-secondary hover:text-text-primary text-lg leading-none"
+        title="Fermer"
+      >
+        ×
+      </button>
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-2xl">🚀</span>
+        <div>
+          <h3 className="font-syne font-bold text-sm text-text-primary">Bienvenue sur TradeIA — Guide de démarrage</h3>
+          <p className="text-[10px] text-text-secondary">{doneCount}/3 étapes complétées</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          {steps.map((s) => (
+            <div
+              key={s.num}
+              className={`w-6 h-1.5 rounded-full ${s.done ? 'bg-accent-green' : 'bg-border'}`}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {steps.map((step) => (
+          <div
+            key={step.num}
+            className={`rounded p-3 border ${step.done ? 'border-accent-green/20 bg-accent-green/5' : 'border-border bg-bg-elevated'}`}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold font-mono ${step.done ? 'bg-accent-green text-bg-base' : 'bg-border text-text-secondary'}`}>
+                {step.done ? '✓' : step.num}
+              </span>
+              <span className={`text-xs font-semibold ${step.done ? 'text-accent-green' : 'text-text-primary'}`}>{step.title}</span>
+            </div>
+            <p className="text-[10px] text-text-secondary leading-relaxed">{step.desc}</p>
+            {step.action && (
+              <button
+                onClick={step.action}
+                className="mt-2 text-[10px] font-mono text-accent-blue hover:underline"
+              >
+                {step.actionLabel}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
@@ -279,7 +372,7 @@ function NasdaqStatusCard({ market }: { market: ReturnType<typeof useSignalsStor
   );
 }
 
-export function Dashboard({ onNavigate: _ }: DashboardProps) {
+export function Dashboard({ onNavigate }: DashboardProps) {
   const { portfolio } = usePortfolioStore();
   const { signals, market, agents, cycleTimeline } = useSignalsStore();
   const [selectedTicker, setSelectedTicker] = useState('AAPL');
@@ -345,6 +438,9 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
           )}
         </button>
       </div>
+
+      {/* Setup guide — visible until configured + first cycle run */}
+      <SetupGuide onGoConfig={() => onNavigate('config')} />
 
       {/* NASDAQ Status */}
       <NasdaqStatusCard market={market} />

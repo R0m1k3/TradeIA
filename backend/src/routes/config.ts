@@ -9,9 +9,11 @@ const KEYS_TO_INVALIDATE = new Set([
   'alpha_vantage_key',
   'polygon_key',
   'finnhub_key',
+  'fred_api_key',
   'ollama_base_url',
   'portfolio_usd',
   'daily_loss_limit_pct',
+  'max_drawdown_pct',
   // Model keys — invalidating cache ensures agents pick up new models on next cycle
   'model_light',
   'model_mid',
@@ -27,7 +29,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const c of configs) {
       if (KEYS_TO_INVALIDATE.has(c.key)) {
-        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key'].includes(c.key)) {
+        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key'].includes(c.key)) {
           secretsConfigured[c.key] = c.value.length > 0;
         } else {
           result[c.key] = c.value;
@@ -38,7 +40,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Ensure all sensitive keys appear in secrets_configured
-    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key']) {
+    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key']) {
       if (!(key in secretsConfigured)) secretsConfigured[key] = false;
     }
 
@@ -52,6 +54,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       watchlist: result.watchlist || process.env.WATCHLIST || '',
       portfolio_usd: result.portfolio_usd || process.env.PORTFOLIO_USD || '',
       daily_loss_limit_pct: result.daily_loss_limit_pct || process.env.DAILY_LOSS_LIMIT_PCT || '',
+      max_drawdown_pct: result.max_drawdown_pct || '10',
       mock_broker: result.mock_broker || process.env.MOCK_BROKER || '',
       secrets_configured: secretsConfigured,
     };
