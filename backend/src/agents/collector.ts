@@ -8,6 +8,7 @@ import { getSectorBiases, getTickerSector, type SectorBias } from '../data/secto
 import { getTickerTweets, getFinancialSentimentTweets, type TweetData } from '../data/twitter';
 import { getTickerRedditPosts, getFinanceRedditPosts, type RedditPost } from '../data/reddit';
 import { getTickerStockTwits, getTrendingStockTwits, type StockTwitsMessage } from '../data/stocktwits';
+import { getFinanceNews, getTickerNewsRSS, type NewsItem } from '../data/news-rss';
 
 // Track tickers where AlphaVantage consistently returns insufficient data
 // so we skip it and go straight to Yahoo on subsequent cycles
@@ -31,6 +32,7 @@ export interface TickerData {
   tweets: TweetData[];
   reddit: RedditPost[];
   stocktwits: StockTwitsMessage[];
+  rss_news: NewsItem[];
 }
 
 export interface CollectorOutput {
@@ -46,6 +48,7 @@ export interface CollectorOutput {
   financial_tweets: TweetData[];
   reddit_trending: RedditPost[];
   stocktwits_trending: StockTwitsMessage[];
+  finance_rss_news: NewsItem[];
   collected_at: string;
 }
 
@@ -140,7 +143,7 @@ export class CollectorAgent {
 
     try {
       // Données marché + macro + secteurs + earnings + tweets financiers en parallèle
-      const [market, macro, sectorBiases, earningsCalendar, financialTweets, redditTrending, stocktwitsTrending] = await Promise.all([
+      const [market, macro, sectorBiases, earningsCalendar, financialTweets, redditTrending, stocktwitsTrending, financeRSS] = await Promise.all([
         getMarketContext(),
         getMacroData(),
         getSectorBiases(),
@@ -148,6 +151,7 @@ export class CollectorAgent {
         getFinancialSentimentTweets(),
         getFinanceRedditPosts(),
         getTrendingStockTwits(),
+        getFinanceNews(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -158,7 +162,7 @@ export class CollectorAgent {
       await Promise.all(
         watchlist.map(async (ticker) => {
           try {
-            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets, reddit, stocktwits] =
+            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets, reddit, stocktwits, rssNews] =
               await Promise.allSettled([
                 fetchOHLCV(ticker),
                 fetchPrice(ticker),
@@ -170,6 +174,7 @@ export class CollectorAgent {
                 getTickerTweets(ticker),
                 getTickerRedditPosts(ticker),
                 getTickerStockTwits(ticker),
+                getTickerNewsRSS(ticker),
               ]);
 
             const bars_15m = resolve(ohlcvData, { bars_15m: [], bars_1h: [], bars_4h: [] } as any);
@@ -182,6 +187,7 @@ export class CollectorAgent {
             const tweetData = resolve(tweets, []);
             const redditData = resolve(reddit, []);
             const stocktwitsData = resolve(stocktwits, []);
+            const rssNewsData = resolve(rssNews, []);
 
             const ohlcv15 = (bars_15m as any).bars_15m || [];
             const ohlcv1h = (bars_15m as any).bars_1h || [];
@@ -231,6 +237,7 @@ export class CollectorAgent {
               tweets: tweetData,
               reddit: redditData,
               stocktwits: stocktwitsData,
+              rss_news: rssNewsData,
               indicators,
             };
           } catch (err) {
@@ -250,6 +257,7 @@ export class CollectorAgent {
               tweets: [],
               reddit: [],
               stocktwits: [],
+              rss_news: [],
               indicators: null,
             };
           }
@@ -273,6 +281,7 @@ export class CollectorAgent {
         financial_tweets: financialTweets,
         reddit_trending: redditTrending,
         stocktwits_trending: stocktwitsTrending,
+        finance_rss_news: financeRSS,
         collected_at: new Date().toISOString(),
       };
     } catch (err) {

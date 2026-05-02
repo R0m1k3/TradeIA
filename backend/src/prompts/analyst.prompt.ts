@@ -94,6 +94,7 @@ export function buildAnalystPrompt(data: {
   tweets?: unknown[];
   reddit?: unknown[];
   stocktwits?: unknown[];
+  rss_news?: unknown[];
 }): string {
   const formatSocial = (items: any[], label: string) => {
     if (!items || items.length === 0) return 'N/A';
@@ -102,6 +103,14 @@ export function buildAnalystPrompt(data: {
       const hint = t.sentiment_hint || t.sentiment || 'neutral';
       const author = t.author || t.username || 'unknown';
       return `[${hint}] ${author}: ${text.slice(0, 150)}`;
+    }).join('\n');
+  };
+
+  const formatNews = (items: any[]) => {
+    if (!items || items.length === 0) return 'N/A';
+    return items.slice(0, 8).map((n: any) => {
+      const hint = n.sentiment_hint || 'neutral';
+      return `[${hint}] (${n.source || 'news'}) ${n.title?.slice(0, 120)}`;
     }).join('\n');
   };
 
@@ -135,6 +144,8 @@ TWITTER/X SIGNALS: ${formatSocial(data.tweets as any[], 'twitter')}
 REDDIT SIGNALS: ${formatSocial(data.reddit as any[], 'reddit')}
 
 STOCKTWITS SIGNALS: ${formatSocial(data.stocktwits as any[], 'stocktwits')}
+
+FRESH NEWS (RSS): ${formatNews(data.rss_news as any[])}
 
 Based on these indicators, generate your analysis. Use ATR for stop/target calculations.
 If indicators are insufficient (many nulls), set skip_reason and confidence=0.

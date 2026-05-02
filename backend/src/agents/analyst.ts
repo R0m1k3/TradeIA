@@ -54,6 +54,7 @@ export class AnalystAgent {
               tweets: data.tweets,
               reddit: data.reddit,
               stocktwits: data.stocktwits,
+              rss_news: data.rss_news,
             });
 
             const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
