@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useConfigStore } from '../store/config.store';
+import { WatchlistEditor } from '../components/controls/WatchlistEditor';
+import { OverridePanel } from '../components/controls/OverridePanel';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -27,7 +29,7 @@ function ApiKeyInput({
       <label className="label">{label}</label>
       <input
         type="password"
-        placeholder={isSet ? 'API key is set' : placeholder}
+        placeholder={isSet ? 'API key configurée' : placeholder}
         value={isSet ? '' : value}
         onChange={(e) => setValue(e.target.value)}
         onFocus={() => { setEditing(true); setValue(''); }}
@@ -38,6 +40,11 @@ function ApiKeyInput({
         }}
         className="input"
       />
+      {isSet && (
+        <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+          ✓ Configurée
+        </div>
+      )}
     </div>
   );
 }
@@ -49,11 +56,6 @@ export function Config() {
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [risk, setRisk] = useState('balanced');
-  const [llm, setLlm] = useState(config.llm_provider || 'openrouter');
-  const [auto, setAuto] = useState(config.mock_broker === 'true');
-  const [maxPos, setMaxPos] = useState(parseFloat(config.daily_loss_limit_pct || '3'));
-  const [maxRisk, setMaxRisk] = useState(parseFloat(config.max_drawdown_pct || '10'));
 
   async function fetchModels() {
     setLoadingModels(true);
@@ -99,12 +101,15 @@ export function Config() {
       const res = await fetch(`${API}/config/test-llm`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        setTestResult(`✓ ${data.message} — ${data.provider}/${data.model}`);
+        const modelsInfo = data.models_available?.length > 0
+          ? ` (${data.models_available.length} models: ${data.models_available.slice(0, 3).join(', ')}${data.models_available.length > 3 ? '...' : ''})`
+          : '';
+        setTestResult(`✓ ${data.message} — ${data.provider}/${data.model}${modelsInfo}`);
       } else {
         setTestResult(`✗ ${data.message}`);
       }
     } catch {
-      setTestResult('✗ Connection failed');
+      setTestResult('✗ Connexion échouée');
     }
     setTesting(false);
   }
@@ -118,213 +123,284 @@ export function Config() {
             Ajustez la stratégie, les agents et les paramètres système.
           </div>
         </div>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Enregistrement...' : 'Enregistrer tout'}
+        </button>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        {/* Strategy */}
+        {/* ── LLM Configuration ── */}
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              Stratégie de trading <Help tip="Définit le profil de risque global et l'agressivité des agents." />
+              IA & LLM <Help tip="Configurez votre provider IA, la clé API et les modèles utilisés par les agents." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
-            <label className="label">Profil</label>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
-              {[
-                ['prudent', 'Prudent', '+8% / -4%'],
-                ['balanced', 'Équilibré', '+18% / -9%'],
-                ['dynamic', 'Dynamique', '+32% / -18%'],
-              ].map(([k, l, t]) => (
-                <button
-                  key={k}
-                  onClick={() => setRisk(k)}
-                  style={{
-                    padding: 12, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                    border: '1.5px solid', borderColor: risk === k ? 'var(--accent)' : 'var(--rule)',
-                    background: risk === k ? 'var(--accent-soft)' : 'var(--bg-elev-2)',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: risk === k ? 'var(--accent)' : 'var(--ink)' }}>{l}</div>
-                  <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t}</div>
-                </button>
-              ))}
-            </div>
-
-            <label className="label">Univers d'actifs</label>
-            <select className="select" defaultValue="us" style={{ marginBottom: 16 }}>
-              <option value="us">Actions US (S&P 500)</option>
-              <option value="eu">Actions Europe (STOXX 600)</option>
-              <option value="crypto">Crypto majeures</option>
-              <option value="mix">Mix multi-asset</option>
+            <label className="label">Provider</label>
+            <select
+              className="select"
+              value={config.llm_provider}
+              onChange={(e) => saveConfig({ llm_provider: e.target.value })}
+              style={{ marginBottom: 16 }}
+            >
+              <option value="openrouter">OpenRouter (Cloud)</option>
+              <option value="ollama">Ollama (Local GPU)</option>
             </select>
 
-            <label className="label">Marchés autorisés</label>
-            <div className="flex wrap gap-2" style={{ marginBottom: 20 }}>
-              {['Actions', 'Crypto', 'Forex', 'Or', 'Pétrole', 'Indices'].map((m, i) => (
-                <button
-                  key={m}
-                  style={{
-                    padding: '6px 12px', fontSize: 12, fontFamily: 'var(--mono)',
-                    border: '1px solid', borderColor: i < 4 ? 'var(--accent)' : 'var(--rule)',
-                    background: i < 4 ? 'var(--accent-soft)' : 'transparent',
-                    color: i < 4 ? 'var(--accent)' : 'var(--ink-3)',
-                    borderRadius: 999, cursor: 'pointer',
-                  }}
-                >
-                  {i < 4 ? '✓ ' : ''}{m}
-                </button>
-              ))}
-            </div>
+            {config.llm_provider === 'openrouter' && (
+              <ApiKeyInput
+                label="Clé API OpenRouter"
+                configured={secretsConfigured.openrouter_api_key}
+                placeholder="sk-or-v1-..."
+                onSave={(val) => saveSecret('openrouter_api_key', val)}
+              />
+            )}
 
-            <button className="btn btn-primary" style={{ width: '100%' }}>Enregistrer la stratégie</button>
+            {config.llm_provider === 'ollama' && (
+              <div style={{ marginBottom: 12 }}>
+                <label className="label">URL Ollama</label>
+                <input
+                  type="text"
+                  placeholder="http://172.x.x.x:11434"
+                  value={config.ollama_base_url || ''}
+                  onChange={(e) => saveConfig({ ollama_base_url: e.target.value })}
+                  className="input"
+                />
+              </div>
+            )}
+
+            <label className="label">Modèle Léger <Help tip="Modèle rapide pour les tâches simples (screening, formatage)." /></label>
+            <select
+              className="select"
+              value={config.model_light}
+              onChange={(e) => saveConfig({ model_light: e.target.value })}
+              disabled={loadingModels}
+              style={{ marginBottom: 12 }}
+            >
+              {loadingModels && <option value="">Chargement...</option>}
+              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+
+            <label className="label">Modèle Intermédiaire <Help tip="Modèle équilibré pour l'analyse et la recherche." /></label>
+            <select
+              className="select"
+              value={config.model_mid}
+              onChange={(e) => saveConfig({ model_mid: e.target.value })}
+              disabled={loadingModels}
+              style={{ marginBottom: 12 }}
+            >
+              {loadingModels && <option value="">Chargement...</option>}
+              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+
+            <label className="label">Modèle Puissant <Help tip="Modèle le plus capable pour les décisions critiques et le raisonnement complexe." /></label>
+            <select
+              className="select"
+              value={config.model_strong}
+              onChange={(e) => saveConfig({ model_strong: e.target.value })}
+              disabled={loadingModels}
+              style={{ marginBottom: 16 }}
+            >
+              {loadingModels && <option value="">Chargement...</option>}
+              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button className="btn btn-ghost btn-sm" onClick={testLLM} disabled={testing}>
+                {testing ? 'Test en cours...' : 'Tester la connexion'}
+              </button>
+              {testResult && (
+                <span className="mono" style={{
+                  fontSize: 12,
+                  color: testResult.startsWith('✓') ? 'var(--accent)' : 'var(--danger)',
+                }}>
+                  {testResult}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* System */}
+        {/* ── Market Data APIs ── */}
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              Système <Help tip="Paramètres techniques de fonctionnement." />
+              API Marché <Help tip="Clés API pour les sources de données financières. Au moins une est requise." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
-            <div className="flex between center" style={{ marginBottom: 20 }}>
+            <ApiKeyInput
+              label="Alpha Vantage"
+              configured={secretsConfigured.alpha_vantage_key}
+              placeholder="Clé API"
+              onSave={(val) => saveSecret('alpha_vantage_key', val)}
+            />
+            <ApiKeyInput
+              label="Polygon.io"
+              configured={secretsConfigured.polygon_key}
+              placeholder="Clé API"
+              onSave={(val) => saveSecret('polygon_key', val)}
+            />
+            <ApiKeyInput
+              label="Finnhub"
+              configured={secretsConfigured.finnhub_key}
+              placeholder="Clé API"
+              onSave={(val) => saveSecret('finnhub_key', val)}
+            />
+            <ApiKeyInput
+              label="FRED (Macro)"
+              configured={secretsConfigured.fred_api_key}
+              placeholder="Clé gratuite sur fred.stlouisfed.org"
+              onSave={(val) => saveSecret('fred_api_key', val)}
+            />
+
+            <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+              Astuce : FRED est gratuit et fournit les données macro (taux, inflation, emploi). Alpha Vantage offre un plan gratuit limité.
+            </div>
+          </div>
+        </div>
+
+        {/* ── Risk Parameters ── */}
+        <div className="card">
+          <div className="card-h">
+            <div className="card-h-title">
+              Paramètres de risque <Help tip="Contrôlez l'exposition du portefeuille et les circuit-breakers automatiques." />
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            <label className="label">Capital initial (USD)</label>
+            <input
+              type="number"
+              value={config.portfolio_usd}
+              onChange={(e) => saveConfig({ portfolio_usd: e.target.value })}
+              className="input"
+              min={1000}
+              step={1000}
+              style={{ marginBottom: 18 }}
+            />
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="label" style={{ marginBottom: 0 }}>Limite de perte journalière</span>
+                <span className="mono" style={{ fontSize: 13, color: 'var(--warn)' }}>{config.daily_loss_limit_pct}%</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={0.5}
+                value={parseFloat(config.daily_loss_limit_pct || '3')}
+                onChange={(e) => saveConfig({ daily_loss_limit_pct: e.target.value })}
+                style={{ width: '100%', accentColor: 'var(--warn)', marginBottom: 4 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
+                <span>1%</span>
+                <span>10%</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="label" style={{ marginBottom: 0 }}>Max Drawdown (Circuit Breaker)</span>
+                <span className="mono" style={{ fontSize: 13, color: 'var(--danger)' }}>{config.max_drawdown_pct}%</span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={30}
+                step={1}
+                value={parseFloat(config.max_drawdown_pct || '10')}
+                onChange={(e) => saveConfig({ max_drawdown_pct: e.target.value })}
+                style={{ width: '100%', accentColor: 'var(--danger)', marginBottom: 4 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
+                <span>5% — conservateur</span>
+                <span>30% — permissif</span>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--ink-3)', fontStyle: 'italic', marginTop: 6 }}>
+                Si le portefeuille perd ce % depuis le capital initial → toutes positions fermées + trading suspendu 72h
+              </p>
+            </div>
+
+            <div style={{ padding: 12, background: 'var(--warn-soft)', borderRadius: 6, fontSize: 12, color: 'var(--warn)', borderLeft: '3px solid var(--warn)' }}>
+              Au-delà de 3% par trade, le drawdown peut dépasser votre seuil cible.
+            </div>
+          </div>
+        </div>
+
+        {/* ── System Settings ── */}
+        <div className="card">
+          <div className="card-h">
+            <div className="card-h-title">
+              Système <Help tip="Paramètres techniques de fonctionnement et mode d'exécution." />
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>Mode automatique</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Les agents exécutent les trades sans validation manuelle</div>
               </div>
               <button
-                onClick={() => {
-                  setAuto(!auto);
-                  saveConfig({ mock_broker: (!auto).toString() });
-                }}
+                onClick={() => saveConfig({ mock_broker: config.mock_broker === 'true' ? 'false' : 'true' })}
                 style={{
                   width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
-                  background: auto ? 'var(--accent)' : 'var(--bg-elev-2)',
+                  background: config.mock_broker === 'true' ? 'var(--accent)' : 'var(--bg-elev-2)',
                   position: 'relative', transition: 'all 0.2s',
                 }}
               >
-                <span style={{ position: 'absolute', top: 2, left: auto ? 20 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s' }} />
+                <span style={{
+                  position: 'absolute', top: 2,
+                  left: config.mock_broker === 'true' ? 20 : 2,
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s',
+                }} />
               </button>
             </div>
 
-            <label className="label">Modèle LLM <Help tip="Le modèle d'IA utilisé par les agents pour raisonner." /></label>
-            <select
-              className="select"
-              value={llm}
-              onChange={(e) => {
-                setLlm(e.target.value);
-                saveConfig({ llm_provider: e.target.value });
-              }}
-              style={{ marginBottom: 18 }}
-            >
-              <option value="openrouter">Claude Sonnet 4.5 (recommandé)</option>
-              <option value="gpt">GPT-4 Turbo</option>
-              <option value="gemini">Gemini 2.5 Pro</option>
-              <option value="ollama">Llama 3.3 70B (local)</option>
-            </select>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Mock Broker (simulation)</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Trade en mode simulé, aucun argent réel engagé</div>
+              </div>
+              <button
+                onClick={() => saveConfig({ mock_broker: config.mock_broker === 'true' ? 'false' : 'true' })}
+                style={{
+                  width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
+                  background: config.mock_broker === 'true' ? 'var(--accent)' : 'var(--bg-elev-2)',
+                  position: 'relative', transition: 'all 0.2s',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2,
+                  left: config.mock_broker === 'true' ? 20 : 2,
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s',
+                }} />
+              </button>
+            </div>
 
-            <label className="label">
-              Capital max engagé : <span className="mono" style={{ color: 'var(--ink)', textTransform: 'none' }}>{maxPos}%</span>
-            </label>
-            <input
-              type="range"
-              min="2"
-              max="20"
-              value={maxPos}
-              onChange={(e) => {
-                setMaxPos(+e.target.value);
-                saveConfig({ daily_loss_limit_pct: e.target.value });
-              }}
-              style={{ width: '100%', accentColor: 'var(--accent)', marginBottom: 18 }}
-            />
-
-            <label className="label">
-              Risque max par trade : <span className="mono" style={{ color: 'var(--ink)', textTransform: 'none' }}>{maxRisk}%</span>
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="5"
-              step="0.5"
-              value={maxRisk}
-              onChange={(e) => {
-                setMaxRisk(+e.target.value);
-                saveConfig({ max_drawdown_pct: e.target.value });
-              }}
-              style={{ width: '100%', accentColor: 'var(--accent)', marginBottom: 20 }}
-            />
-
-            <div style={{ padding: 12, background: 'var(--warn-soft)', borderRadius: 6, fontSize: 12, color: 'var(--warn)', borderLeft: '3px solid var(--warn)' }}>
-              ⚠ Au-delà de 3% par trade, le drawdown peut dépasser votre seuil cible.
+            {/* Manual Overrides */}
+            <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 16, marginTop: 8 }}>
+              <div className="card-h-title" style={{ marginBottom: 12 }}>
+                Contrôles manuels <Help tip="Bloquez un ticker, fermez une position ou forcez une action sur les signaux actifs." />
+              </div>
+              <OverridePanel />
             </div>
           </div>
         </div>
 
-        {/* Backtest */}
-        <div className="card">
+        {/* ── Watchlist ── */}
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-h">
             <div className="card-h-title">
-              Backtest <Help tip="Teste votre stratégie sur des données historiques." />
+              Watchlist <Help tip="Liste des actifs surveillés en permanence par les agents. Ajoutez ou retirez des tickers." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
-            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div>
-                <label className="label">Du</label>
-                <input className="input" type="date" defaultValue="2024-01-01" />
-              </div>
-              <div>
-                <label className="label">Au</label>
-                <input className="input" type="date" defaultValue="2026-04-28" />
-              </div>
-            </div>
-            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div>
-                <label className="label">Capital initial</label>
-                <input className="input" type="text" defaultValue="$10 000" />
-              </div>
-              <div>
-                <label className="label">Frais par trade</label>
-                <input className="input" type="text" defaultValue="0.02%" />
-              </div>
-            </div>
-            <button className="btn btn-ghost" style={{ width: '100%' }}>Lancer le backtest →</button>
-          </div>
-        </div>
-
-        {/* Watchlist */}
-        <div className="card">
-          <div className="card-h">
-            <div className="card-h-title">
-              Watchlist <Help tip="Liste des actifs surveillés en permanence par les agents." />
-            </div>
-            <button className="btn btn-ghost btn-sm">+ Ajouter</button>
-          </div>
-          <div style={{ padding: 8 }}>
-            {[
-              ['AAPL', 'Apple Inc.', 0.42],
-              ['MSFT', 'Microsoft', -0.18],
-              ['NVDA', 'Nvidia', 1.94],
-              ['TSLA', 'Tesla', -0.62],
-              ['BTC', 'Bitcoin', 0.83],
-              ['ETH', 'Ethereum', -0.24],
-            ].map(([s, n, p]) => (
-              <div key={s as string} className="flex between center" style={{ padding: '10px 12px', borderRadius: 6, fontSize: 13 }}>
-                <div className="flex gap-3 center">
-                  <span className="mono" style={{ fontWeight: 600, width: 60 }}>{s as string}</span>
-                  <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{n as string}</span>
-                </div>
-                <div className="flex gap-3 center">
-                  <span className={`mono ${(p as number) >= 0 ? 'up' : 'down'}`} style={{ fontSize: 12 }}>
-                    {(p as number) >= 0 ? '+' : ''}{(p as number).toFixed(2)}%
-                  </span>
-                  <button style={{ padding: 4, background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 14 }}>×</button>
-                </div>
-              </div>
-            ))}
+            <WatchlistEditor />
           </div>
         </div>
       </div>
