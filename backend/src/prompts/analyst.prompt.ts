@@ -92,7 +92,19 @@ export function buildAnalystPrompt(data: {
   news?: unknown[];
   sentiment?: unknown;
   tweets?: unknown[];
+  reddit?: unknown[];
+  stocktwits?: unknown[];
 }): string {
+  const formatSocial = (items: any[], label: string) => {
+    if (!items || items.length === 0) return 'N/A';
+    return items.slice(0, 5).map((t: any) => {
+      const text = t.title || t.body || t.text || '';
+      const hint = t.sentiment_hint || t.sentiment || 'neutral';
+      const author = t.author || t.username || 'unknown';
+      return `[${hint}] ${author}: ${text.slice(0, 150)}`;
+    }).join('\n');
+  };
+
   return `Analyze ${data.ticker} using the PRE-COMPUTED indicators below.
 
 Current price: $${data.current_price}
@@ -118,7 +130,11 @@ RECENT NEWS: ${data.news ? JSON.stringify(data.news) : 'N/A'}
 
 SENTIMENT: ${data.sentiment ? JSON.stringify(data.sentiment) : 'N/A'}
 
-TWITTER/X SIGNALS: ${data.tweets && data.tweets.length > 0 ? data.tweets.map((t: any) => `[${t.sentiment_hint}] @${t.author}: ${t.text}`).join('\n') : 'N/A'}
+TWITTER/X SIGNALS: ${formatSocial(data.tweets as any[], 'twitter')}
+
+REDDIT SIGNALS: ${formatSocial(data.reddit as any[], 'reddit')}
+
+STOCKTWITS SIGNALS: ${formatSocial(data.stocktwits as any[], 'stocktwits')}
 
 Based on these indicators, generate your analysis. Use ATR for stop/target calculations.
 If indicators are insufficient (many nulls), set skip_reason and confidence=0.

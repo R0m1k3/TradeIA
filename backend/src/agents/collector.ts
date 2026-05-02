@@ -6,6 +6,8 @@ import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
 import { getTickerTweets, getFinancialSentimentTweets, type TweetData } from '../data/twitter';
+import { getTickerRedditPosts, getFinanceRedditPosts, type RedditPost } from '../data/reddit';
+import { getTickerStockTwits, getTrendingStockTwits, type StockTwitsMessage } from '../data/stocktwits';
 
 // Track tickers where AlphaVantage consistently returns insufficient data
 // so we skip it and go straight to Yahoo on subsequent cycles
@@ -27,6 +29,8 @@ export interface TickerData {
   daily_volume: number | null;
   indicators: IndicatorValues | null;
   tweets: TweetData[];
+  reddit: RedditPost[];
+  stocktwits: StockTwitsMessage[];
 }
 
 export interface CollectorOutput {
@@ -40,6 +44,8 @@ export interface CollectorOutput {
     sector_biases: Record<string, SectorBias>;
   };
   financial_tweets: TweetData[];
+  reddit_trending: RedditPost[];
+  stocktwits_trending: StockTwitsMessage[];
   collected_at: string;
 }
 
@@ -134,12 +140,14 @@ export class CollectorAgent {
 
     try {
       // Données marché + macro + secteurs + earnings + tweets financiers en parallèle
-      const [market, macro, sectorBiases, earningsCalendar, financialTweets] = await Promise.all([
+      const [market, macro, sectorBiases, earningsCalendar, financialTweets, redditTrending, stocktwitsTrending] = await Promise.all([
         getMarketContext(),
         getMacroData(),
         getSectorBiases(),
         getUpcomingEarnings(watchlist),
         getFinancialSentimentTweets(),
+        getFinanceRedditPosts(),
+        getTrendingStockTwits(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -150,7 +158,7 @@ export class CollectorAgent {
       await Promise.all(
         watchlist.map(async (ticker) => {
           try {
-            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets] =
+            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets, reddit, stocktwits] =
               await Promise.allSettled([
                 fetchOHLCV(ticker),
                 fetchPrice(ticker),
@@ -160,6 +168,8 @@ export class CollectorAgent {
                 getSentiment(ticker),
                 getDailyVolume(ticker),
                 getTickerTweets(ticker),
+                getTickerRedditPosts(ticker),
+                getTickerStockTwits(ticker),
               ]);
 
             const bars_15m = resolve(ohlcvData, { bars_15m: [], bars_1h: [], bars_4h: [] } as any);
@@ -170,6 +180,8 @@ export class CollectorAgent {
             const sent = resolve(sentiment, { sentiment_score: 0, buzz_score: 0 } as any);
             const vol = resolve(daily_volume, null);
             const tweetData = resolve(tweets, []);
+            const redditData = resolve(reddit, []);
+            const stocktwitsData = resolve(stocktwits, []);
 
             const ohlcv15 = (bars_15m as any).bars_15m || [];
             const ohlcv1h = (bars_15m as any).bars_1h || [];
@@ -217,6 +229,8 @@ export class CollectorAgent {
               sentiment: sent,
               daily_volume: vol,
               tweets: tweetData,
+              reddit: redditData,
+              stocktwits: stocktwitsData,
               indicators,
             };
           } catch (err) {
@@ -234,6 +248,8 @@ export class CollectorAgent {
               sentiment: {},
               daily_volume: null,
               tweets: [],
+              reddit: [],
+              stocktwits: [],
               indicators: null,
             };
           }
@@ -255,6 +271,8 @@ export class CollectorAgent {
           sector_biases: sectorBiases,
         },
         financial_tweets: financialTweets,
+        reddit_trending: redditTrending,
+        stocktwits_trending: stocktwitsTrending,
         collected_at: new Date().toISOString(),
       };
     } catch (err) {
