@@ -1,329 +1,170 @@
-import { useState } from 'react';
-import { usePortfolioStore } from '../store/portfolio.store';
+import { useState, useMemo } from 'react';
+import { CandlestickChart } from '../components/charts/CandlestickChart';
 import { useSignalsStore } from '../store/signals.store';
-import { PortfolioChart } from '../components/charts/PortfolioChart';
-import { getTickerName } from '../data/tickerNames';
-import type { Trade } from '../types';
+import type { OHLCVBar } from '../types';
 
-const CLOSE_REASON_ICONS: Record<string, string> = {
-  TP: '✓',
-  SL: '✗',
-  MANUAL: '⊘',
-  STRUCTURE_BREAK: '⊗',
-  CIRCUIT_BREAKER: '🚨',
-};
+function Help({ tip }: { tip: string }) {
+  return <span className="card-h-help" data-tip={tip}>i</span>;
+}
 
-const CLOSE_REASON_LABELS: Record<string, string> = {
-  TP: 'Objectif atteint',
-  SL: 'Stop-loss déclenché',
-  MANUAL: 'Fermeture manuelle',
-  CIRCUIT_BREAKER: 'Circuit breaker',
-};
+const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'BTC', 'ETH', 'SOL'];
 
-function PositionCard({ position, signal }: {
-  position: {
-    ticker: string;
-    quantity: number;
-    entryPrice: number;
-    currentPrice: number;
-    sizeUsd: number;
-    pnlUsd: number;
-    pnlPct: number;
-    stopLoss: number;
-    takeProfit: number;
-  };
-  signal?: { debate_score: number; bull_conviction: number; bear_conviction: number; confidence: number; reasoning: string } | null;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const pnlPositive = position.pnlUsd >= 0;
-  const riskAmount = position.entryPrice - position.stopLoss;
-  const gainAmount = position.takeProfit - position.entryPrice;
-  const rr = riskAmount > 0 ? (gainAmount / riskAmount).toFixed(1) : '—';
-
-  // Calcul progression trailing stop
-  const currentGain = position.currentPrice - position.entryPrice;
-  const trailingStatus = riskAmount > 0 ? (
-    currentGain >= 2 * riskAmount ? 'Profit verrouillé (+1R)' :
-    currentGain >= riskAmount ? 'Stop au break-even' :
-    'Stop initial'
-  ) : null;
-
+function BigCandles({ candles }: { candles: { o: number; h: number; l: number; c: number }[] }) {
+  const w = 1000, h = 360, pad = 28;
+  const min = Math.min(...candles.map((c) => c.l));
+  const max = Math.max(...candles.map((c) => c.h));
+  const r = max - min || 1;
+  const cw = (w - pad * 2) / candles.length;
+  const ys = (v: number) => pad + (1 - (v - min) / r) * (h - pad * 2);
+  const ma20 = candles.map((_, i) => {
+    const slice = candles.slice(Math.max(0, i - 19), i + 1);
+    return slice.reduce((a, c) => a + c.c, 0) / slice.length;
+  });
   return (
-    <div className={`bg-bg-surface rounded-lg border transition-all ${pnlPositive ? 'border-accent-green/20' : 'border-accent-red/20'}`}>
-      {/* Header */}
-      <div
-        className="p-4 cursor-pointer flex items-center justify-between"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-1 h-12 rounded-full ${pnlPositive ? 'bg-accent-green' : 'bg-accent-red'}`} />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-syne font-bold text-text-primary">{position.ticker}</span>
-              <span className="text-[10px] text-text-secondary">{getTickerName(position.ticker)}</span>
-            </div>
-            <p className="text-xs text-text-secondary mt-0.5">
-              {position.quantity.toFixed(4)} actions @ ${position.entryPrice.toFixed(2)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="text-right">
-            <p className="text-[10px] text-text-secondary uppercase">P&L</p>
-            <p className={`font-mono font-bold ${pnlPositive ? 'text-accent-green' : 'text-accent-red'}`}>
-              {pnlPositive ? '+' : ''}${position.pnlUsd.toFixed(2)}
-            </p>
-            <p className={`text-[10px] font-mono ${pnlPositive ? 'text-accent-green' : 'text-accent-red'}`}>
-              {pnlPositive ? '+' : ''}{position.pnlPct.toFixed(2)}%
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-text-secondary uppercase">Prix actuel</p>
-            <p className="font-mono text-text-primary">${position.currentPrice.toFixed(2)}</p>
-          </div>
-          <span className={`text-text-secondary text-sm transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
-        </div>
-      </div>
-
-      {/* Expanded "Pourquoi ce trade?" */}
-      {expanded && (
-        <div className="border-t border-border p-4 space-y-4">
-          {/* Barres Stop/TP visuelles */}
-          <div>
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-2">Progression du trade</p>
-            <div className="relative h-6 bg-bg-elevated rounded overflow-hidden">
-              {/* Zone rouge (stop) */}
-              <div className="absolute left-0 top-0 h-full bg-accent-red/20 flex items-center justify-center"
-                style={{ width: `${(riskAmount / (riskAmount + gainAmount)) * 100}%` }}>
-                <span className="text-[8px] text-accent-red font-mono">Stop ${position.stopLoss.toFixed(0)}</span>
-              </div>
-              {/* Zone verte (TP) */}
-              <div className="absolute right-0 top-0 h-full bg-accent-green/20 flex items-center justify-center"
-                style={{ width: `${(gainAmount / (riskAmount + gainAmount)) * 100}%` }}>
-                <span className="text-[8px] text-accent-green font-mono">TP ${position.takeProfit.toFixed(0)}</span>
-              </div>
-              {/* Curseur prix actuel */}
-              {(() => {
-                const range = position.takeProfit - position.stopLoss;
-                const pos = ((position.currentPrice - position.stopLoss) / range) * 100;
-                const clamped = Math.max(2, Math.min(98, pos));
-                return (
-                  <div
-                    className="absolute top-0 h-full w-0.5 bg-white"
-                    style={{ left: `${clamped}%` }}
-                  />
-                );
-              })()}
-            </div>
-            <div className="flex justify-between text-[9px] text-text-secondary mt-1">
-              <span>R/R : 1:{rr}</span>
-              {trailingStatus && <span className="text-accent-amber">{trailingStatus}</span>}
-              <span>Investi : ${position.sizeUsd.toFixed(0)}</span>
-            </div>
-          </div>
-
-          {/* Raison IA */}
-          {signal && (
-            <div className="bg-bg-elevated rounded p-3">
-              <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-2">Pourquoi ce trade ?</p>
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-accent-green text-sm">🟢</span>
-                  <div>
-                    <p className="text-[9px] text-text-secondary">Camp haussier</p>
-                    <p className="text-xs text-accent-green font-mono font-bold">{signal.bull_conviction}/10</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-accent-red text-sm">🔴</span>
-                  <div>
-                    <p className="text-[9px] text-text-secondary">Camp baissier</p>
-                    <p className="text-xs text-accent-red font-mono font-bold">{signal.bear_conviction}/10</p>
-                  </div>
-                </div>
-              </div>
-              {signal.reasoning && (
-                <p className="text-[11px] text-text-primary leading-relaxed border-t border-border pt-2 mt-2">
-                  {signal.reasoning}
-                </p>
-              )}
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[9px] text-text-secondary">Confiance IA :</span>
-                <div className="flex-1 h-1 bg-border rounded-full">
-                  <div className="h-1 rounded-full bg-accent-blue" style={{ width: `${signal.confidence}%` }} />
-                </div>
-                <span className="text-[9px] font-mono text-accent-blue">{signal.confidence}%</span>
-              </div>
-            </div>
-          )}
-
-          {!signal && (
-            <div className="bg-bg-elevated rounded p-3">
-              <p className="text-[10px] text-text-secondary">Raisonnement IA non disponible pour ce cycle (trade d'un cycle précédent).</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
+      {[0.2, 0.4, 0.6, 0.8].map((p) => (
+        <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="var(--rule)" strokeWidth="1" strokeDasharray="2 4" />
+      ))}
+      {candles.map((c, i) => {
+        const up = c.c >= c.o;
+        const x = pad + i * cw + cw / 2;
+        const color = up ? 'var(--accent)' : 'var(--danger)';
+        return (
+          <g key={i}>
+            <line x1={x} x2={x} y1={ys(c.h)} y2={ys(c.l)} stroke={color} strokeWidth="1" />
+            <rect x={x - cw * 0.32} y={ys(Math.max(c.o, c.c))} width={cw * 0.64} height={Math.max(1, Math.abs(ys(c.o) - ys(c.c)))} fill={color} />
+          </g>
+        );
+      })}
+      <polyline points={ma20.map((v, i) => `${pad + i * cw + cw / 2},${ys(v)}`).join(' ')} fill="none" stroke="var(--info)" strokeWidth="1.5" opacity="0.8" />
+      {[min, (min + max) / 2, max].map((v, i) => (
+        <text key={i} x={w - pad + 4} y={ys(v) + 3} fill="var(--ink-3)" fontFamily="var(--mono)" fontSize="9">${v.toFixed(2)}</text>
+      ))}
+    </svg>
   );
 }
 
-function TradeRow({ trade }: { trade: Trade }) {
-  const pnlPositive = (trade.pnlUsd || 0) >= 0;
-  const icon = trade.closeReason ? CLOSE_REASON_ICONS[trade.closeReason] || '?' : '?';
-  const reasonLabel = trade.closeReason ? CLOSE_REASON_LABELS[trade.closeReason] || trade.closeReason : '?';
-
+function VolBars({ candles }: { candles: { v: number; c: number; o: number }[] }) {
+  const w = 1000, h = 60, pad = 28;
+  const max = Math.max(...candles.map((c) => c.v));
+  const cw = (w - pad * 2) / candles.length;
   return (
-    <tr className="border-b border-border/50 hover:bg-bg-elevated transition-colors">
-      <td className="px-4 py-3 font-mono font-bold text-text-primary">{trade.ticker}</td>
-      <td className="px-4 py-3 text-text-secondary text-[11px]">{getTickerName(trade.ticker)}</td>
-      <td className="px-4 py-3 font-mono text-text-secondary">${trade.filledPrice.toFixed(2)}</td>
-      <td className="px-4 py-3 font-mono text-text-secondary">${trade.closePrice?.toFixed(2) || '—'}</td>
-      <td className="px-4 py-3 font-mono text-text-secondary">{trade.quantity.toFixed(4)}</td>
-      <td className="px-4 py-3 font-mono font-bold" style={{ color: pnlPositive ? '#00D4AA' : '#FF4D6D' }}>
-        {pnlPositive ? '+' : ''}${(trade.pnlUsd || 0).toFixed(2)}
-      </td>
-      <td className="px-4 py-3">
-        <span
-          className="text-xs font-mono px-2 py-0.5 rounded"
-          title={reasonLabel}
-          style={{
-            color: trade.closeReason === 'TP' ? '#00D4AA' : trade.closeReason === 'SL' ? '#FF4D6D' : '#FFB347',
-            background: trade.closeReason === 'TP' ? '#00D4AA15' : trade.closeReason === 'SL' ? '#FF4D6D15' : '#FFB34715',
-          }}
-        >
-          {icon} {reasonLabel}
-        </span>
-      </td>
-      <td className="px-4 py-3">
-        <span className="text-[10px] font-mono" style={{ color: trade.bullConviction > trade.bearConviction ? '#00D4AA' : '#FF4D6D' }}>
-          {trade.bullConviction > trade.bearConviction ? '🟢 Haussier' : '🔴 Baissier'}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-[10px] text-text-secondary font-mono">
-        {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString('fr-FR') : '—'}
-      </td>
-    </tr>
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
+      {candles.map((c, i) => {
+        const up = c.c >= c.o;
+        const bh = (c.v / max) * (h - 8);
+        return <rect key={i} x={pad + i * cw + cw * 0.18} y={h - bh - 4} width={cw * 0.64} height={bh} fill={up ? 'var(--accent)' : 'var(--danger)'} opacity="0.5" />;
+      })}
+    </svg>
   );
 }
 
 export function Portfolio() {
-  const { portfolio, history } = usePortfolioStore();
+  const [sym, setSym] = useState('AAPL');
   const { signals } = useSignalsStore();
-  const [tab, setTab] = useState<'open' | 'history'>('open');
 
-  const startingValue = portfolio.initial_capital || 10000;
-  const totalPnl = portfolio.total_usd - startingValue;
-  const totalPnlPct = (totalPnl / startingValue) * 100;
+  const candles = useMemo(() => {
+    const arr = [];
+    let p = 224;
+    for (let i = 0; i < 100; i++) {
+      const o = p;
+      const c = o + (Math.sin(i * 0.3) * 2.5 + (Math.random() - 0.5) * 1.6);
+      arr.push({ o, h: Math.max(o, c) + Math.random() * 1.4, l: Math.min(o, c) - Math.random() * 1.4, c, v: 800 + Math.random() * 1200 });
+      p = c;
+    }
+    return arr;
+  }, [sym]);
+
+  const last = candles[candles.length - 1].c;
+  const prev = candles[candles.length - 2].c;
+  const chg = ((last - prev) / prev) * 100;
 
   return (
-    <div className="space-y-4 max-w-[1600px]">
-      {/* Portfolio curve */}
-      <div className="bg-bg-surface rounded-lg border border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-syne font-bold text-lg text-text-primary">
-              ${portfolio.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </h2>
-            <p className="text-sm font-mono" style={{ color: totalPnlPct >= 0 ? '#00D4AA' : '#FF4D6D' }}>
-              {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% total
-              {' '}({totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)})
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider">Régime</p>
-            <p className={`font-syne font-bold text-sm ${
-              portfolio.risk_regime === 'NORMAL' ? 'text-accent-green' :
-              portfolio.risk_regime === 'ELEVATED' ? 'text-accent-amber' : 'text-accent-red'
-            }`}>{portfolio.risk_regime}</p>
+    <div className="page">
+      <div className="flex between center" style={{ marginBottom: 22 }}>
+        <div>
+          <h1 className="h1">Graphiques</h1>
+          <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
+            Cours détaillés et analyse technique sur l'actif sélectionné.
           </div>
         </div>
-        <PortfolioChart history={history} startingValue={startingValue} />
       </div>
 
-      {/* Résumé risque */}
-      {portfolio.positions.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-bg-surface rounded-lg border border-border p-3 text-center">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider">Capital investi</p>
-            <p className="font-mono font-bold text-text-primary">
-              ${portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0).toFixed(0)}
-            </p>
-            <p className="text-[9px] text-text-secondary">
-              {((portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0) / portfolio.total_usd) * 100).toFixed(1)}% du portefeuille
-            </p>
-          </div>
-          <div className="bg-bg-surface rounded-lg border border-border p-3 text-center">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider">P&L non-réalisé</p>
-            <p className={`font-mono font-bold ${portfolio.positions.reduce((s, p) => s + p.pnlUsd, 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-              {portfolio.positions.reduce((s, p) => s + p.pnlUsd, 0) >= 0 ? '+' : ''}
-              ${portfolio.positions.reduce((s, p) => s + p.pnlUsd, 0).toFixed(2)}
-            </p>
-          </div>
-          <div className="bg-bg-surface rounded-lg border border-border p-3 text-center">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider">Liquidités dispo</p>
-            <p className="font-mono font-bold text-text-primary">${portfolio.cash_usd.toFixed(0)}</p>
-            <p className="text-[9px] text-text-secondary">pour de nouveaux trades</p>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
-        {(['open', 'history'] as const).map((t) => (
+      {/* Symbol switcher */}
+      <div className="flex gap-2 wrap" style={{ marginBottom: 12 }}>
+        {symbols.map((s) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-mono transition-colors border-b-2 -mb-px ${
-              tab === t ? 'border-accent-green text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
+            key={s}
+            onClick={() => setSym(s)}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontFamily: 'var(--mono)', fontWeight: 600,
+              border: '1px solid var(--rule)',
+              background: sym === s ? 'var(--accent-soft)' : 'var(--bg-elev)',
+              color: sym === s ? 'var(--accent)' : 'var(--ink-2)',
+              borderRadius: 6, cursor: 'pointer',
+            }}
           >
-            {t === 'open' ? `Ouvertes (${portfolio.positions.length})` : `Historique (${history.length})`}
+            {s}
           </button>
         ))}
       </div>
 
-      {/* Open positions — cartes expansibles */}
-      {tab === 'open' && (
-        <div className="space-y-3">
-          {portfolio.positions.length === 0 ? (
-            <div className="bg-bg-surface rounded-lg border border-border p-8 text-center text-text-secondary">
-              Aucune position ouverte — le système IA attend les prochaines opportunités
+      <div className="grid" style={{ gridTemplateColumns: '1fr 320px', gap: 12 }}>
+        <div className="card">
+          <div className="card-h">
+            <div className="flex gap-3 center">
+              <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>{sym}</span>
+              <span className="mono" style={{ fontSize: 22 }}>${last.toFixed(2)}</span>
+              <span className={`badge ${chg >= 0 ? 'badge-up' : 'badge-down'}`}>{chg >= 0 ? '+' : ''}{chg.toFixed(2)}%</span>
             </div>
-          ) : (
-            portfolio.positions.map((p) => {
-              const signal = signals.find((s) => s.ticker === p.ticker) || null;
-              return <PositionCard key={p.ticker} position={p} signal={signal} />;
-            })
-          )}
-        </div>
-      )}
-
-      {/* Trade history */}
-      {tab === 'history' && (
-        <div className="bg-bg-surface rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border">
-                  {['Ticker', 'Entreprise', 'Entrée', 'Sortie', 'Qté', 'P&L', 'Résultat', 'Camp gagnant', 'Date'].map((h) => (
-                    <th key={h} className="text-left px-4 py-2 text-[10px] text-text-secondary uppercase tracking-wider font-normal">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {history.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-text-secondary">Aucun trade fermé</td>
-                  </tr>
-                ) : (
-                  history.map((t) => <TradeRow key={t.id} trade={t} />)
-                )}
-              </tbody>
-            </table>
+            <div className="flex gap-2">
+              {['1m', '5m', '15m', '1h', '4h', '1d', '1w'].map((tf, i) => (
+                <button key={tf} style={{ padding: '4px 10px', fontSize: 11, fontFamily: 'var(--mono)', border: '1px solid var(--rule)', background: i === 5 ? 'var(--accent-soft)' : 'transparent', color: i === 5 ? 'var(--accent)' : 'var(--ink-3)', borderRadius: 4, cursor: 'pointer' }}>{tf}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding: 16, height: 380 }}>
+            <BigCandles candles={candles} />
+          </div>
+          <div className="card-h" style={{ borderTop: '1px solid var(--rule)', borderBottom: 'none' }}>
+            <span className="eyebrow">Volume</span>
+            <span className="card-h-meta">moyenne 20j : 1.2k</span>
+          </div>
+          <div style={{ padding: '8px 16px 16px', height: 80 }}>
+            <VolBars candles={candles} />
           </div>
         </div>
-      )}
+
+        {/* Side panel */}
+        <div className="flex col gap-3">
+          <div className="card">
+            <div className="card-h"><div className="card-h-title">Contexte de marché</div></div>
+            <div style={{ padding: 16 }}>
+              {[
+                ['Tendance 4h', 'Haussière', 'var(--accent)'],
+                ['RSI 14', '58.2', 'var(--ink)'],
+                ['MACD', '+0.84', 'var(--accent)'],
+                ['Volatilité 20j', '18.4%', 'var(--warn)'],
+                ['Support', '$226.50', 'var(--ink)'],
+                ['Résistance', '$240.00', 'var(--ink)'],
+              ].map(([k, v, c], i) => (
+                <div key={k as string} className="flex between" style={{ padding: '10px 0', borderTop: i > 0 ? '1px solid var(--rule)' : 'none', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{k as string}</span>
+                  <span className="mono" style={{ fontSize: 13, color: c as string, fontWeight: 500 }}>{v as string}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-h"><div className="card-h-title">Analyse en cours</div></div>
+            <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>Modérateur</div>
+              <p style={{ marginBottom: 12 }}>Setup haussier confirmé sur 4h. RSI neutre, MACD positif, volume au-dessus de la moyenne 20j.</p>
+              <p>Position recommandée : <strong style={{ color: 'var(--accent)' }}>LONG 2.4%</strong> du book. Stop suggéré <span className="mono">$226.50</span>. Cible <span className="mono">$240.00</span>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

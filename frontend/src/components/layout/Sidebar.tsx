@@ -1,143 +1,193 @@
 import { useSignalsStore } from '../../store/signals.store';
 import type { Page } from '../../App';
 import type { WsStatus } from '../../hooks/useWebSocket';
-import type { AgentStatus } from '../../types';
 
-const AGENT_NAMES = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'] as const;
-
-const NAV_ITEMS: { id: Page; label: string; sublabel: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Vue Marché', sublabel: 'Signaux & pipeline IA', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { id: 'portfolio', label: 'Portefeuille', sublabel: 'Positions & historique', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'agents', label: 'Agents IA', sublabel: 'Débats & raisonnement', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2' },
-  { id: 'markets', label: 'Graphiques', sublabel: 'Cours & heatmap', icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z' },
-  { id: 'config', label: 'Configuration', sublabel: 'Clés API & paramètres', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+const NAV = [
+  { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
+  { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
+  { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
+  { id: 'portfolio' as Page, label: 'Graphiques', sub: 'Cours & analyse', icon: IcChart },
+  { id: 'config' as Page, label: 'Configuration', sub: 'Stratégie & système', icon: IcConfig },
 ];
 
-const statusColor: Record<AgentStatus, string> = {
-  idle: '#8892A4',
-  running: '#FFB347',
-  ok: '#00D4AA',
-  error: '#FF4D6D',
-};
+const WATCHLIST: [string, number][] = [
+  ['AAPL', 0.42],
+  ['MSFT', -0.18],
+  ['NVDA', 1.94],
+  ['TSLA', -0.62],
+  ['BTC', 0.83],
+  ['ETH', -0.24],
+];
+
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 28 28" width="28" height="28" fill="none">
+      <circle cx="14" cy="14" r="12" stroke="var(--ink-3)" strokeWidth="1.4" />
+      <path
+        d="M5 17 L9.5 11 L13.5 14 L22 6.5"
+        stroke="var(--accent)"
+        strokeWidth="1.8"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="22" cy="6.5" r="1.8" fill="var(--accent)" />
+    </svg>
+  );
+}
+
+function IcDash() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="6" height="7" rx="1.5" />
+      <rect x="10" y="2" width="6" height="4" rx="1.5" />
+      <rect x="2" y="11" width="6" height="5" rx="1.5" />
+      <rect x="10" y="8" width="6" height="8" rx="1.5" />
+    </svg>
+  );
+}
+function IcMarket() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 14 L6 9 L9 11 L14 4 L16 6" />
+      <circle cx="14" cy="4" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+function IcAgents() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="13" cy="6" r="2.5" />
+      <circle cx="9.5" cy="13" r="2.5" />
+      <path d="M7.5 7.5 L12 11 M11 7.5 L8 11" />
+    </svg>
+  );
+}
+function IcChart() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 16 V2 M2 16 H16" />
+      <rect x="5" y="9" width="2" height="5" />
+      <rect x="9" y="6" width="2" height="8" />
+      <rect x="13" y="11" width="2" height="3" />
+    </svg>
+  );
+}
+function IcConfig() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="9" cy="9" r="2.5" />
+      <path d="M9 1.5 V3.5 M9 14.5 V16.5 M1.5 9 H3.5 M14.5 9 H16.5 M3.6 3.6 L5 5 M13 13 L14.4 14.4 M3.6 14.4 L5 13 M13 5 L14.4 3.6" />
+    </svg>
+  );
+}
 
 const wsColors: Record<WsStatus, string> = {
-  connecting: '#FFB347',
-  connected: '#00D4AA',
-  disconnected: '#8892A4',
-  error: '#FF4D6D',
+  connecting: 'var(--warn)',
+  connected: 'var(--accent)',
+  disconnected: 'var(--ink-4)',
+  error: 'var(--danger)',
 };
 
 interface SidebarProps {
-  activePage: Page;
-  onNavigate: (page: Page) => void;
+  page: Page;
+  setPage: (page: Page) => void;
   wsStatus: WsStatus;
-  open: boolean;
-  onToggle: () => void;
 }
 
-export function Sidebar({ activePage, onNavigate, wsStatus, open }: SidebarProps) {
+export function Sidebar({ page, setPage, wsStatus }: SidebarProps) {
   const { agents } = useSignalsStore();
 
   return (
-    <>
-      {/* Mobile overlay */}
-      {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => {}}
-        />
-      )}
-
-      <aside
-        className={`
-          fixed md:relative z-30 md:z-auto h-full flex flex-col
-          bg-bg-surface border-r border-border transition-all duration-300
-          ${open ? 'w-[220px]' : 'w-0 md:w-[220px]'} overflow-hidden
-        `}
-        style={{ minWidth: open ? 220 : 0 }}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-border flex-shrink-0">
-          <div
-            className="w-5 h-5 flex-shrink-0"
-            style={{
-              background: '#00D4AA',
-              animation: 'pulse2 2s ease-in-out infinite',
-            }}
-          />
-          <span className="font-syne font-bold text-[18px] tracking-tight text-accent-green whitespace-nowrap">
-            NEXUS TRADE
-          </span>
+    <aside className="sidebar">
+      <div className="sb-brand">
+        <div className="sb-brand-mark">
+          <BrandMark />
         </div>
+        <div className="sb-brand-name">
+          trade<em>IA</em>
+        </div>
+      </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 text-sm transition-all duration-150 whitespace-nowrap
-                ${activePage === item.id
-                  ? 'border-l-2 border-accent-green bg-bg-elevated text-text-primary'
-                  : 'border-l-2 border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-                }
-              `}
-            >
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-              </svg>
-              <div className="text-left">
-                <div className="font-medium text-[13px] leading-tight">{item.label}</div>
-                <div className="text-[9px] text-text-secondary leading-tight mt-0.5">{item.sublabel}</div>
-              </div>
+      <div className="sb-section">Navigation</div>
+      <ul className="sb-nav">
+        {NAV.map((n) => {
+          const Icon = n.icon;
+          return (
+            <li key={n.id}>
+              <button
+                className={`sb-link ${page === n.id ? 'active' : ''}`}
+                onClick={() => setPage(n.id)}
+              >
+                <span className="sb-link-icon">
+                  <Icon />
+                </span>
+              <span className="sb-link-text">
+                <div className="sb-link-label">{n.label}</div>
+                <div className="sb-link-sub">{n.sub}</div>
+              </span>
             </button>
-          ))}
-        </nav>
+          </li>
+        );
+        })}
+      </ul>
 
-        {/* Agent indicators */}
-        <div className="border-t border-border px-4 py-3 space-y-1.5 flex-shrink-0">
-          <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-2">Agents</p>
-          {AGENT_NAMES.map((name) => {
-            const agent = agents[name];
-            const color = statusColor[agent.status];
-            const isRunning = agent.status === 'running';
-            return (
-              <div key={name} className="flex items-center gap-2">
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{
-                    background: color,
-                    animation: isRunning ? 'pulse2 1s ease-in-out infinite' : undefined,
-                  }}
-                />
-                <span className="text-[11px] text-text-secondary font-mono capitalize flex-1 whitespace-nowrap">
-                  {name}
-                </span>
-                <span className="text-[10px]" style={{ color }}>
-                  {agent.status}
-                </span>
-              </div>
-            );
-          })}
+      <div className="sb-foot">
+        <div className="sb-watchlist-title">
+          <span>Watchlist</span>
+          <span>%j</span>
         </div>
-
-        {/* WS Status */}
-        <div className="border-t border-border px-4 py-3 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: wsColors[wsStatus],
-                animation: wsStatus === 'connected' ? 'blink 2s ease-in-out infinite' : undefined,
-              }}
-            />
-            <span className="text-[11px] font-mono" style={{ color: wsColors[wsStatus] }}>
-              {wsStatus === 'connected' ? '● LIVE' : wsStatus.toUpperCase()}
+        {WATCHLIST.map(([s, p]) => (
+          <div key={s} className="sb-wl-row">
+            <span className="sb-wl-sym">{s}</span>
+            <span className={`sb-wl-pct ${p >= 0 ? 'up' : 'down'}`}>
+              {p >= 0 ? '+' : ''}
+              {p.toFixed(2)}%
             </span>
           </div>
+        ))}
+
+        {/* Agents mini status */}
+        <div style={{ padding: '10px 8px 0', borderTop: '1px solid var(--rule)', marginTop: 8 }}>
+          <div className="sb-watchlist-title" style={{ padding: '4px 0 6px' }}>
+            <span>Agents</span>
+            <span
+              className="mono"
+              style={{ color: wsColors[wsStatus], fontSize: 10 }}
+            >
+              {wsStatus === 'connected' ? 'live' : wsStatus}
+            </span>
+          </div>
+          {Object.entries(agents).map(([name, a]) => (
+            <div key={name} className="sb-wl-row" style={{ padding: '3px 0' }}>
+              <span className="sb-wl-sym" style={{ textTransform: 'capitalize', fontSize: 10 }}>
+                {name}
+              </span>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 10,
+                  color:
+                    a.status === 'ok'
+                      ? 'var(--accent)'
+                      : a.status === 'running'
+                      ? 'var(--warn)'
+                      : a.status === 'error'
+                      ? 'var(--danger)'
+                      : 'var(--ink-4)',
+                }}
+              >
+                {a.status === 'ok' ? '✓' : a.status === 'running' ? '⟳' : a.status === 'error' ? '✗' : '·'}
+              </span>
+            </div>
+          ))}
         </div>
-      </aside>
-    </>
+
+        <div style={{ padding: '10px 8px 0', color: 'var(--ink-4)', fontSize: 10 }}>
+          v2.4 · démo
+        </div>
+      </div>
+    </aside>
   );
 }

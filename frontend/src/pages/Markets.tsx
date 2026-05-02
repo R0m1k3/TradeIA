@@ -1,242 +1,202 @@
-import { useState } from 'react';
-import { CandlestickChart } from '../components/charts/CandlestickChart';
-import { HeatMap } from '../components/charts/HeatMap';
+import { useState, useMemo } from 'react';
+import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
+import { CandlestickChart } from '../components/charts/CandlestickChart';
 import type { OHLCVBar } from '../types';
 
-const TICKERS = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'GOOGL', 'AMZN', 'META', 'JPM', 'BAC', 'GE'];
-const TIMEFRAMES = ['15m', '1h', '4h', '1d'] as const;
-type Timeframe = typeof TIMEFRAMES[number];
-
-function generateMockBars(ticker: string, tf: Timeframe): OHLCVBar[] {
-  const seed = ticker.charCodeAt(0);
-  const base = 100 + seed;
-  const intervalMs: Record<Timeframe, number> = { '15m': 15 * 60 * 1000, '1h': 3600 * 1000, '4h': 4 * 3600 * 1000, '1d': 86400 * 1000 };
-  const count = 100;
-  const bars: OHLCVBar[] = [];
-  let price = base;
-  for (let i = count; i >= 0; i--) {
-    const t = new Date(Date.now() - i * intervalMs[tf]);
-    const open = price;
-    const change = (Math.random() - 0.49) * (base * 0.015);
-    const close = Math.max(1, open + change);
-    price = close;
-    bars.push({
-      time: t.toISOString(),
-      open,
-      high: Math.max(open, close) * (1 + Math.random() * 0.003),
-      low: Math.min(open, close) * (1 - Math.random() * 0.003),
-      close,
-      volume: 300000 + Math.random() * 700000,
-    });
-  }
-  return bars;
+function Help({ tip }: { tip: string }) {
+  return <span className="card-h-help" data-tip={tip}>i</span>;
 }
 
-function RSIPanel({ rsi }: { rsi: number }) {
-  const color = rsi > 70 ? '#FF4D6D' : rsi < 30 ? '#00D4AA' : '#8892A4';
+function Candles({ candles }: { candles: { o: number; h: number; l: number; c: number }[] }) {
+  const w = 800, h = 280, pad = 24;
+  const min = Math.min(...candles.map((c) => c.l));
+  const max = Math.max(...candles.map((c) => c.h));
+  const r = max - min || 1;
+  const cw = (w - pad * 2) / candles.length;
+  const ys = (v: number) => pad + (1 - (v - min) / r) * (h - pad * 2);
   return (
-    <div className="relative h-16">
-      <div className="absolute inset-0 flex items-end">
-        <div className="w-full h-full flex flex-col justify-between">
-          <div className="w-full h-px bg-accent-red/30" style={{ marginTop: '20%' }} />
-          <div className="w-full h-px bg-accent-green/30" style={{ marginBottom: '20%' }} />
-        </div>
-      </div>
-      <div className="absolute inset-0 flex items-center justify-center flex-col gap-1">
-        <span className="text-[10px] text-text-secondary uppercase tracking-wider">RSI</span>
-        <span className="font-syne font-bold text-xl" style={{ color }}>{rsi.toFixed(0)}</span>
-        <span className="text-[10px] font-mono" style={{ color }}>
-          {rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral'}
-        </span>
-      </div>
-    </div>
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
+      {[0.25, 0.5, 0.75].map((p) => (
+        <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="var(--rule)" strokeWidth="1" strokeDasharray="2 4" />
+      ))}
+      {candles.map((c, i) => {
+        const up = c.c >= c.o;
+        const x = pad + i * cw + cw / 2;
+        const color = up ? 'var(--accent)' : 'var(--danger)';
+        return (
+          <g key={i}>
+            <line x1={x} x2={x} y1={ys(c.h)} y2={ys(c.l)} stroke={color} strokeWidth="1" />
+            <rect x={x - cw * 0.35} y={ys(Math.max(c.o, c.c))} width={cw * 0.7} height={Math.max(1, Math.abs(ys(c.o) - ys(c.c)))} fill={color} />
+          </g>
+        );
+      })}
+      {[min, (min + max) / 2, max].map((v, i) => (
+        <text key={i} x={w - pad + 4} y={ys(v) + 3} fill="var(--ink-3)" fontFamily="var(--mono)" fontSize="9">${v.toFixed(2)}</text>
+      ))}
+    </svg>
   );
 }
 
 export function Markets() {
-  const [selectedTicker, setSelectedTicker] = useState('AAPL');
-  const [timeframe, setTimeframe] = useState<Timeframe>('1h');
-  const { signals, market } = useSignalsStore();
+  const { portfolio } = usePortfolioStore();
+  const { signals, market, agents, cycleTimeline } = useSignalsStore();
+  const candles = useMemo(() => {
+    const arr = []; let p = 224;
+    for (let i = 0; i < 60; i++) {
+      const o = p;
+      const c = o + (Math.sin(i * 0.4) * 2 + (Math.random() - 0.5) * 1.4);
+      const h = Math.max(o, c) + Math.random() * 1.2;
+      const l = Math.min(o, c) - Math.random() * 1.2;
+      arr.push({ o, h, l, c }); p = c;
+    }
+    return arr;
+  }, []);
 
-  const bars = generateMockBars(selectedTicker, timeframe);
-  const signal = signals.find((s) => s.ticker === selectedTicker);
-  const mockRSI = 45 + Math.sin(selectedTicker.charCodeAt(0)) * 25;
+  const flux = cycleTimeline.slice(-7).map((e, i) => ({
+    t: new Date(e.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    who: e.agent.toUpperCase(),
+    color: e.status === 'ok' ? 'var(--accent)' : e.status === 'error' ? 'var(--danger)' : 'var(--info)',
+    msg: e.label,
+  }));
+
+  const agentOrder = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'];
+  const isCycleActive = Object.values(agents).some((a) => a.status === 'running');
 
   return (
-    <div className="space-y-4 max-w-[1600px]">
-      {/* Timeframe selector + ticker */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex gap-1">
-          {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1.5 rounded text-xs font-mono transition-colors border ${
-                timeframe === tf
-                  ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                  : 'border-border text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {tf}
-            </button>
-          ))}
+    <div className="page">
+      <div className="flex between center" style={{ marginBottom: 22 }}>
+        <div>
+          <h1 className="h1">Vue Marché</h1>
+          <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
+            Synthèse temps réel : indicateurs, pipeline d'agents IA et graphiques de l'actif suivi.
+          </div>
         </div>
+        <div className="flex gap-2">
+          <button className="btn btn-ghost btn-sm">AAPL ▾</button>
+          <button className="btn btn-primary btn-sm">+ Nouvelle session</button>
+        </div>
+      </div>
 
-        <div className="flex gap-1 flex-wrap">
-          {TICKERS.map((t) => {
-            const s = signals.find((sig) => sig.ticker === t);
+      {/* Onboarding banner */}
+      <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(180deg, var(--accent-soft), transparent)', borderColor: 'var(--accent-line)' }}>
+        <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <div className="flex gap-3 center">
+            <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>i</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Mode démonstration actif — aucun ordre réel n'est envoyé.</div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Connectez un courtier dans Configuration pour passer en réel. Toutes les données affichées sont simulées.</div>
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-sm">Connecter un courtier →</button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        {[
+          ['Valeur portefeuille', `$${portfolio.total_usd.toLocaleString('en-US')}`, '+0.84% jour', 'var(--accent)'],
+          ['Capital disponible', `$${portfolio.cash_usd.toLocaleString('en-US')}`, `${((portfolio.cash_usd / portfolio.total_usd) * 100).toFixed(0)}% en cash`, null],
+          ['Positions ouvertes', String(portfolio.positions.length), 'exposition 68%', null],
+          ['Niveau de risque', portfolio.risk_regime, `VaR 1j : -$${(portfolio.total_usd * 0.018).toFixed(0)}`, 'var(--accent)'],
+        ].map(([l, v, s, c], i) => (
+          <div key={i} className="card kpi">
+            <div className="kpi-label">{l as string}</div>
+            <div className="kpi-value" style={{ color: c || 'var(--ink)', fontSize: l === 'Niveau de risque' ? 26 : 32, fontFamily: l === 'Niveau de risque' ? 'var(--mono)' : 'var(--serif)' }}>{v as string}</div>
+            <div className="kpi-sub">{s as string}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-h">
+          <div className="card-h-title">Pipeline d'agents IA <Help tip="Chaque agent traite l'information dans l'ordre. Une décision n'est prise que quand tous ont parlé." /></div>
+          <span className="card-h-meta">{isCycleActive ? 'cycle en cours' : 'en attente'} · étape {agentOrder.filter((n) => (agents as any)[n]?.status === 'ok').length}/7 · ~2s</span>
+        </div>
+        <div style={{ padding: '24px 18px', display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, position: 'relative' }}>
+          {[
+            ['01', 'Collecteur', 'Récolte les données', 'done', 'var(--info)'],
+            ['02', 'Analyste', 'Lit les chiffres', 'done', 'var(--accent)'],
+            ['03', 'Bull', 'Cherche le haussier', 'done', 'var(--accent)'],
+            ['04', 'Bear', 'Cherche le baissier', 'done', 'var(--danger)'],
+            ['05', 'Risk', 'Calib. exposition', 'active', 'var(--warn)'],
+            ['06', 'Modérateur', 'Tranche', 'wait', 'oklch(0.74 0.10 280)'],
+            ['07', 'Reporter', 'Archive', 'wait', 'var(--ink-4)'],
+          ].map(([n, name, role, st, color], i) => {
+            const realAgent = (agents as any)[name.toLowerCase().replace(' ', '')] || { status: 'idle' };
+            const realStatus = realAgent.status === 'ok' ? 'done' : realAgent.status === 'running' ? 'active' : 'wait';
             return (
-              <button
-                key={t}
-                onClick={() => setSelectedTicker(t)}
-                className={`px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
-                  selectedTicker === t
-                    ? 'border-accent-green bg-accent-green/10 text-accent-green'
-                    : 'border-border text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {t}
-                {s && <span className="ml-1 opacity-60">●</span>}
-              </button>
+              <div key={n as string} style={{ textAlign: 'center', position: 'relative' }}>
+                <div style={{
+                  width: 56, height: 56, margin: '0 auto 12px',
+                  borderRadius: 14,
+                  border: '1.5px solid',
+                  borderColor: realStatus === 'active' ? color : realStatus === 'done' ? 'var(--rule-strong)' : 'var(--rule)',
+                  background: realStatus === 'active' ? (color as string) + '22' : realStatus === 'done' ? 'var(--bg-elev-2)' : 'transparent',
+                  display: 'grid', placeItems: 'center',
+                  fontFamily: 'var(--mono)', fontSize: 13,
+                  color: realStatus === 'active' ? color : realStatus === 'done' ? 'var(--ink)' : 'var(--ink-4)',
+                  fontWeight: 600,
+                  position: 'relative',
+                }}>
+                  {realStatus === 'done' ? '✓' : n}
+                  {realStatus === 'active' && <span style={{ position: 'absolute', inset: -6, borderRadius: 18, border: `2px solid ${color}`, opacity: 0.4, animation: 'pulse 2s infinite' }} />}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{name as string}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{role as string}</div>
+                {i < 6 && <div style={{ position: 'absolute', top: 28, right: -6, width: 12, height: 1, background: 'var(--rule-strong)' }} />}
+              </div>
             );
           })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-        {/* Main chart area (3/4) */}
-        <div className="xl:col-span-3 space-y-3">
-          <div className="bg-bg-surface rounded-lg border border-border overflow-hidden">
-            <CandlestickChart data={bars} ticker={selectedTicker} height={400} />
-            {/* RSI & indicators */}
-            <div className="border-t border-border grid grid-cols-3 divide-x divide-border">
-              <div className="p-3">
-                <RSIPanel rsi={mockRSI} />
-              </div>
-              <div className="p-3 flex flex-col justify-center items-center gap-1">
-                <span className="text-[10px] text-text-secondary uppercase tracking-wider">MACD</span>
-                <div className="flex gap-1 items-end h-8">
-                  {Array.from({ length: 12 }).map((_, i) => {
-                    const val = Math.sin(i * 0.8) * 20;
-                    return (
-                      <div
-                        key={i}
-                        className="w-2 rounded-sm"
-                        style={{
-                          height: `${Math.abs(val)}px`,
-                          background: val >= 0 ? '#00D4AA' : '#FF4D6D',
-                          opacity: 0.7 + i * 0.025,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                <span className="text-[10px] font-mono" style={{ color: '#00D4AA' }}>Bullish cross</span>
-              </div>
-              <div className="p-3 flex flex-col justify-center items-center gap-1">
-                <span className="text-[10px] text-text-secondary uppercase tracking-wider">Volume</span>
-                <div className="flex gap-0.5 items-end h-8">
-                  {Array.from({ length: 16 }).map((_, i) => {
-                    const h = 8 + Math.random() * 24;
-                    return (
-                      <div
-                        key={i}
-                        className="w-1.5 rounded-sm"
-                        style={{ height: `${h}px`, background: i === 15 ? '#4A9EFF' : '#1E2D45' }}
-                      />
-                    );
-                  })}
-                </div>
-                <span className="text-[10px] font-mono text-accent-blue">1.2× avg</span>
-              </div>
+      {/* Chart + flux */}
+      <div className="grid" style={{ gridTemplateColumns: '1.6fr 1fr', gap: 12 }}>
+        <div className="card">
+          <div className="card-h">
+            <div className="flex gap-3 center">
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>AAPL</span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>$232.18</span>
+              <span className="badge badge-up">+0.42%</span>
+            </div>
+            <div className="flex gap-2">
+              {['1m', '5m', '15m', '1h', '4h', '1d'].map((tf, i) => (
+                <button key={tf} style={{
+                  padding: '4px 10px', fontSize: 11, fontFamily: 'var(--mono)',
+                  border: '1px solid var(--rule)',
+                  background: i === 3 ? 'var(--accent-soft)' : 'transparent',
+                  color: i === 3 ? 'var(--accent)' : 'var(--ink-3)',
+                  borderRadius: 4, cursor: 'pointer',
+                }}>{tf}</button>
+              ))}
             </div>
           </div>
+          <div style={{ padding: 16, height: 320, position: 'relative' }}>
+            <Candles candles={candles} />
+          </div>
         </div>
-
-        {/* Right panel: News + signal (1/4) */}
-        <div className="space-y-3">
-          {signal && (
-            <div className="bg-bg-surface rounded-lg border border-border p-4 space-y-3">
-              <h3 className="font-syne font-bold text-sm text-text-primary">{selectedTicker} Signal</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-text-secondary">Signal</span>
-                  <span
-                    className="font-mono font-bold"
-                    style={{ color: signal.signal === 'BUY' ? '#00D4AA' : signal.signal === 'SELL' ? '#FF4D6D' : '#FFB347' }}
-                  >
-                    {signal.signal}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-text-secondary">Confidence</span>
-                  <span className="font-mono text-accent-blue">{signal.confidence}%</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-text-secondary">Debate</span>
-                  <span
-                    className="font-mono font-bold"
-                    style={{ color: signal.debate_score > 0 ? '#00D4AA' : '#FF4D6D' }}
-                  >
-                    {signal.debate_score > 0 ? '+' : ''}{signal.debate_score}
-                  </span>
-                </div>
-                <div className="text-xs">
-                  <p className="text-text-secondary mb-1">Sentiment</p>
-                  <div className="w-full bg-bg-elevated rounded-full h-1.5">
-                    <div
-                      className="h-1.5 rounded-full"
-                      style={{
-                        width: `${50 + signal.debate_score * 10}%`,
-                        background: signal.debate_score > 0 ? '#00D4AA' : '#FF4D6D',
-                      }}
-                    />
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="card-h">
+            <div className="card-h-title">Flux des agents <Help tip="Chaque ligne est une action ou une analyse postée par un agent IA en temps réel." /></div>
+            <span className="card-h-meta">live</span>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', maxHeight: 320 }}>
+            {flux.length === 0 ? (
+              <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>En attente du cycle IA...</div>
+            ) : (
+              flux.map((f, i) => (
+                <div key={i} style={{ padding: '12px 14px', borderBottom: i < flux.length - 1 ? '1px solid var(--rule)' : 'none' }}>
+                  <div className="flex between" style={{ marginBottom: 4 }}>
+                    <span className="mono" style={{ fontSize: 10, color: f.color, letterSpacing: '0.06em', fontWeight: 600 }}>{f.who}</span>
+                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{f.t}</span>
                   </div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>{f.msg}</div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-bg-surface rounded-lg border border-border">
-            <div className="px-4 py-3 border-b border-border">
-              <h3 className="font-syne font-bold text-sm text-text-primary">Market Context</h3>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-text-secondary">VIX</span>
-                <span
-                  className="text-sm font-mono font-bold"
-                  style={{ color: market.vix > 25 ? '#FF4D6D' : market.vix > 18 ? '#FFB347' : '#00D4AA' }}
-                >
-                  {market.vix.toFixed(1)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-text-secondary">Fear & Greed</span>
-                <span className="text-sm font-mono text-text-primary">{market.fear_greed}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-text-secondary">NASDAQ</span>
-                <span
-                  className="text-sm font-mono font-bold capitalize"
-                  style={{ color: market.nasdaq === 'bullish' ? '#00D4AA' : market.nasdaq === 'bearish' ? '#FF4D6D' : '#8892A4' }}
-                >
-                  {market.nasdaq}
-                </span>
-              </div>
-            </div>
+              ))
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Heatmap */}
-      <div className="bg-bg-surface rounded-lg border border-border">
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="font-syne font-bold text-sm text-text-primary">Watchlist Heatmap</h3>
-        </div>
-        <div className="p-4">
-          <HeatMap signals={signals} />
         </div>
       </div>
     </div>

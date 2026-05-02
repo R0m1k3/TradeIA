@@ -15,10 +15,10 @@ export type Page = 'dashboard' | 'portfolio' | 'agents' | 'markets' | 'config';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const { status: wsStatus } = useWebSocket();
   const { fetchPortfolio, fetchHistory } = usePortfolioStore();
-  const { fetchConfig } = useConfigStore();
+  const { fetchConfig, paused, setPaused } = useConfigStore();
 
   useEffect(() => {
     fetchPortfolio();
@@ -26,27 +26,46 @@ export default function App() {
     fetchConfig();
   }, [fetchPortfolio, fetchHistory, fetchConfig]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
-      <Sidebar
-        activePage={page}
-        onNavigate={setPage}
-        wsStatus={wsStatus}
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen((o) => !o)}
-      />
-
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <TopBar onMenuToggle={() => setSidebarOpen((o) => !o)} />
-
-        <main className="flex-1 overflow-auto p-4">
+    <div className="app-layout" data-screen-label={page}>
+      <Sidebar page={page} setPage={setPage} wsStatus={wsStatus} />
+      <div className="main-panel">
+        <TopBar paused={paused} onToggleRun={() => setPaused(!paused)} />
+        <div className="scroll">
           {page === 'dashboard' && <Dashboard onNavigate={setPage} />}
           {page === 'portfolio' && <Portfolio />}
           {page === 'agents' && <Agents />}
           {page === 'markets' && <Markets />}
           {page === 'config' && <Config />}
-        </main>
+        </div>
       </div>
+
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        style={{
+          position: 'fixed',
+          bottom: 18,
+          right: 18,
+          zIndex: 50,
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          border: '1px solid var(--rule-strong)',
+          background: 'var(--bg-elev)',
+          color: 'var(--ink-2)',
+          cursor: 'pointer',
+          fontSize: 16,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+        }}
+        title="Changer thème"
+      >
+        {theme === 'dark' ? '☀' : '☾'}
+      </button>
 
       <AlertToast />
     </div>
