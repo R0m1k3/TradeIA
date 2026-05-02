@@ -1,5 +1,3 @@
-import { callLLM, parseJsonResponse } from '../llm/client';
-import { getModels } from '../llm/models';
 import { getIntraday, getDaily, getFundamentals, getCurrentPrice } from '../data/alphavantage';
 import { getOptionsData, getDailyVolume } from '../data/polygon';
 import { getTickerNews, getSentiment, getMarketContext, getUpcomingEarnings } from '../data/finnhub';
@@ -7,7 +5,6 @@ import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../da
 import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
-import { buildCollectorPrompt, COLLECTOR_SYSTEM } from '../prompts/collector.prompt';
 
 // Track tickers where AlphaVantage consistently returns insufficient data
 // so we skip it and go straight to Yahoo on subsequent cycles
@@ -235,43 +232,22 @@ export class CollectorAgent {
         })
       );
 
-      const prompt = buildCollectorPrompt({ tickers: watchlist, rawData, marketData: market });
-
-      try {
-        const models = await getModels();
-        const response = await callLLM('collector', models.LIGHT, COLLECTOR_SYSTEM, prompt);
-        const parsed = parseJsonResponse<CollectorOutput>(response.content);
-        // Merge locally-computed indicators + metadata into LLM output
-        for (const ticker of Object.keys(rawData)) {
-          const local = rawData[ticker] as any;
-          if (parsed.tickers?.[ticker]) {
-            if (local.indicators) parsed.tickers[ticker].indicators = local.indicators;
-            if (local.upcoming_earnings) parsed.tickers[ticker].upcoming_earnings = local.upcoming_earnings;
-            if (local.sector) parsed.tickers[ticker].sector = local.sector;
-            if (typeof local.earnings_blackout === 'boolean') parsed.tickers[ticker].earnings_blackout = local.earnings_blackout;
-          }
-        }
-        parsed.market = {
-          ...parsed.market,
+      // Skip LLM for collector — data is already structured locally.
+      // The LLM call just reformats what we already have, wasting 2+ minutes.
+      // Use local data directly (same as the catch branch).
+      console.log('[Collector] Skipping LLM — using locally structured data with indicators');
+      return {
+        tickers: rawData as Record<string, TickerData>,
+        market: {
+          vix: market.vix,
+          fear_greed: market.fear_greed,
+          nasdaq_direction: market.nasdaq_direction,
+          fed_next_meeting: '',
           macro,
           sector_biases: sectorBiases,
-        };
-        return parsed;
-      } catch (err) {
-        console.warn('[Collector] LLM parsing failed, using raw data with local indicators:', err);
-        return {
-          tickers: rawData as Record<string, TickerData>,
-          market: {
-            vix: market.vix,
-            fear_greed: market.fear_greed,
-            nasdaq_direction: market.nasdaq_direction,
-            fed_next_meeting: '',
-            macro,
-            sector_biases: sectorBiases,
-          },
-          collected_at: new Date().toISOString(),
-        };
-      }
+        },
+        collected_at: new Date().toISOString(),
+      };
     } catch (err) {
       console.error('[Collector] Fatal error:', err);
       return null;
