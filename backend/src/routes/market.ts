@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getMarketContext } from '../data/finnhub';
 
-function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
+export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
   const now = new Date();
   const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = etNow.getDay();

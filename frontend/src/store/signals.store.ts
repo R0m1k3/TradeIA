@@ -52,7 +52,7 @@ export const useSignalsStore = create<SignalsStore>((set) => ({
   cycleTimeline: [],
 
   setSignals: (signals) => set({ signals }),
-  setMarket: (market) => set({ market }),
+  setMarket: (market) => set((state) => ({ market: { ...state.market, ...market } })),
   setOrdersExecuted: (ordersExecuted) => set({ ordersExecuted }),
   setDebates: (debates) => set({ debates }),
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),

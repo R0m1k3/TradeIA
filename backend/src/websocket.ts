@@ -72,6 +72,11 @@ export interface CycleUpdatePayload {
     fear_greed: number;
     nasdaq: string;
     nasdaq_change_pct: number;
+    nasdaq_status?: {
+      isOpen: boolean;
+      nextOpen: string;
+      nextClose: string;
+    };
   };
   signals: SignalItem[];
   orders_executed: ExecutedOrder[];

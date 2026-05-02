@@ -5,6 +5,7 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { prisma } from '../lib/prisma';
 import { getYahooCurrentPrice } from '../data/yahoo';
+import { getNasdaqStatus } from '../routes/market';
 
 const REPORTER_SYSTEM = `Tu es le rapporteur du cycle de trading automatisé. Résume le cycle et génère les alertes importantes.
 IMPORTANT: Toutes les alertes et le résumé DOIVENT être rédigés en français naturel, compréhensible par un non-expert.
@@ -34,7 +35,7 @@ export class ReporterAgent {
         initial_capital: 0,
         positions: [],
       },
-      market: { vix: 0, fear_greed: 0, nasdaq: '', nasdaq_change_pct: 0 },
+      market: { vix: 0, fear_greed: 0, nasdaq: '', nasdaq_change_pct: 0, nasdaq_status: getNasdaqStatus() },
       signals: [],
       orders_executed: [],
       alerts: [],
@@ -144,6 +145,7 @@ export class ReporterAgent {
         fear_greed: market?.fear_greed || 0,
         nasdaq: market?.nasdaq_direction || 'neutral',
         nasdaq_change_pct: (market as any)?.nasdaq_change_pct || 0,
+        nasdaq_status: getNasdaqStatus(),
         macro: (market as any)?.macro || null,
         sector_biases: (market as any)?.sector_biases || null,
       } as any,
