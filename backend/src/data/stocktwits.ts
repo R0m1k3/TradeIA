@@ -8,8 +8,15 @@ export interface StockTwitsMessage {
   author: string;
   created_at: string;
   likes: number;
-  sentiment: 'Bullish' | 'Bearish' | 'neutral';
+  sentiment: 'bullish' | 'bearish' | 'neutral';
   symbols: string[];
+}
+
+// Circuit breaker: disable for 24h after persistent 403/401
+let disabledUntil = 0;
+
+function isDisabled(): boolean {
+  return Date.now() < disabledUntil;
 }
 
 function normalizeSentiment(s: string): 'bullish' | 'bearish' | 'neutral' {
@@ -21,9 +28,11 @@ function normalizeSentiment(s: string): 'bullish' | 'bearish' | 'neutral' {
 
 /**
  * Fetch recent StockTwits messages about a stock ticker.
- * No API key needed — public API with rate limiting.
+ * Public API — circuit breaker disables for 24h on 403/401.
  */
 export async function getTickerStockTwits(ticker: string, limit = 10): Promise<StockTwitsMessage[]> {
+  if (isDisabled()) return [];
+
   const cacheKey = `stocktwits:ticker:${ticker}`;
   const cached = await cacheGet<StockTwitsMessage[]>(cacheKey);
   if (cached) return cached;
@@ -35,6 +44,12 @@ export async function getTickerStockTwits(ticker: string, limit = 10): Promise<S
       timeout: 10_000,
       validateStatus: () => true,
     });
+
+    if (response.status === 403 || response.status === 401) {
+      console.warn(`[StockTwits] Blocked (${response.status}) — disabling for 24h`);
+      disabledUntil = Date.now() + 24 * 3600000;
+      return [];
+    }
 
     if (response.status !== 200) {
       console.warn(`[StockTwits] getTickerStockTwits ${ticker}: HTTP ${response.status}`);
@@ -60,22 +75,28 @@ export async function getTickerStockTwits(ticker: string, limit = 10): Promise<S
 
 /**
  * Fetch trending messages from StockTwits (general market sentiment).
- * Uses the "trending" endpoint — captures current market mood.
+ * Circuit breaker disables for 24h on 403/401.
  */
 export async function getTrendingStockTwits(limit = 15): Promise<StockTwitsMessage[]> {
+  if (isDisabled()) return [];
+
   const cacheKey = 'stocktwits:trending';
   const cached = await cacheGet<StockTwitsMessage[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    // StockTwits doesn't have a simple "trending all" endpoint,
-    // so we use the general stream with market filter
     const response = await axios.get(`${BASE}/streams/trending.json`, {
       params: { limit },
       headers: { Accept: 'application/json' },
       timeout: 10_000,
       validateStatus: () => true,
     });
+
+    if (response.status === 403 || response.status === 401) {
+      console.warn(`[StockTwits] Blocked (${response.status}) — disabling for 24h`);
+      disabledUntil = Date.now() + 24 * 3600000;
+      return [];
+    }
 
     if (response.status !== 200) {
       console.warn(`[StockTwits] getTrendingStockTwits: HTTP ${response.status}`);

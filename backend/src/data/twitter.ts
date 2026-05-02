@@ -4,6 +4,13 @@ import { getCredential } from '../config/credentials';
 
 const BASE = 'https://api.socialdata.tools';
 
+// Circuit breaker: disable for 24h after 402 (payment required) or 403
+let disabledUntil = 0;
+
+function isTwitterDisabled(): boolean {
+  return Date.now() < disabledUntil;
+}
+
 export interface TweetData {
   text: string;
   author: string;
@@ -18,6 +25,8 @@ export interface TweetData {
  * Uses SocialData API (freemium) — falls back gracefully if no key or rate limited.
  */
 export async function getTickerTweets(ticker: string, limit = 10): Promise<TweetData[]> {
+  if (isTwitterDisabled()) return [];
+
   const cacheKey = `twitter:tweets:${ticker}`;
   const cached = await cacheGet<TweetData[]>(cacheKey);
   if (cached) return cached;
@@ -36,6 +45,12 @@ export async function getTickerTweets(ticker: string, limit = 10): Promise<Tweet
       timeout: 15_000,
       validateStatus: () => true,
     });
+
+    if (response.status === 402 || response.status === 403) {
+      console.warn(`[Twitter] Blocked (${response.status}) — disabling for 24h`);
+      disabledUntil = Date.now() + 24 * 3600000;
+      return [];
+    }
 
     if (response.status !== 200) {
       console.warn(`[Twitter] getTickerTweets ${ticker}: HTTP ${response.status}`);
@@ -64,6 +79,8 @@ export async function getTickerTweets(ticker: string, limit = 10): Promise<Tweet
  * Useful when markets are closed — still captures weekend sentiment.
  */
 export async function getFinancialSentimentTweets(): Promise<TweetData[]> {
+  if (isTwitterDisabled()) return [];
+
   const cacheKey = 'twitter:financial_sentiment';
   const cached = await cacheGet<TweetData[]>(cacheKey);
   if (cached) return cached;
@@ -82,6 +99,12 @@ export async function getFinancialSentimentTweets(): Promise<TweetData[]> {
       timeout: 15_000,
       validateStatus: () => true,
     });
+
+    if (response.status === 402 || response.status === 403) {
+      console.warn(`[Twitter] Blocked (${response.status}) — disabling for 24h`);
+      disabledUntil = Date.now() + 24 * 3600000;
+      return [];
+    }
 
     if (response.status !== 200) {
       console.warn(`[Twitter] getFinancialSentimentTweets: HTTP ${response.status}`);
