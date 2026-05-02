@@ -12,13 +12,13 @@ import { broadcastAlert } from '../websocket';
 
 const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
 
-const CYCLE_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes max par cycle
+const CYCLE_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes max par cycle
 
 let isRunning = false;
 
 function cycleTimeout(): Promise<never> {
   return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Cycle timeout after 4 minutes')), CYCLE_TIMEOUT_MS)
+    setTimeout(() => reject(new Error('Cycle timeout after 8 minutes')), CYCLE_TIMEOUT_MS)
   );
 }
 
@@ -93,6 +93,16 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   if (tickers.length === 0) {
     console.log('[Orchestrator] Discovery returned nothing, using fallback watchlist');
     tickers = WATCHLIST_DEFAULT;
+  }
+
+  // Limit tickers per cycle to avoid timeout with slow LLM calls
+  if (tickers.length > 8) {
+    const held = (await getPortfolioState(portfolioUsd)).positions.map((p) => p.ticker);
+    // Prioritize held positions, then fill up to 8
+    const prioritized = [...held.filter((t) => tickers.includes(t))];
+    const remaining = tickers.filter((t) => !prioritized.includes(t));
+    tickers = [...prioritized, ...remaining].slice(0, 8);
+    console.log(`[Orchestrator] Limiting to ${tickers.length} tickers: ${tickers.join(', ')}`);
   }
 
   // Step 4: Collect data

@@ -9,6 +9,10 @@ import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
 import { buildCollectorPrompt, COLLECTOR_SYSTEM } from '../prompts/collector.prompt';
 
+// Track tickers where AlphaVantage consistently returns insufficient data
+// so we skip it and go straight to Yahoo on subsequent cycles
+const avInsufficient = new Set<string>();
+
 export interface TickerData {
   data_quality: 'ok' | 'stale' | 'partial' | 'missing';
   earnings_blackout: boolean;
@@ -43,8 +47,22 @@ function resolve<T>(promise: PromiseSettledResult<T>, fallback: T): T {
   return promise.status === 'fulfilled' ? promise.value : fallback;
 }
 
-/** Fetch OHLCV data with fallback: AlphaVantage → Yahoo Finance */
+/** Fetch OHLCV data — skip AlphaVantage for known-insufficient tickers */
 async function fetchOHLCV(ticker: string): Promise<{ bars_15m: unknown[]; bars_1h: unknown[]; bars_4h: unknown[] }> {
+  // If AlphaVantage has been insufficient before, go straight to Yahoo
+  if (avInsufficient.has(ticker)) {
+    const [y15m, y1h, y4h] = await Promise.allSettled([
+      getYahooOHLCV(ticker, '15m'),
+      getYahooOHLCV(ticker, '1h'),
+      getYahooOHLCV(ticker, '4h'),
+    ]);
+    return {
+      bars_15m: resolve(y15m, []),
+      bars_1h: resolve(y1h, []),
+      bars_4h: resolve(y4h, []),
+    };
+  }
+
   // Try AlphaVantage first
   const [av15m, av1h, avDaily] = await Promise.allSettled([
     getIntraday(ticker, '15min'),
@@ -61,7 +79,8 @@ async function fetchOHLCV(ticker: string): Promise<{ bars_15m: unknown[]; bars_1
     return { bars_15m, bars_1h, bars_4h: bars_daily };
   }
 
-  // Fallback to Yahoo Finance
+  // AlphaVantage insufficient — remember for next cycle and fall back to Yahoo
+  avInsufficient.add(ticker);
   console.log(`[Collector] AlphaVantage data insufficient for ${ticker}, trying Yahoo`);
   const [y15m, y1h, y4h] = await Promise.allSettled([
     getYahooOHLCV(ticker, '15m'),
@@ -81,25 +100,29 @@ async function fetchOHLCV(ticker: string): Promise<{ bars_15m: unknown[]; bars_1
   };
 }
 
-/** Fetch current price with fallback */
+/** Fetch current price — skip AlphaVantage for known-insufficient tickers */
 async function fetchPrice(ticker: string): Promise<number | null> {
+  if (avInsufficient.has(ticker)) {
+    return getYahooCurrentPrice(ticker);
+  }
   const [avPrice, yahooPrice] = await Promise.allSettled([
     getCurrentPrice(ticker),
     getYahooCurrentPrice(ticker),
   ]);
-
   const p1 = resolve(avPrice, null);
   const p2 = resolve(yahooPrice, null);
   return p1 ?? p2;
 }
 
-/** Fetch fundamentals with fallback */
+/** Fetch fundamentals — skip AlphaVantage for known-insufficient tickers */
 async function fetchFundamentals(ticker: string): Promise<unknown> {
+  if (avInsufficient.has(ticker)) {
+    return getYahooFundamentals(ticker);
+  }
   const [avFund, yahooFund] = await Promise.allSettled([
     getFundamentals(ticker),
     getYahooFundamentals(ticker),
   ]);
-
   const f1 = resolve(avFund, null);
   const f2 = resolve(yahooFund, null);
   return f1 ?? f2 ?? {};
