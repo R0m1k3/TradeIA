@@ -20,6 +20,7 @@ interface ConfigSecrets {
   polygon_key: boolean;
   finnhub_key: boolean;
   fred_api_key: boolean;
+  socialdata_key: boolean;
 }
 
 interface ConfigStore {
@@ -54,6 +55,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     polygon_key: false,
     finnhub_key: false,
     fred_api_key: false,
+    socialdata_key: false,
   },
   paused: false,
 

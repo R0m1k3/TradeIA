@@ -58,6 +58,7 @@ export class ResearcherAgent {
             fundamentals: tickerData.fundamentals,
             news: tickerData.news,
             sentiment: tickerData.sentiment,
+            tweets: tickerData.tweets,
             current_price: tickerData.current_price,
           };
 

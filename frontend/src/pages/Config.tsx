@@ -257,6 +257,12 @@ export function Config() {
               placeholder="Clé gratuite sur fred.stlouisfed.org"
               onSave={(val) => saveSecret('fred_api_key', val)}
             />
+            <ApiKeyInput
+              label="SocialData (X/Twitter)"
+              configured={secretsConfigured.socialdata_key}
+              placeholder="Clé API socialdata.tools"
+              onSave={(val) => saveSecret('socialdata_key', val)}
+            />
 
             <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
               Astuce : FRED est gratuit et fournit les données macro (taux, inflation, emploi). Alpha Vantage offre un plan gratuit limité.

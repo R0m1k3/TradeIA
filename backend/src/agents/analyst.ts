@@ -51,6 +51,7 @@ export class AnalystAgent {
               fundamentals: data.fundamentals,
               news: data.news,
               sentiment: data.sentiment,
+              tweets: data.tweets,
             });
 
             const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
@@ -90,6 +91,7 @@ export class AnalystAgent {
             fundamentals: data.fundamentals,
             news: data.news,
             sentiment: data.sentiment,
+            tweets: data.tweets,
           });
 
           const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);

@@ -91,6 +91,7 @@ export function buildAnalystPrompt(data: {
   fundamentals?: unknown;
   news?: unknown[];
   sentiment?: unknown;
+  tweets?: unknown[];
 }): string {
   return `Analyze ${data.ticker} using the PRE-COMPUTED indicators below.
 
@@ -116,6 +117,8 @@ FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}
 RECENT NEWS: ${data.news ? JSON.stringify(data.news) : 'N/A'}
 
 SENTIMENT: ${data.sentiment ? JSON.stringify(data.sentiment) : 'N/A'}
+
+TWITTER/X SIGNALS: ${data.tweets && data.tweets.length > 0 ? data.tweets.map((t: any) => `[${t.sentiment_hint}] @${t.author}: ${t.text}`).join('\n') : 'N/A'}
 
 Based on these indicators, generate your analysis. Use ATR for stop/target calculations.
 If indicators are insufficient (many nulls), set skip_reason and confidence=0.

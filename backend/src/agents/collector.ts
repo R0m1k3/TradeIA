@@ -5,6 +5,7 @@ import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../da
 import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
+import { getTickerTweets, getFinancialSentimentTweets, type TweetData } from '../data/twitter';
 
 // Track tickers where AlphaVantage consistently returns insufficient data
 // so we skip it and go straight to Yahoo on subsequent cycles
@@ -25,6 +26,7 @@ export interface TickerData {
   sentiment: unknown;
   daily_volume: number | null;
   indicators: IndicatorValues | null;
+  tweets: TweetData[];
 }
 
 export interface CollectorOutput {
@@ -37,6 +39,7 @@ export interface CollectorOutput {
     macro: MacroData;
     sector_biases: Record<string, SectorBias>;
   };
+  financial_tweets: TweetData[];
   collected_at: string;
 }
 
@@ -130,12 +133,13 @@ export class CollectorAgent {
     console.log(`[Collector] Fetching data for: ${watchlist.join(', ')}`);
 
     try {
-      // Données marché + macro + secteurs + earnings en parallèle
-      const [market, macro, sectorBiases, earningsCalendar] = await Promise.all([
+      // Données marché + macro + secteurs + earnings + tweets financiers en parallèle
+      const [market, macro, sectorBiases, earningsCalendar, financialTweets] = await Promise.all([
         getMarketContext(),
         getMacroData(),
         getSectorBiases(),
         getUpcomingEarnings(watchlist),
+        getFinancialSentimentTweets(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -146,7 +150,7 @@ export class CollectorAgent {
       await Promise.all(
         watchlist.map(async (ticker) => {
           try {
-            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume] =
+            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets] =
               await Promise.allSettled([
                 fetchOHLCV(ticker),
                 fetchPrice(ticker),
@@ -155,6 +159,7 @@ export class CollectorAgent {
                 getTickerNews(ticker),
                 getSentiment(ticker),
                 getDailyVolume(ticker),
+                getTickerTweets(ticker),
               ]);
 
             const bars_15m = resolve(ohlcvData, { bars_15m: [], bars_1h: [], bars_4h: [] } as any);
@@ -164,6 +169,7 @@ export class CollectorAgent {
             const newsData = resolve(news, []);
             const sent = resolve(sentiment, { sentiment_score: 0, buzz_score: 0 } as any);
             const vol = resolve(daily_volume, null);
+            const tweetData = resolve(tweets, []);
 
             const ohlcv15 = (bars_15m as any).bars_15m || [];
             const ohlcv1h = (bars_15m as any).bars_1h || [];
@@ -210,6 +216,7 @@ export class CollectorAgent {
               news: newsData,
               sentiment: sent,
               daily_volume: vol,
+              tweets: tweetData,
               indicators,
             };
           } catch (err) {
@@ -226,6 +233,7 @@ export class CollectorAgent {
               news: [],
               sentiment: {},
               daily_volume: null,
+              tweets: [],
               indicators: null,
             };
           }
@@ -246,6 +254,7 @@ export class CollectorAgent {
           macro,
           sector_biases: sectorBiases,
         },
+        financial_tweets: financialTweets,
         collected_at: new Date().toISOString(),
       };
     } catch (err) {
