@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
@@ -38,9 +38,21 @@ function Candles({ candles }: { candles: { o: number; h: number; l: number; c: n
   );
 }
 
+const AGENT_ORDER = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'];
+const AGENT_PIPELINE_NAMES: Record<string, { num: string; name: string; role: string; color: string }> = {
+  collector: { num: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)' },
+  analyst: { num: '02', name: 'Analyste', role: 'Lit les chiffres', color: 'var(--accent)' },
+  bull: { num: '03', name: 'Bull', role: 'Cherche le haussier', color: 'var(--accent)' },
+  bear: { num: '04', name: 'Bear', role: 'Cherche le baissier', color: 'var(--danger)' },
+  risk: { num: '05', name: 'Risk', role: 'Calib. exposition', color: 'var(--warn)' },
+  strategist: { num: '06', name: 'Modérateur', role: 'Tranche', color: 'oklch(0.74 0.10 280)' },
+  reporter: { num: '07', name: 'Reporter', role: 'Archive', color: 'var(--ink-4)' },
+};
+
 export function Markets() {
   const { portfolio } = usePortfolioStore();
-  const { signals, market, agents, cycleTimeline } = useSignalsStore();
+  const { signals, market, agents, cycleTimeline, lastUpdate } = useSignalsStore();
+
   const candles = useMemo(() => {
     const arr = []; let p = 224;
     for (let i = 0; i < 60; i++) {
@@ -53,15 +65,19 @@ export function Markets() {
     return arr;
   }, []);
 
-  const flux = cycleTimeline.slice(-7).map((e, i) => ({
+  const flux = cycleTimeline.slice(-7).map((e) => ({
     t: new Date(e.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     who: e.agent.toUpperCase(),
     color: e.status === 'ok' ? 'var(--accent)' : e.status === 'error' ? 'var(--danger)' : 'var(--info)',
     msg: e.label,
   }));
 
-  const agentOrder = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'];
   const isCycleActive = Object.values(agents).some((a) => a.status === 'running');
+  const completedSteps = AGENT_ORDER.filter((n) => (agents as any)[n]?.status === 'ok').length;
+
+  const investedUsd = portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0);
+  const exposurePct = portfolio.total_usd > 0 ? ((investedUsd / portfolio.total_usd) * 100).toFixed(0) : '0';
+  const cashPct = portfolio.total_usd > 0 ? ((portfolio.cash_usd / portfolio.total_usd) * 100).toFixed(0) : '100';
 
   return (
     <div className="page">
@@ -72,79 +88,69 @@ export function Markets() {
             Synthèse temps réel : indicateurs, pipeline d'agents IA et graphiques de l'actif suivi.
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="btn btn-ghost btn-sm">AAPL ▾</button>
-          <button className="btn btn-primary btn-sm">+ Nouvelle session</button>
-        </div>
       </div>
 
-      {/* Onboarding banner */}
-      <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(180deg, var(--accent-soft), transparent)', borderColor: 'var(--accent-line)' }}>
-        <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-          <div className="flex gap-3 center">
-            <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>i</span>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>Mode démonstration actif — aucun ordre réel n'est envoyé.</div>
-              <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Connectez un courtier dans Configuration pour passer en réel. Toutes les données affichées sont simulées.</div>
+      {/* Onboarding banner - only show if mock broker */}
+      {portfolio.positions.length === 0 && (
+        <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(180deg, var(--accent-soft), transparent)', borderColor: 'var(--accent-line)' }}>
+          <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontFamily: 'var(--serif)', fontStyle: 'italic' }}>i</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Mode démonstration actif — aucun ordre réel n'est envoyé.</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Configurez vos API et attendez le premier cycle IA pour voir les données apparaître.</div>
+              </div>
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm">Connecter un courtier →</button>
         </div>
-      </div>
+      )}
 
-      {/* KPIs */}
+      {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          ['Valeur portefeuille', `$${portfolio.total_usd.toLocaleString('en-US')}`, '+0.84% jour', 'var(--accent)'],
-          ['Capital disponible', `$${portfolio.cash_usd.toLocaleString('en-US')}`, `${((portfolio.cash_usd / portfolio.total_usd) * 100).toFixed(0)}% en cash`, null],
-          ['Positions ouvertes', String(portfolio.positions.length), 'exposition 68%', null],
-          ['Niveau de risque', portfolio.risk_regime, `VaR 1j : -$${(portfolio.total_usd * 0.018).toFixed(0)}`, 'var(--accent)'],
-        ].map(([l, v, s, c], i) => (
+          { label: 'Valeur portefeuille', value: `$${portfolio.total_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, sub: `${portfolio.daily_pnl_pct >= 0 ? '+' : ''}${portfolio.daily_pnl_pct.toFixed(2)}% jour`, color: portfolio.daily_pnl_pct >= 0 ? 'var(--accent)' : 'var(--danger)' },
+          { label: 'Capital disponible', value: `$${portfolio.cash_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, sub: `${cashPct}% en cash`, color: null },
+          { label: 'Positions ouvertes', value: String(portfolio.positions.length), sub: `exposition ${exposurePct}%`, color: null },
+          { label: 'Niveau de risque', value: portfolio.risk_regime, sub: `VIX ${market.vix > 0 ? market.vix.toFixed(1) : '—'} · Fear/Greed ${market.fear_greed > 0 ? market.fear_greed : '—'}`, color: portfolio.risk_regime === 'NORMAL' ? 'var(--accent)' : portfolio.risk_regime === 'ELEVATED' ? 'var(--warn)' : 'var(--danger)' },
+        ].map((kpi, i) => (
           <div key={i} className="card kpi">
-            <div className="kpi-label">{l as string}</div>
-            <div className="kpi-value" style={{ color: c || 'var(--ink)', fontSize: l === 'Niveau de risque' ? 26 : 32, fontFamily: l === 'Niveau de risque' ? 'var(--mono)' : 'var(--serif)' }}>{v as string}</div>
-            <div className="kpi-sub">{s as string}</div>
+            <div className="kpi-label">{kpi.label}</div>
+            <div className="kpi-value" style={{ color: kpi.color || 'var(--ink)', fontSize: kpi.label === 'Niveau de risque' ? 26 : 32, fontFamily: kpi.label === 'Niveau de risque' ? 'var(--mono)' : 'var(--serif)' }}>{kpi.value}</div>
+            <div className="kpi-sub">{kpi.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Pipeline */}
+      {/* Pipeline — real agent status */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
           <div className="card-h-title">Pipeline d'agents IA <Help tip="Chaque agent traite l'information dans l'ordre. Une décision n'est prise que quand tous ont parlé." /></div>
-          <span className="card-h-meta">{isCycleActive ? 'cycle en cours' : 'en attente'} · étape {agentOrder.filter((n) => (agents as any)[n]?.status === 'ok').length}/7 · ~2s</span>
+          <span className="card-h-meta">{isCycleActive ? 'cycle en cours' : 'en attente'} · étape {completedSteps}/7</span>
         </div>
         <div style={{ padding: '24px 18px', display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, position: 'relative' }}>
-          {[
-            ['01', 'Collecteur', 'Récolte les données', 'done', 'var(--info)'],
-            ['02', 'Analyste', 'Lit les chiffres', 'done', 'var(--accent)'],
-            ['03', 'Bull', 'Cherche le haussier', 'done', 'var(--accent)'],
-            ['04', 'Bear', 'Cherche le baissier', 'done', 'var(--danger)'],
-            ['05', 'Risk', 'Calib. exposition', 'active', 'var(--warn)'],
-            ['06', 'Modérateur', 'Tranche', 'wait', 'oklch(0.74 0.10 280)'],
-            ['07', 'Reporter', 'Archive', 'wait', 'var(--ink-4)'],
-          ].map(([n, name, role, st, color], i) => {
-            const realAgent = (agents as any)[name.toLowerCase().replace(' ', '')] || { status: 'idle' };
+          {AGENT_ORDER.map((id, i) => {
+            const m = AGENT_PIPELINE_NAMES[id];
+            const realAgent = (agents as any)[id] || { status: 'idle' };
             const realStatus = realAgent.status === 'ok' ? 'done' : realAgent.status === 'running' ? 'active' : 'wait';
             return (
-              <div key={n as string} style={{ textAlign: 'center', position: 'relative' }}>
+              <div key={id} style={{ textAlign: 'center', position: 'relative' }}>
                 <div style={{
                   width: 56, height: 56, margin: '0 auto 12px',
                   borderRadius: 14,
                   border: '1.5px solid',
-                  borderColor: realStatus === 'active' ? color : realStatus === 'done' ? 'var(--rule-strong)' : 'var(--rule)',
-                  background: realStatus === 'active' ? (color as string) + '22' : realStatus === 'done' ? 'var(--bg-elev-2)' : 'transparent',
+                  borderColor: realStatus === 'active' ? m.color : realStatus === 'done' ? 'var(--rule-strong)' : 'var(--rule)',
+                  background: realStatus === 'active' ? m.color + '22' : realStatus === 'done' ? 'var(--bg-elev-2)' : 'transparent',
                   display: 'grid', placeItems: 'center',
                   fontFamily: 'var(--mono)', fontSize: 13,
-                  color: realStatus === 'active' ? color : realStatus === 'done' ? 'var(--ink)' : 'var(--ink-4)',
+                  color: realStatus === 'active' ? m.color : realStatus === 'done' ? 'var(--ink)' : 'var(--ink-4)',
                   fontWeight: 600,
                   position: 'relative',
                 }}>
-                  {realStatus === 'done' ? '✓' : n}
-                  {realStatus === 'active' && <span style={{ position: 'absolute', inset: -6, borderRadius: 18, border: `2px solid ${color}`, opacity: 0.4, animation: 'pulse 2s infinite' }} />}
+                  {realStatus === 'done' ? '✓' : m.num}
+                  {realStatus === 'active' && <span style={{ position: 'absolute', inset: -6, borderRadius: 18, border: `2px solid ${m.color}`, opacity: 0.4 }} />}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{name as string}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{role as string}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{m.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.role}</div>
                 {i < 6 && <div style={{ position: 'absolute', top: 28, right: -6, width: 12, height: 1, background: 'var(--rule-strong)' }} />}
               </div>
             );
@@ -157,24 +163,29 @@ export function Markets() {
         <div className="card">
           <div className="card-h">
             <div className="flex gap-3 center">
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>AAPL</span>
-              <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>$232.18</span>
-              <span className="badge badge-up">+0.42%</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>
+                {market.nasdaq || 'NASDAQ'}
+              </span>
+              <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>
+                {market.nasdaq_change_pct !== 0 ? `${market.nasdaq_change_pct >= 0 ? '+' : ''}${market.nasdaq_change_pct.toFixed(2)}%` : '—'}
+              </span>
             </div>
-            <div className="flex gap-2">
-              {['1m', '5m', '15m', '1h', '4h', '1d'].map((tf, i) => (
-                <button key={tf} style={{
-                  padding: '4px 10px', fontSize: 11, fontFamily: 'var(--mono)',
-                  border: '1px solid var(--rule)',
-                  background: i === 3 ? 'var(--accent-soft)' : 'transparent',
-                  color: i === 3 ? 'var(--accent)' : 'var(--ink-3)',
-                  borderRadius: 4, cursor: 'pointer',
-                }}>{tf}</button>
-              ))}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {market.nasdaq_status && (
+                <span style={{ fontSize: 11, color: market.nasdaq_status.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
+                  {market.nasdaq_status.isOpen ? 'Ouvert' : market.nasdaq_status.nextOpen || 'Fermé'}
+                </span>
+              )}
             </div>
           </div>
           <div style={{ padding: 16, height: 320, position: 'relative' }}>
-            <Candles candles={candles} />
+            {candles.length > 0 ? (
+              <Candles candles={candles} />
+            ) : (
+              <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)' }}>
+                Graphique en attente de données
+              </div>
+            )}
           </div>
         </div>
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -188,7 +199,7 @@ export function Markets() {
             ) : (
               flux.map((f, i) => (
                 <div key={i} style={{ padding: '12px 14px', borderBottom: i < flux.length - 1 ? '1px solid var(--rule)' : 'none' }}>
-                  <div className="flex between" style={{ marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span className="mono" style={{ fontSize: 10, color: f.color, letterSpacing: '0.06em', fontWeight: 600 }}>{f.who}</span>
                     <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{f.t}</span>
                   </div>

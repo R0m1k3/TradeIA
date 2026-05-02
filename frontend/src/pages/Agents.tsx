@@ -1,20 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
+import type { AgentState } from '../types';
 
-const AGENTS = [
-  { id: 'collector', n: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)', desc: 'Ingère les flux OHLC niveau 2, le carnet d\'ordres et les volumes en temps réel.', metrics: [['Flux', '12'], ['Latence', '82ms'], ['Erreurs 24h', '0']], status: 'actif' },
-  { id: 'analyst', n: '02', name: 'Analyste', role: 'Lit les chiffres', color: 'var(--accent)', desc: 'Surveille fondamentaux, ratios, bilans et corrélations sectorielles.', metrics: [['Cadence', '15m'], ['Univers', '420'], ['Note moy.', '7.1/10']], status: 'actif' },
-  { id: 'bull', n: '03', name: 'Bull', role: 'Cherche le haussier', color: 'var(--accent)', desc: 'Identifie les setups haussiers : breakouts, supports, divergences positives.', metrics: [['Signaux 24h', '14'], ['Win rate', '67%'], ['Confiance moy.', '71%']], status: 'actif' },
-  { id: 'bear', n: '04', name: 'Bear', role: 'Cherche le baissier', color: 'var(--danger)', desc: 'Identifie les retournements baissiers, divergences négatives, cassures.', metrics: [['Signaux 24h', '9'], ['Win rate', '58%'], ['Confiance moy.', '62%']], status: 'actif' },
-  { id: 'risk', n: '05', name: 'Risk', role: 'Calibre l\'exposition', color: 'var(--warn)', desc: 'Dimensionne chaque position via Kelly fractionné, oppose son veto si nécessaire.', metrics: [['Vetos 24h', '3'], ['Sizing moy.', '2.1%'], ['VaR 1j', '-$184']], status: 'actif' },
-  { id: 'strategist', n: '06', name: 'Modérateur', role: 'Tranche', color: 'oklch(0.74 0.10 280)', desc: 'Pondère les avis des autres agents, prend la décision finale, gère les conflits.', metrics: [['Décisions 24h', '23'], ['Long/Short', '64/36'], ['Abstentions', '5']], status: 'actif' },
-  { id: 'reporter', n: '07', name: 'Reporter', role: 'Archive la décision', color: 'var(--ink-3)', desc: 'Génère une justification écrite en français pour chaque trade. Tout est auditable.', metrics: [['Rapports 24h', '23'], ['Stockage', '420MB'], ['Format', 'MDX']], status: 'actif' },
-];
+const AGENT_META: Record<string, { n: string; name: string; role: string; color: string; desc: string }> = {
+  collector: { n: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)', desc: 'Ingère les flux OHLC, données fondamentales, macro et secteur pour alimenter les autres agents.' },
+  analyst: { n: '02', name: 'Analyste', role: 'Analyse technique & fondamentale', color: 'var(--accent)', desc: 'Surveille fondamentaux, ratios, bilans, corrélations sectorielles et signaux techniques multi-timeframe.' },
+  bull: { n: '03', name: 'Bull', role: 'Cherche le haussier', color: 'var(--accent)', desc: 'Identifie les setups haussiers : breakouts, supports, divergences positives, catalyseurs fondamentaux.' },
+  bear: { n: '04', name: 'Bear', role: 'Cherche le baissier', color: 'var(--danger)', desc: 'Identifie les retournements baissiers, divergences négatives, cassures de structure, risques macro.' },
+  risk: { n: '05', name: 'Risk', role: "Calibre l'exposition", color: 'var(--warn)', desc: "Dimensionne chaque position via Kelly fractionné, oppose son veto si le risque est trop élevé." },
+  strategist: { n: '06', name: 'Modérateur', role: 'Tranche', color: 'oklch(0.74 0.10 280)', desc: 'Pondère les avis des autres agents, prend la décision finale, gère les conflits.' },
+  reporter: { n: '07', name: 'Reporter', role: 'Archive la décision', color: 'var(--ink-3)', desc: 'Génère une justification écrite en français pour chaque trade. Tout est auditable.' },
+};
+
+const AGENT_IDS = ['collector', 'analyst', 'bull', 'bear', 'risk', 'strategist', 'reporter'];
 
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
 }
+
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  idle: { label: 'en attente', color: 'var(--ink-4)' },
+  running: { label: 'actif', color: 'var(--warn)' },
+  ok: { label: 'actif', color: 'var(--accent)' },
+  error: { label: 'erreur', color: 'var(--danger)' },
+};
 
 interface PredictionStats {
   total: number;
@@ -29,9 +39,9 @@ interface PredictionStats {
 }
 
 export function Agents() {
-  const { agents, signals, debates, cycleTimeline } = useSignalsStore();
+  const { agents, signals, debates, cycleTimeline, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
-  const [active, setActive] = useState(AGENTS[2]);
+  const [active, setActive] = useState('bull');
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
 
   useEffect(() => {
@@ -44,7 +54,19 @@ export function Agents() {
       .catch(() => {});
   }, []);
 
-  const realActive = AGENTS.find((a) => a.id === active.id) || AGENTS[0];
+  const meta = AGENT_META[active] || AGENT_META.bull;
+  const realAgent: AgentState = (agents as any)[active] || { status: 'idle' };
+  const statusInfo = STATUS_MAP[realAgent.status] || STATUS_MAP.idle;
+
+  // Find debates for active agent
+  const agentDebates = debates.filter((d) => {
+    if (active === 'bull') return d.bull;
+    if (active === 'bear') return d.bear;
+    return true;
+  });
+
+  // Latest signal for bull/bear/strategist
+  const latestSignal = signals.length > 0 ? signals[0] : null;
 
   return (
     <div className="page">
@@ -52,40 +74,48 @@ export function Agents() {
         <div>
           <h1 className="h1">Agents IA</h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
-            Chaque agent a une spécialité humaine bien identifiée. Aucun n'agit seul.
+            Chaque agent a une spécialité. Aucun n'agit seul.
           </div>
         </div>
       </div>
 
       {/* Cards grid */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        {AGENTS.map((a) => {
-          const real = (agents as any)[a.id];
+        {AGENT_IDS.map((id) => {
+          const m = AGENT_META[id];
+          const real = (agents as any)[id] as AgentState | undefined;
           const isRunning = real?.status === 'running';
+          const isOk = real?.status === 'ok';
+          const isErr = real?.status === 'error';
+          const st = STATUS_MAP[real?.status || 'idle'];
           return (
             <button
-              key={a.id}
-              onClick={() => setActive(a)}
+              key={id}
+              onClick={() => setActive(id)}
               className="card"
               style={{
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontFamily: 'inherit',
-                border: active.id === a.id ? `1px solid ${a.color}` : '1px solid var(--rule)',
-                background: active.id === a.id ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
+                border: active === id ? `1px solid ${m.color}` : '1px solid var(--rule)',
+                background: active === id ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
                 padding: 0,
               }}
             >
               <div style={{ padding: 16 }}>
-                <div className="flex between center" style={{ marginBottom: 12 }}>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{a.n}</span>
-                  <span className="badge" style={{ background: a.color + '22', color: a.color }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: a.color }} />
-                    {isRunning ? 'actif' : 'actif'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{m.n}</span>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
+                    background: st.color + '22', color: st.color,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color }} />
+                    {st.label}
                   </span>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{a.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.role}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{m.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{m.role}</div>
               </div>
             </button>
           );
@@ -97,73 +127,144 @@ export function Agents() {
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              <span style={{ width: 10, height: 10, borderRadius: 50, background: realActive.color }} />
-              {realActive.name} · <span className="muted" style={{ fontWeight: 400 }}>{realActive.role}</span>
+              <span style={{ width: 10, height: 10, borderRadius: 50, background: meta.color }} />
+              {meta.name} · <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>{meta.role}</span>
             </div>
-            <span className="card-h-meta">agent {realActive.n}</span>
+            <span className="card-h-meta">agent {meta.n}</span>
           </div>
           <div style={{ padding: 24 }}>
-            <p style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 24 }}>{realActive.desc}</p>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              {realActive.metrics.map(([k, v]) => (
-                <div key={k} className="card kpi" style={{ background: 'var(--bg-elev-2)', padding: 16 }}>
-                  <div className="kpi-label">{k}</div>
-                  <div className="kpi-value" style={{ fontSize: 26, fontFamily: 'var(--mono)' }}>{v}</div>
+            <p style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 24 }}>{meta.desc}</p>
+
+            {/* Real agent info */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+              <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
+                <div className="kpi-label">Statut</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: statusInfo.color }}>{statusInfo.label}</div>
+              </div>
+              {realAgent.lastRun && (
+                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
+                  <div className="kpi-label">Dernière exécution</div>
+                  <div className="mono" style={{ fontSize: 14 }}>{new Date(realAgent.lastRun).toLocaleTimeString('fr-FR')}</div>
                 </div>
-              ))}
+              )}
+              {realAgent.durationMs != null && (
+                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
+                  <div className="kpi-label">Durée</div>
+                  <div className="mono" style={{ fontSize: 14 }}>{(realAgent.durationMs / 1000).toFixed(1)}s</div>
+                </div>
+              )}
+              {realAgent.tokensUsed != null && (
+                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
+                  <div className="kpi-label">Tokens</div>
+                  <div className="mono" style={{ fontSize: 14 }}>{realAgent.tokensUsed.toLocaleString()}</div>
+                </div>
+              )}
+              {realAgent.error && (
+                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8, gridColumn: '1 / -1' }}>
+                  <div className="kpi-label">Erreur</div>
+                  <div style={{ fontSize: 12, color: 'var(--danger)' }}>{realAgent.error}</div>
+                </div>
+              )}
             </div>
-            <div style={{ marginTop: 24, padding: 16, background: 'var(--bg-elev-2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+
+            {/* Real output from debates/signals */}
+            <div style={{ padding: 16, background: 'var(--bg-elev-2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
               <div className="eyebrow" style={{ marginBottom: 8 }}>Dernière sortie</div>
-              {realActive.id === 'bull' && '« AAPL — setup haussier 4h confirmé. RSI 58, volume +18% vs moyenne 20j. Cible 240, stop 226.50. Confiance 71%. »'}
-              {realActive.id === 'bear' && '« AAPL — divergence baissière 1h détectée mais non confirmée par le 4h. Probabilité retracement 35%. ABSTENTION. »'}
-              {realActive.id === 'analyst' && '« AAPL — note 8.2/10. Marges +340bp YoY, FCF +12% QoQ. Inventaire +28% à surveiller. »'}
-              {realActive.id === 'risk' && '« Approuvé. Taille : 2.4% du book. Risque max : 0.6% NAV. Stop : -3.2% sur l\'actif. »'}
-              {realActive.id === 'strategist' && '« Décision : LONG AAPL 2.4% du book. Vote 4 pour, 1 contre. Confiance 71%. Stop 226.50. TP1 240. »'}
-              {realActive.id === 'collector' && '« Mise à jour OHLC AAPL · 1m · 14:32:08 UTC. Latence 82ms. Source : NASDAQ TotalView. »'}
-              {realActive.id === 'reporter' && '« Décision archivée : trade-2026-04-28-aapl-long-002.mdx. Justification PDF disponible. »'}
+              {agentDebates.length > 0 ? (
+                agentDebates.slice(0, 2).map((d) => (
+                  <div key={d.ticker} style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{d.ticker}</span> — score {d.debate_score > 0 ? '+' : ''}{d.debate_score}
+                    {active === 'bull' && d.bull && (
+                      <span> · conviction {d.bull.conviction}/10{d.bull.technical_case ? ` · ${d.bull.technical_case.slice(0, 60)}` : ''}</span>
+                    )}
+                    {active === 'bear' && d.bear && (
+                      <span> · conviction {d.bear.conviction}/10</span>
+                    )}
+                    {active === 'analyst' && d.analyst_output && (
+                      <span> · confiance {d.analyst_output.confidence}%</span>
+                    )}
+                  </div>
+                ))
+              ) : signals.length > 0 && (active === 'bull' || active === 'bear' || active === 'strategist') ? (
+                signals.slice(0, 3).map((s) => (
+                  <div key={s.ticker} style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{s.ticker}</span> — {s.signal} (score {s.debate_score > 0 ? '+' : ''}{s.debate_score}, confiance {s.confidence}%)
+                    {s.reasoning ? ` · ${s.reasoning.slice(0, 80)}` : ''}
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: 'var(--ink-4)' }}>Aucune sortie disponible — en attente du prochain cycle</div>
+              )}
             </div>
+
+            {/* Cycle timeline */}
+            {cycleTimeline.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>Dernier cycle</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {cycleTimeline.slice(-7).map((ev, i) => {
+                    const evMeta = AGENT_META[ev.agent];
+                    return (
+                      <div key={i} style={{
+                        padding: '4px 10px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
+                        background: (ev.status === 'ok' ? 'var(--accent-soft)' : ev.status === 'running' ? 'var(--warn-soft)' : 'var(--danger-soft)'),
+                        color: ev.status === 'ok' ? 'var(--accent)' : ev.status === 'running' ? 'var(--warn)' : 'var(--danger)',
+                      }}>
+                        {evMeta?.name || ev.agent} {ev.status === 'ok' ? '✓' : ev.status === 'running' ? '⟳' : '✗'}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              Performance par agent (30j) <Help tip="Win rate des signaux convertis en trades, pondéré." />
+              Performance IA <Help tip="Win rate des prédictions des agents, basé sur les trades fermés." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
-            {perfStats ? (
+            {perfStats && perfStats.total > 0 ? (
               <>
-                {AGENTS.filter((a) => ['bull', 'bear', 'strategist', 'analyst'].includes(a.id)).map((a) => {
-                  const w = a.id === 'bull' ? 67 : a.id === 'bear' ? 58 : a.id === 'strategist' ? 64 : 71;
+                {AGENT_IDS.filter((id) => ['bull', 'bear', 'strategist', 'analyst'].includes(id)).map((id) => {
+                  const m = AGENT_META[id];
+                  // Use real perf stats where available
+                  const w = id === 'bull' ? (perfStats.by_direction.BUY.total > 0 ? Math.round((perfStats.by_direction.BUY.correct / perfStats.by_direction.BUY.total) * 100) : 0) :
+                            id === 'bear' ? (perfStats.by_direction.SELL.total > 0 ? Math.round((perfStats.by_direction.SELL.correct / perfStats.by_direction.SELL.total) * 100) : 0) :
+                            Math.round(perfStats.win_rate);
                   return (
-                    <div key={a.id} style={{ marginBottom: 16 }}>
-                      <div className="flex between" style={{ marginBottom: 6 }}>
-                        <span style={{ fontSize: 13 }}>{a.name}</span>
-                        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: a.color }}>{w}%</span>
+                    <div key={id} style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13 }}>{m.name}</span>
+                        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.color }}>{w}%</span>
                       </div>
                       <div style={{ height: 6, background: 'var(--bg-elev-2)', borderRadius: 999 }}>
-                        <div style={{ width: `${w}%`, height: '100%', background: a.color, borderRadius: 999 }} />
+                        <div style={{ width: `${w}%`, height: '100%', background: m.color, borderRadius: 999 }} />
                       </div>
                     </div>
                   );
                 })}
                 <hr style={{ border: 0, borderTop: '1px solid var(--rule)', margin: '20px 0' }} />
-                <div className="flex between" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  <span>Décisions ce mois</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)' }}>
+                  <span>Prédictions totales</span>
                   <span className="mono" style={{ color: 'var(--ink)' }}>{perfStats.total}</span>
                 </div>
-                <div className="flex between" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-                  <span>Trades exécutés</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+                  <span>Résolues</span>
                   <span className="mono" style={{ color: 'var(--ink)' }}>{perfStats.resolved}</span>
                 </div>
-                <div className="flex between" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
                   <span>Win rate global</span>
                   <span className="mono" style={{ color: 'var(--accent)' }}>{perfStats.win_rate.toFixed(1)}%</span>
                 </div>
               </>
             ) : (
-              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>Chargement des statistiques...</div>
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+                Pas encore de données de performance — les statistiques apparaîtront avec les premiers trades
+              </div>
             )}
           </div>
         </div>
