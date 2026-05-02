@@ -41,8 +41,17 @@ export function TopBar({ paused, onToggleRun }: { paused: boolean; onToggleRun: 
       </div>
       <div className="tb-spacer" />
       <span className="tb-pill">
-        <span className="dot" />
-        Marché ouvert · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
+        {market.nasdaq_status?.isOpen ? (
+          <>
+            <span className="dot" style={{ background: 'var(--accent)' }} />
+            Marché ouvert · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
+          </>
+        ) : (
+          <>
+            <span className="dot" style={{ background: 'var(--ink-4)' }} />
+            {market.nasdaq_status?.nextOpen || 'Marché fermé'} · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
+          </>
+        )}
       </span>
       <button
         className={`btn ${paused ? 'btn-primary' : 'btn-ghost'} btn-sm`}
