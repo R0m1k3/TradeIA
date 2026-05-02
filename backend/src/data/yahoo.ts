@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
-import { getCredential } from '../config/credentials';
 import type { OHLCVBar, Fundamentals } from './alphavantage';
 
 const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
@@ -12,6 +11,30 @@ const YAHOO_HEADERS = {
 
 function unixToISO(ts: number): string {
   return new Date(ts * 1000).toISOString();
+}
+
+// Fetch a crumb from Yahoo to authenticate v8/v10 endpoints
+let cachedCrumb: string | null = null;
+let crumbExpiry = 0;
+
+async function getYahooCrumb(): Promise<string | null> {
+  if (cachedCrumb && Date.now() < crumbExpiry) return cachedCrumb;
+  try {
+    const sessionRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: YAHOO_HEADERS,
+      timeout: 10_000,
+      withCredentials: true,
+    });
+    if (typeof sessionRes.data === 'string' && sessionRes.data.length > 5) {
+      cachedCrumb = sessionRes.data;
+      crumbExpiry = Date.now() + 3600_000; // Cache for 1h
+      console.log('[Yahoo] Got crumb for authenticated requests');
+      return cachedCrumb;
+    }
+  } catch {
+    console.warn('[Yahoo] Could not get crumb — will try without auth');
+  }
+  return null;
 }
 
 interface YahooChartResult {
@@ -37,11 +60,21 @@ export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h
     const yahooInterval = interval === '4h' ? '1h' : interval === '1d' ? '1d' : interval;
     const yahooRange = interval === '15m' ? '5d' : interval === '1h' ? '1mo' : range;
 
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = { interval: yahooInterval, range: yahooRange };
+    if (crumb) params.crumb = crumb;
+
     const response = await axios.get(`${BASE}/${ticker}`, {
-      params: { interval: yahooInterval, range: yahooRange },
+      params,
       headers: YAHOO_HEADERS,
       timeout: 15_000,
+      validateStatus: () => true, // Don't throw on 401/404
     });
+
+    if (response.status === 401 || response.status === 404) {
+      console.warn(`[Yahoo] getOHLCV ${ticker} ${interval}: HTTP ${response.status} — skipping`);
+      return [];
+    }
 
     const result: YahooChartResult = response.data?.chart?.result?.[0];
     if (!result?.timestamp || !result?.indicators?.quote?.[0]) return [];
@@ -59,11 +92,7 @@ export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h
       if (o != null && h != null && l != null && c != null) {
         bars.push({
           time: unixToISO(result.timestamp[i]),
-          open: o,
-          high: h,
-          low: l,
-          close: c,
-          volume: v ?? 0,
+          open: o, high: h, low: l, close: c, volume: v ?? 0,
         });
       }
     }
@@ -71,7 +100,7 @@ export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h
     await cacheSet(cacheKey, bars, interval === '15m' ? TTL.OHLCV : TTL.FUNDAMENTALS);
     return bars;
   } catch (err) {
-    console.error(`[Yahoo] getOHLCV ${ticker} ${interval} error:`, (err as Error).message);
+    console.warn(`[Yahoo] getOHLCV ${ticker} ${interval} failed: ${(err as Error).message}`);
     return [];
   }
 }
@@ -82,11 +111,21 @@ export async function getYahooCurrentPrice(ticker: string): Promise<number | nul
   if (cached) return cached;
 
   try {
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = { interval: '1d', range: '1d' };
+    if (crumb) params.crumb = crumb;
+
     const response = await axios.get(`${BASE}/${ticker}`, {
-      params: { interval: '1d', range: '1d' },
+      params,
       headers: YAHOO_HEADERS,
       timeout: 10_000,
+      validateStatus: () => true,
     });
+
+    if (response.status === 401 || response.status === 404) {
+      console.warn(`[Yahoo] getCurrentPrice ${ticker}: HTTP ${response.status}`);
+      return null;
+    }
 
     const price = response.data?.chart?.result?.[0]?.meta?.regularMarketPrice;
     if (price) {
@@ -95,7 +134,7 @@ export async function getYahooCurrentPrice(ticker: string): Promise<number | nul
     }
     return null;
   } catch (err) {
-    console.error(`[Yahoo] getCurrentPrice ${ticker} error:`, (err as Error).message);
+    console.warn(`[Yahoo] getCurrentPrice ${ticker} failed: ${(err as Error).message}`);
     return null;
   }
 }
@@ -110,11 +149,23 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
   };
 
   try {
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings' };
+    if (crumb) params.crumb = crumb;
+
     const response = await axios.get(`${SUMMARY}/${ticker}`, {
-      params: { modules: 'defaultKeyStatistics,financialData,earnings' },
+      params,
       headers: YAHOO_HEADERS,
       timeout: 15_000,
+      validateStatus: () => true,
     });
+
+    if (response.status === 401 || response.status === 404) {
+      // Cache empty result to avoid hammering Yahoo with 401s
+      console.warn(`[Yahoo] getFundamentals ${ticker}: HTTP ${response.status} — caching empty`);
+      await cacheSet(cacheKey, empty, TTL.FUNDAMENTALS);
+      return empty;
+    }
 
     const stats = response.data?.quoteSummary?.result?.[0];
     if (!stats) return empty;
@@ -131,7 +182,7 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
     await cacheSet(cacheKey, result, TTL.FUNDAMENTALS);
     return result;
   } catch (err) {
-    console.error(`[Yahoo] getFundamentals ${ticker} error:`, (err as Error).message);
+    console.warn(`[Yahoo] getFundamentals ${ticker} failed: ${(err as Error).message}`);
     return empty;
   }
 }
@@ -143,11 +194,21 @@ export async function getYahooVIX(): Promise<number | null> {
   if (cached) return cached;
 
   try {
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = { interval: '1d', range: '5d' };
+    if (crumb) params.crumb = crumb;
+
     const response = await axios.get(`${BASE}/%5EVIX`, {
-      params: { interval: '1d', range: '5d' },
+      params,
       headers: YAHOO_HEADERS,
       timeout: 10_000,
+      validateStatus: () => true,
     });
+
+    if (response.status !== 200) {
+      console.warn(`[Yahoo] getVIX: HTTP ${response.status}`);
+      return null;
+    }
 
     const price = response.data?.chart?.result?.[0]?.meta?.regularMarketPrice;
     if (price) {
@@ -156,34 +217,55 @@ export async function getYahooVIX(): Promise<number | null> {
     }
     return null;
   } catch (err) {
-    console.error('[Yahoo] getVIX error:', (err as Error).message);
+    console.warn(`[Yahoo] getVIX failed: ${(err as Error).message}`);
     return null;
   }
 }
 
-/** Fetch Fear & Greed index from CNN (free, no API key) */
+/** Fetch Fear & Greed index — tries CNN, then alternative API */
 export async function getFearAndGreed(): Promise<number | null> {
   const cacheKey = 'market:fear_greed';
   const cached = await cacheGet<number>(cacheKey);
   if (cached) return cached;
 
+  // Try CNN first
   try {
     const response = await axios.get(
       'https://production.dataviz.cnn.io/index/fearandgreed/graphdata',
-      { timeout: 10_000 }
+      { timeout: 10_000, validateStatus: () => true }
     );
-
-    const data = response.data;
-    const fg = data?.fear_and_greed?.score ?? data?.fear_and_greed_index?.score ?? null;
-    if (fg !== null) {
-      await cacheSet(cacheKey, fg, TTL.MARKET_CONTEXT);
-      return fg;
+    if (response.status === 200) {
+      const data = response.data;
+      const fg = data?.fear_and_greed?.score ?? data?.fear_and_greed_index?.score ?? null;
+      if (fg !== null) {
+        await cacheSet(cacheKey, fg, TTL.MARKET_CONTEXT);
+        return fg;
+      }
     }
-    return null;
-  } catch (err) {
-    console.error('[Market] getFearAndGreed error:', (err as Error).message);
-    return null;
+  } catch {
+    // CNN blocked, try alternative
   }
+
+  // Alternative: fear-and-greed.com API
+  try {
+    const response = await axios.get('https://api.alternative.me/fng/?limit=1', {
+      timeout: 10_000,
+      validateStatus: () => true,
+    });
+    if (response.status === 200 && response.data?.data?.[0]?.value) {
+      const fg = parseInt(response.data.data[0].value, 10);
+      if (!isNaN(fg)) {
+        console.log(`[Market] FearGreed from alternative.me: ${fg}`);
+        await cacheSet(cacheKey, fg, TTL.MARKET_CONTEXT);
+        return fg;
+      }
+    }
+  } catch {
+    // Alternative also failed
+  }
+
+  console.warn('[Market] FearGreed unavailable — using default 50');
+  return null;
 }
 
 /** Fetch QQQ daily change for Nasdaq direction + change % */
@@ -193,11 +275,21 @@ export async function getNasdaqDirection(): Promise<{ direction: string; change_
   if (cached) return cached;
 
   try {
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = { interval: '1d', range: '5d' };
+    if (crumb) params.crumb = crumb;
+
     const response = await axios.get(`${BASE}/QQQ`, {
-      params: { interval: '1d', range: '5d' },
+      params,
       headers: YAHOO_HEADERS,
       timeout: 10_000,
+      validateStatus: () => true,
     });
+
+    if (response.status !== 200) {
+      console.warn(`[Yahoo] getNasdaqDirection: HTTP ${response.status}`);
+      return { direction: 'neutral', change_pct: 0 };
+    }
 
     const result: YahooChartResult = response.data?.chart?.result?.[0];
     const closes = result?.indicators?.quote?.[0]?.close?.filter((c): c is number => c !== null) ?? [];
@@ -208,13 +300,13 @@ export async function getNasdaqDirection(): Promise<{ direction: string; change_
       const change = ((today - yesterday) / yesterday) * 100;
 
       const dir = change > 0.5 ? 'bullish' : change < -0.5 ? 'bearish' : 'neutral';
-      const result = { direction: dir, change_pct: Math.round(change * 100) / 100 };
-      await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
-      return result;
+      const data = { direction: dir, change_pct: Math.round(change * 100) / 100 };
+      await cacheSet(cacheKey, data, TTL.MARKET_CONTEXT);
+      return data;
     }
     return { direction: 'neutral', change_pct: 0 };
   } catch (err) {
-    console.error('[Yahoo] getNasdaqDirection error:', (err as Error).message);
+    console.warn(`[Yahoo] getNasdaqDirection failed: ${(err as Error).message}`);
     return { direction: 'neutral', change_pct: 0 };
   }
 }
