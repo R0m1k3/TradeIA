@@ -1,4 +1,5 @@
 import type { SignalItem } from '../../types';
+import { getTickerName } from '../../data/tickerNames';
 
 interface HeatMapProps {
   signals: SignalItem[];
@@ -21,7 +22,7 @@ export function HeatMap({ signals }: HeatMapProps) {
   if (signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-24 text-text-secondary text-sm">
-        Awaiting signal data...
+        En attente des signaux...
       </div>
     );
   }
@@ -38,6 +39,7 @@ export function HeatMap({ signals }: HeatMapProps) {
           }}
         >
           <span className="font-mono font-bold text-xs text-text-primary">{s.ticker}</span>
+          <span className="text-[9px] text-text-secondary truncate max-w-[60px]">{getTickerName(s.ticker)}</span>
           <span
             className="text-[10px] font-mono font-medium"
             style={{ color: getColor(s.debate_score) }}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useConfigStore } from '../../store/config.store';
+import { getTickerName } from '../../data/tickerNames';
 
 export function WatchlistEditor() {
   const { config, saveConfig } = useConfigStore();
@@ -34,6 +35,7 @@ export function WatchlistEditor() {
             className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-bg-elevated border border-border"
           >
             <span className="text-xs font-mono font-bold text-text-primary">{t}</span>
+            <span className="text-[9px] text-text-secondary">{getTickerName(t)}</span>
             <button
               onClick={() => removeTicker(t)}
               className="text-text-secondary hover:text-accent-red transition-colors text-xs"
@@ -48,7 +50,7 @@ export function WatchlistEditor() {
           value={input}
           onChange={(e) => setInput(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === 'Enter' && addTicker()}
-          placeholder="Add ticker (e.g. AAPL)"
+          placeholder="Ajouter ticker (ex. AAPL)"
           maxLength={8}
           className="flex-1 bg-bg-elevated border border-border rounded px-3 py-1.5 text-xs font-mono text-text-primary placeholder-text-secondary focus:outline-none focus:border-accent-blue"
         />
@@ -57,7 +59,7 @@ export function WatchlistEditor() {
           disabled={saving || !input.trim()}
           className="px-3 py-1.5 bg-accent-blue/10 border border-accent-blue/30 text-accent-blue text-xs font-mono rounded hover:bg-accent-blue/20 transition-colors disabled:opacity-50"
         >
-          Add
+          Ajouter
         </button>
       </div>
     </div>

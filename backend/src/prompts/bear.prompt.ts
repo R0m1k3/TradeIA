@@ -16,6 +16,8 @@ CONVICTION SCORING (1-10):
 
 INVALIDATION: State clearly what price level or event would prove your thesis wrong.
 
+IMPORTANT: All text fields (technical_case, structural_weakness, macro_headwind, bull_rebuttal, invalidation_condition, strongest_bull_argument) MUST be written in French.
+
 Output STRICT JSON only:
 {
   "ticker": "",

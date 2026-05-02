@@ -6,6 +6,7 @@ import { SignalFeed } from '../components/cards/SignalFeed';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
 import type { Page } from '../App';
 import type { OHLCVBar } from '../types';
+import { getTickerName } from '../data/tickerNames';
 
 
 const SIGNAL_COLOR: Record<string, string> = {
@@ -14,13 +15,19 @@ const SIGNAL_COLOR: Record<string, string> = {
   HOLD: '#FFB347',
 };
 
+const SIGNAL_LABEL: Record<string, string> = {
+  BUY: 'ACHAT',
+  SELL: 'VENTE',
+  HOLD: 'CONSERVE',
+};
+
 interface DashboardProps {
   onNavigate: (page: Page) => void;
 }
 
 function FearGreedGauge({ value }: { value: number }) {
   const color = value > 70 ? '#FF4D6D' : value > 55 ? '#FFB347' : value > 45 ? '#8892A4' : value > 30 ? '#4A9EFF' : '#00D4AA';
-  const label = value > 70 ? 'Extreme Greed' : value > 55 ? 'Greed' : value > 45 ? 'Neutral' : value > 30 ? 'Fear' : 'Extreme Fear';
+  const label = value > 70 ? 'Ext. Cupidité' : value > 55 ? 'Cupidité' : value > 45 ? 'Neutre' : value > 30 ? 'Peur' : 'Ext. Peur';
   const pct = (value / 100) * 100;
 
   return (
@@ -44,6 +51,39 @@ function FearGreedGauge({ value }: { value: number }) {
   );
 }
 
+function NasdaqStatusCard({ market }: { market: ReturnType<typeof useSignalsStore>['market'] }) {
+  const status = market.nasdaq_status;
+  const isOpen = status?.isOpen ?? false;
+  const trendColor = market.nasdaq === 'bullish' ? 'text-accent-green' : market.nasdaq === 'bearish' ? 'text-accent-red' : 'text-text-secondary';
+  const trendArrow = market.nasdaq === 'bullish' ? '↑' : market.nasdaq === 'bearish' ? '↓' : '→';
+  const trendLabel = market.nasdaq === 'bullish' ? 'Haussier' : market.nasdaq === 'bearish' ? 'Baissier' : 'Neutre';
+
+  return (
+    <div className="bg-bg-surface rounded-lg border border-border p-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className={`w-2.5 h-2.5 rounded-full ${isOpen ? 'bg-accent-green animate-pulse' : 'bg-accent-red'}`} />
+        <div>
+          <p className="text-[10px] text-text-secondary uppercase tracking-wider">NASDAQ</p>
+          <p className={`font-syne font-bold text-sm ${trendColor}`}>
+            {trendArrow} {trendLabel}
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOpen ? 'bg-accent-green/10 text-accent-green border border-accent-green/30' : 'bg-accent-red/10 text-accent-red border border-accent-red/30'}`}>
+          {isOpen ? 'OUVERT' : 'FERMÉ'}
+        </span>
+        {status && !isOpen && status.nextOpen && (
+          <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextOpen}</p>
+        )}
+        {status && isOpen && status.nextClose && (
+          <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextClose}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard({ onNavigate: _ }: DashboardProps) {
   const { portfolio } = usePortfolioStore();
   const { signals, market } = useSignalsStore();
@@ -55,7 +95,6 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
     try {
       const api = import.meta.env.VITE_API_URL || '/api';
       await fetch(`${api}/orchestrator/run`, { method: 'POST' });
-      // The results will come back via WebSocket
     } catch (err) {
       console.error('Failed to trigger analysis:', err);
     }
@@ -64,7 +103,6 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
 
   const selectedSignal = signals.find((s) => s.ticker === selectedTicker);
 
-  // Generate mock OHLCV for chart (replaced by real data when connected)
   const mockBars: OHLCVBar[] = Array.from({ length: 100 }, (_, i) => {
     const base = 180;
     const t = new Date(Date.now() - (99 - i) * 15 * 60 * 1000);
@@ -85,14 +123,14 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
   return (
     <div className="space-y-4 max-w-[1600px]">
       <div className="flex items-center justify-between">
-        <h2 className="font-syne font-bold text-xl text-text-primary tracking-tight">Market Overview</h2>
+        <h2 className="font-syne font-bold text-xl text-text-primary tracking-tight">Vue Marché</h2>
         <button
           onClick={triggerAnalysis}
           disabled={analyzing}
           className={`
             px-4 py-2 rounded text-xs font-mono font-bold transition-all duration-200 flex items-center gap-2
-            ${analyzing 
-              ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/30' 
+            ${analyzing
+              ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/30'
               : 'bg-accent-green/10 border border-accent-green/40 text-accent-green hover:bg-accent-green/20'
             }
           `}
@@ -100,39 +138,43 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
           {analyzing ? (
             <>
               <span className="w-2 h-2 rounded-full bg-accent-blue animate-pulse" />
-              IA Scanning...
+              Analyse IA en cours...
             </>
           ) : (
             <>
               <span className="text-lg">⚡</span>
-              Force Global IA Analysis
+              Forcer l'analyse IA
             </>
           )}
         </button>
       </div>
+
+      {/* NASDAQ Status */}
+      <NasdaqStatusCard market={market} />
+
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
-          label="Portfolio Value"
+          label="Valeur Portfolio"
           value={`$${portfolio.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          sub={`Cash $${portfolio.cash_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+          sub={`Liquidités $${portfolio.cash_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
           accentColor="#00D4AA"
         />
         <KpiCard
-          label="P&L Today"
+          label="P&L Jour"
           value={`${pnlPositive ? '+' : ''}${portfolio.daily_pnl_pct.toFixed(2)}%`}
           sub={`${pnlPositive ? '+' : ''}$${((portfolio.total_usd * portfolio.daily_pnl_pct) / 100).toFixed(2)}`}
           subPositive={pnlPositive}
           accentColor={pnlPositive ? '#00D4AA' : '#FF4D6D'}
         />
         <KpiCard
-          label="Open Positions"
+          label="Positions Ouvertes"
           value={String(portfolio.positions.length)}
-          sub={`${signals.filter((s) => s.signal === 'BUY').length} BUY signals`}
+          sub={`${signals.filter((s) => s.signal === 'BUY').length} signaux ACHAT`}
           accentColor="#4A9EFF"
         />
         <KpiCard
-          label="Risk Regime"
+          label="Risque"
           value={portfolio.risk_regime}
           sub={`VIX ${market.vix.toFixed(1)}`}
           accentColor={portfolio.risk_regime === 'NORMAL' ? '#00D4AA' : portfolio.risk_regime === 'ELEVATED' ? '#FFB347' : '#FF4D6D'}
@@ -162,6 +204,7 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
                     `}
                   >
                     {t}
+                    <span className="ml-1 text-[9px] text-text-secondary font-normal">{getTickerName(t)}</span>
                     <span className="ml-1.5 text-[9px]" style={{ color: sigColor }}>
                       ●
                     </span>
@@ -176,19 +219,19 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
             {selectedSignal && (
               <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
                 <div className="px-4 py-2">
-                  <p className="text-[10px] text-text-secondary uppercase tracking-wider">RSI 15m</p>
+                  <p className="text-[10px] text-text-secondary uppercase tracking-wider">Confiance</p>
                   <p className={`text-sm font-mono font-bold ${selectedSignal.confidence > 70 ? 'text-accent-amber' : 'text-text-primary'}`}>
-                    {selectedSignal.confidence || '—'}
+                    {selectedSignal.confidence || '—'}%
                   </p>
                 </div>
                 <div className="px-4 py-2">
                   <p className="text-[10px] text-text-secondary uppercase tracking-wider">Signal</p>
                   <p className="text-sm font-mono font-bold" style={{ color: SIGNAL_COLOR[selectedSignal.signal] }}>
-                    {selectedSignal.signal}
+                    {SIGNAL_LABEL[selectedSignal.signal] || selectedSignal.signal}
                   </p>
                 </div>
                 <div className="px-4 py-2">
-                  <p className="text-[10px] text-text-secondary uppercase tracking-wider">Debate</p>
+                  <p className="text-[10px] text-text-secondary uppercase tracking-wider">Débat</p>
                   <p className={`text-sm font-mono font-bold ${selectedSignal.debate_score > 0 ? 'text-accent-green' : selectedSignal.debate_score < 0 ? 'text-accent-red' : 'text-text-secondary'}`}>
                     {selectedSignal.debate_score > 0 ? '+' : ''}{selectedSignal.debate_score}
                   </p>
@@ -203,7 +246,7 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
           {/* Agent Signal Feed */}
           <div className="bg-bg-surface rounded-lg border border-border">
             <div className="px-4 py-3 border-b border-border">
-              <h3 className="font-syne font-bold text-sm text-text-primary">Agent Feed</h3>
+              <h3 className="font-syne font-bold text-sm text-text-primary">Flux Agents</h3>
             </div>
             <div className="p-3">
               <SignalFeed signals={signals} />
@@ -213,7 +256,7 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
           {/* Market Context */}
           <div className="bg-bg-surface rounded-lg border border-border">
             <div className="px-4 py-3 border-b border-border">
-              <h3 className="font-syne font-bold text-sm text-text-primary">Market Context</h3>
+              <h3 className="font-syne font-bold text-sm text-text-primary">Contexte Marché</h3>
             </div>
             <div className="p-4 flex items-center justify-around">
               <div className="text-center">
@@ -223,13 +266,13 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-2 text-center">Fear & Greed</p>
+                <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-2 text-center">Peur & Cupidité</p>
                 <FearGreedGauge value={market.fear_greed} />
               </div>
               <div className="text-center">
                 <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">NASDAQ</p>
                 <p className={`font-syne font-bold text-sm capitalize ${market.nasdaq === 'bullish' ? 'text-accent-green' : market.nasdaq === 'bearish' ? 'text-accent-red' : 'text-text-secondary'}`}>
-                  {market.nasdaq === 'bullish' ? '↑' : market.nasdaq === 'bearish' ? '↓' : '→'} {market.nasdaq}
+                  {market.nasdaq === 'bullish' ? '↑' : market.nasdaq === 'bearish' ? '↓' : '→'} {market.nasdaq === 'bullish' ? 'Haussier' : market.nasdaq === 'bearish' ? 'Baissier' : 'Neutre'}
                 </p>
               </div>
             </div>
@@ -240,13 +283,13 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
       {/* Watchlist table */}
       <div className="bg-bg-surface rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border">
-          <h3 className="font-syne font-bold text-sm text-text-primary">Watchlist</h3>
+          <h3 className="font-syne font-bold text-sm text-text-primary">Liste de Surveillance</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border">
-                {['Ticker', 'Signal', 'Debate Score', 'Bull Conv.', 'Bear Conv.', 'Confidence', 'Reasoning'].map((h) => (
+                {['Ticker', 'Entreprise', 'Signal', 'Score Débat', 'Conv. Haussier', 'Conv. Baissier', 'Confiance', 'Raisonnement'].map((h) => (
                   <th key={h} className="text-left px-4 py-2 text-[10px] text-text-secondary uppercase tracking-wider font-normal">
                     {h}
                   </th>
@@ -256,8 +299,8 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
             <tbody>
               {signals.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-text-secondary">
-                    Awaiting agent cycle...
+                  <td colSpan={8} className="px-4 py-6 text-center text-text-secondary">
+                    En attente du cycle IA...
                   </td>
                 </tr>
               ) : (
@@ -270,12 +313,13 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
                       style={{ background: i % 2 === 0 ? undefined : '#111827' }}
                     >
                       <td className="px-4 py-3 font-mono font-bold text-text-primary">{s.ticker}</td>
+                      <td className="px-4 py-3 text-text-secondary text-[11px]">{getTickerName(s.ticker)}</td>
                       <td className="px-4 py-3">
                         <span
                           className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
                           style={{ background: `${sigColor}15`, border: `1px solid ${sigColor}50`, color: sigColor }}
                         >
-                          {s.signal}
+                          {SIGNAL_LABEL[s.signal] || s.signal}
                         </span>
                       </td>
                       <td className="px-4 py-3">

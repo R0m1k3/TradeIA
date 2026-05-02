@@ -66,8 +66,8 @@ export class RiskAgent {
       }
 
       const rr = (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss);
-      if (rr < 1.5) {
-        console.log(`[Risk] Rejected ${p.ticker}: R/R ${rr.toFixed(2)} < 1.5`);
+      if (rr < 2.0) {
+        console.log(`[Risk] Rejected ${p.ticker}: R/R ${rr.toFixed(2)} < 2.0`);
         continue;
       }
 
@@ -76,7 +76,7 @@ export class RiskAgent {
         continue;
       }
 
-      let sizeUsd = portfolioUsd * (p.risk_pct / 100) * (p.confidence / 100) * 0.5;
+      let sizeUsd = portfolioUsd * (p.risk_pct / 100) * (p.confidence / 100) * 0.4;
       sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.05);
 
       approved.push({

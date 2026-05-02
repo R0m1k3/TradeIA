@@ -14,6 +14,8 @@ Classify data_quality as:
 
 Set earnings_blackout: true if earnings are within 48 hours of current time.
 
+IMPORTANT: All text fields in the output (news headlines, sentiment hints) MUST be written in French.
+
 Output format:
 {
   "tickers": {

@@ -5,6 +5,7 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 
 const REPORTER_SYSTEM = `You are the trading cycle reporter. Summarize the completed cycle and generate any necessary alerts.
+IMPORTANT: All alert messages and the summary MUST be written in French.
 Output JSON only: { "alerts": [{ "level": "info|warning|critical", "message": "", "ticker": "" }], "summary": "" }`;
 
 export class ReporterAgent {

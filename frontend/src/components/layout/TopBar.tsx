@@ -51,7 +51,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
 
       {/* Risk regime */}
       <div className="flex items-center gap-2">
-        <div className="text-[10px] text-text-secondary uppercase tracking-wider">Risk</div>
+        <div className="text-[10px] text-text-secondary uppercase tracking-wider">Risque</div>
         <span
           className="text-xs font-mono font-bold px-2 py-0.5 rounded"
           style={{
@@ -74,7 +74,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
 
       {/* Cash */}
       <div className="hidden lg:flex items-center gap-2">
-        <div className="text-[10px] text-text-secondary uppercase tracking-wider">Cash</div>
+        <div className="text-[10px] text-text-secondary uppercase tracking-wider">Liquidités</div>
         <span className="text-sm font-mono text-text-primary">
           ${portfolio.cash_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
         </span>

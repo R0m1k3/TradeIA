@@ -1,4 +1,5 @@
 import type { SignalItem } from '../../types';
+import { getTickerName } from '../../data/tickerNames';
 
 const SIGNAL_STYLES: Record<string, { bg: string; border: string; text: string }> = {
   BUY: { bg: '#00D4AA10', border: '#00D4AA', text: '#00D4AA' },
@@ -15,7 +16,7 @@ export function SignalFeed({ signals, onBlock }: SignalFeedProps) {
   if (signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-text-secondary text-sm">
-        Waiting for agent cycle...
+        En attente du cycle IA...
       </div>
     );
   }
@@ -32,12 +33,15 @@ export function SignalFeed({ signals, onBlock }: SignalFeedProps) {
             <span className="font-mono font-bold text-xs text-text-primary w-12 flex-shrink-0">
               {s.ticker}
             </span>
+            <span className="text-[10px] text-text-secondary flex-shrink-0 max-w-[80px] truncate">
+              {getTickerName(s.ticker)}
+            </span>
 
             <span
               className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded flex-shrink-0"
               style={{ background: style.bg, border: `1px solid ${style.border}`, color: style.text }}
             >
-              {s.signal}
+              {s.signal === 'BUY' ? 'ACHAT' : s.signal === 'SELL' ? 'VENTE' : 'CONSERVE'}
             </span>
 
             {/* Debate score bar */}
@@ -74,7 +78,7 @@ export function SignalFeed({ signals, onBlock }: SignalFeedProps) {
                 onClick={() => onBlock(s.ticker)}
                 className="text-[10px] font-mono text-accent-red border border-accent-red/30 px-1.5 py-0.5 rounded hover:bg-accent-red/10 transition-colors flex-shrink-0"
               >
-                Block
+                Bloquer
               </button>
             )}
           </div>

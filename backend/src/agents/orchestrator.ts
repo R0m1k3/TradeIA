@@ -9,7 +9,7 @@ import { executeOrder, getPortfolioState, markToMarket } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 
-const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META,JPM,BAC,GE,AVGO,ORCL,CRM,AMD,QCOM,SBUX').split(',').map((t) => t.trim());
+const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
 
 let isRunning = false;
 

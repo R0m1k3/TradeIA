@@ -4,22 +4,29 @@ import { getModels } from '../llm/models';
 import { getCredential } from '../config/credentials';
 import axios from 'axios';
 
-const DISCOVERY_SYSTEM = `You are a Master Market Scanner.
-Your goal is to analyze a list of top market movers and select the most promising tickers for a long/short day-trading strategy.
+const DISCOVERY_SYSTEM = `You are a Master Market Scanner for medium-term swing trading (5-20 day holds).
+Your goal is to analyze a list of top market movers and select the most promising tickers for a medium-term swing trading strategy.
+Transaction costs (~0.1-0.5% per trade) make short-term scalping unprofitable — focus on moves of 3%+.
 Focus on:
-1. High relative volume (unusual activity).
-2. Clean price action (avoiding penny stocks or extremely illiquid assets).
-3. Stocks with clear momentum or reversal patterns.
+1. Stocks with clear medium-term trend alignment (4H/daily trend direction).
+2. High relative volume confirming institutional interest.
+3. Clean price action with identifiable S/R levels (avoid penny stocks or extremely illiquid assets).
+4. Stocks approaching key technical levels (breakouts, pullbacks to moving averages).
 
 Return ONLY a JSON array of 5 to 15 ticker symbols. Example: ["AAPL", "NVDA", "TSLA"]`;
 
-/** NASDAQ 100 fallback tickers */
+/** NASDAQ 100 fallback tickers (full list) */
 const NASDAQ_100 = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'ORCL', 'ADBE',
-  'CRM', 'INTC', 'AMD', 'QCOM', 'TXN', 'SBUX', 'PYPL', 'BKNG', 'ISRG', 'MDLZ',
-  'ADP', 'GILD', 'VRTX', 'REGN', 'ATVI', 'MNST', 'CHTR', 'LRCX', 'KLAC', 'MRVL',
-  'PANW', 'SNPS', 'CDNS', 'MRNA', 'ILMN', 'BIIB', 'FTNT', 'ZS', 'DDOG', 'NET',
-  'CRWD', 'ABNB', 'LCID', 'RIVN', 'SOFI', 'COIN', 'HOOD', 'PLTR', 'AI', 'ARM',
+  'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMGN', 'AMZN', 'ANSS',
+  'ARM', 'ASML', 'AVGO', 'AXON', 'AZN', 'BIIB', 'BKNG', 'BKR', 'CDNS', 'CDW',
+  'CEG', 'CHTR', 'CMCSA', 'COIN', 'COST', 'CPRT', 'CRWD', 'CTAS', 'CTSH', 'DASH',
+  'DDOG', 'DLTR', 'DXCM', 'EA', 'EXC', 'FANG', 'FAST', 'FTNT', 'GE', 'GILD',
+  'GOOGL', 'HON', 'IDXX', 'ILMN', 'INTC', 'INTU', 'ISRG', 'KDP', 'KHC', 'KLAC',
+  'LRCX', 'LULU', 'MAR', 'MCHP', 'MDB', 'MDLZ', 'MELI', 'META', 'MNST', 'MRVL',
+  'MSFT', 'MU', 'NFLX', 'NVDA', 'NXPI', 'ODFL', 'ON', 'ORCL', 'PANW', 'PAYX',
+  'PCAR', 'PDD', 'PEP', 'PLTR', 'PYPL', 'QCOM', 'REGN', 'ROP', 'ROST', 'SBUX',
+  'SNPS', 'TEAM', 'TMUS', 'TSLA', 'TTD', 'TTWO', 'TXN', 'VRTX', 'VRSK', 'VRSN',
+  'WBD', 'WDAY', 'XEL', 'ZS',
 ];
 
 export class DiscoveryAgent {
