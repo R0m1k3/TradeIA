@@ -25,7 +25,7 @@ services:
       - DATABASE_URL=postgresql://trading:${DB_PASS:-trading123}@postgres:5439/trading
       - REDIS_URL=redis://redis:6379
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
       - MODEL_LIGHT=${MODEL_LIGHT:-anthropic/claude-haiku-4-5}
       - MODEL_MID=${MODEL_MID:-anthropic/claude-sonnet-4-5}
       - MODEL_STRONG=${MODEL_STRONG:-anthropic/claude-opus-4}
@@ -38,6 +38,7 @@ services:
       - POLYGON_KEY=${POLYGON_KEY:-}
       - FINNHUB_KEY=${FINNHUB_KEY:-}
       - ALPHAVANTAGE_KEY=${ALPHAVANTAGE_KEY:-}
+      - FRED_API_KEY=${FRED_API_KEY:-}
       - PORT=4000
     depends_on:
       postgres:
@@ -92,16 +93,4 @@ services:
       tradeia_net:
       nginx_default:
         ipv4_address: 172.20.0.26
-    restart: unless-stopped
-
-  ollama:
-    image: ollama/ollama
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    volumes:
-      - ./data/ollama:/root/.ollama
-    networks:
-      - tradeia_net
     restart: unless-stopped
