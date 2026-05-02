@@ -257,6 +257,12 @@ export function Config() {
               placeholder="API Key"
               onSave={(val) => saveSecret('finnhub_key', val)}
             />
+            <ApiKeyInput
+              label="FRED (Macro)"
+              configured={secretsConfigured.fred_api_key}
+              placeholder="Clé gratuite sur fred.stlouisfed.org"
+              onSave={(val) => saveSecret('fred_api_key', val)}
+            />
           </div>
 
           {/* Watchlist */}
@@ -328,6 +334,29 @@ export function Config() {
                 <span>1%</span>
                 <span>10%</span>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-text-secondary">Max Drawdown (Circuit Breaker)</span>
+                <span className="font-mono text-accent-red">{config.max_drawdown_pct}%</span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={30}
+                step={1}
+                value={parseFloat(config.max_drawdown_pct || '10')}
+                onChange={(e) => saveConfig({ max_drawdown_pct: e.target.value })}
+                className="w-full accent-accent-red"
+              />
+              <div className="flex justify-between text-[10px] text-text-secondary">
+                <span>5% — très conservateur</span>
+                <span>30% — permissif</span>
+              </div>
+              <p className="text-[9px] text-text-secondary italic">
+                Si le portefeuille perd ce % depuis le capital initial → toutes positions fermées + trading suspendu 72h
+              </p>
             </div>
 
             <div className="flex justify-end mt-4">

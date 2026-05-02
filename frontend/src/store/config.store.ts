@@ -8,7 +8,9 @@ interface Config {
   watchlist: string;
   portfolio_usd: string;
   daily_loss_limit_pct: string;
+  max_drawdown_pct: string;
   mock_broker: string;
+  ollama_base_url: string;
   [key: string]: string;
 }
 
@@ -17,6 +19,7 @@ interface ConfigSecrets {
   alpha_vantage_key: boolean;
   polygon_key: boolean;
   finnhub_key: boolean;
+  fred_api_key: boolean;
 }
 
 interface ConfigStore {
@@ -41,13 +44,16 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     watchlist: 'AAPL,MSFT,GOOGL,NVDA,TSLA',
     portfolio_usd: '10000',
     daily_loss_limit_pct: '3',
+    max_drawdown_pct: '10',
     mock_broker: 'true',
+    ollama_base_url: '',
   },
   secretsConfigured: {
     openrouter_api_key: false,
     alpha_vantage_key: false,
     polygon_key: false,
     finnhub_key: false,
+    fred_api_key: false,
   },
   paused: false,
 

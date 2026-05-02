@@ -38,7 +38,6 @@ services:
       - POLYGON_KEY=${POLYGON_KEY:-}
       - FINNHUB_KEY=${FINNHUB_KEY:-}
       - ALPHAVANTAGE_KEY=${ALPHAVANTAGE_KEY:-}
-      - FRED_API_KEY=${FRED_API_KEY:-}
       - PORT=4000
     depends_on:
       postgres:
