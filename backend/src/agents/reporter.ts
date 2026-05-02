@@ -26,21 +26,10 @@ export class ReporterAgent {
   updateAgent(name: keyof CycleUpdatePayload['agents'], state: AgentState) {
     this.agentStates[name] = { ...this.agentStates[name], ...state };
 
+    // Only broadcast agent status — don't wipe portfolio/market data
     broadcastCycleUpdate({
-      portfolio: {
-        total_usd: 0,
-        cash_usd: 0,
-        daily_pnl_pct: 0,
-        risk_regime: 'NORMAL',
-        initial_capital: 0,
-        positions: [],
-      },
-      market: { vix: 0, fear_greed: 0, nasdaq: '', nasdaq_change_pct: 0, nasdaq_status: getNasdaqStatus() },
-      signals: [],
-      orders_executed: [],
-      alerts: [],
       agents: this.agentStates,
-    });
+    } as any);
   }
 
   async finalize(

@@ -59,7 +59,7 @@ export function broadcastOverrideAck(action: string, ticker: string) {
 }
 
 export interface CycleUpdatePayload {
-  portfolio: {
+  portfolio?: {
     total_usd: number;
     cash_usd: number;
     daily_pnl_pct: number;
@@ -67,7 +67,7 @@ export interface CycleUpdatePayload {
     initial_capital: number;
     positions: PortfolioPosition[];
   };
-  market: {
+  market?: {
     vix: number;
     fear_greed: number;
     nasdaq: string;
@@ -78,10 +78,10 @@ export interface CycleUpdatePayload {
       nextClose: string;
     };
   };
-  signals: SignalItem[];
-  orders_executed: ExecutedOrder[];
-  alerts: AlertItem[];
-  agents: AgentStatus;
+  signals?: SignalItem[];
+  orders_executed?: ExecutedOrder[];
+  alerts?: AlertItem[];
+  agents?: AgentStatus;
 }
 
 export interface PortfolioPosition {
