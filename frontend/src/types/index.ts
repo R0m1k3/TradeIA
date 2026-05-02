@@ -20,6 +20,7 @@ export interface Portfolio {
   cash_usd: number;
   daily_pnl_pct: number;
   risk_regime: RiskRegime;
+  initial_capital: number;
   positions: Position[];
 }
 

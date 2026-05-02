@@ -29,6 +29,7 @@ export class ReporterAgent {
         cash_usd: 0,
         daily_pnl_pct: 0,
         risk_regime: 'NORMAL',
+        initial_capital: 0,
         positions: [],
       },
       market: { vix: 0, fear_greed: 0, nasdaq: '' },
@@ -100,6 +101,7 @@ export class ReporterAgent {
       cash_usd: portfolioUsd,
       daily_pnl_pct: 0,
       risk_regime: 'NORMAL',
+      initial_capital: portfolioUsd,
       positions: [],
     };
 

@@ -6,6 +6,7 @@ const DEFAULT_PORTFOLIO: Portfolio = {
   cash_usd: 10000,
   daily_pnl_pct: 0,
   risk_regime: 'NORMAL',
+  initial_capital: 10000,
   positions: [],
 };
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { PortfolioChart } from '../components/charts/PortfolioChart';
+import { getTickerName } from '../data/tickerNames';
 import type { Trade } from '../types';
 
 const CLOSE_REASON_ICONS: Record<string, string> = {
@@ -11,15 +12,12 @@ const CLOSE_REASON_ICONS: Record<string, string> = {
 };
 
 function PositionRow({ position }: { position: { ticker: string; quantity: number; entryPrice: number; currentPrice: number; sizeUsd: number; pnlUsd: number; pnlPct: number; stopLoss: number; takeProfit: number } }) {
-  const [showReasoning, setShowReasoning] = useState(false);
   const pnlPositive = position.pnlUsd >= 0;
 
   return (
-    <tr
-      className="border-b border-border/50 hover:bg-bg-elevated transition-colors cursor-pointer"
-      onClick={() => setShowReasoning((s) => !s)}
-    >
+    <tr className="border-b border-border/50 hover:bg-bg-elevated transition-colors">
       <td className="px-4 py-3 font-mono font-bold text-text-primary">{position.ticker}</td>
+      <td className="px-4 py-3 text-text-secondary text-[11px]">{getTickerName(position.ticker)}</td>
       <td className="px-4 py-3 font-mono text-text-secondary">${position.entryPrice.toFixed(2)}</td>
       <td className="px-4 py-3 font-mono text-text-primary">${position.currentPrice.toFixed(2)}</td>
       <td className="px-4 py-3 font-mono text-text-secondary">{position.quantity.toFixed(4)}</td>
@@ -42,6 +40,7 @@ function TradeRow({ trade }: { trade: Trade }) {
   return (
     <tr className="border-b border-border/50 hover:bg-bg-elevated transition-colors">
       <td className="px-4 py-3 font-mono font-bold text-text-primary">{trade.ticker}</td>
+      <td className="px-4 py-3 text-text-secondary text-[11px]">{getTickerName(trade.ticker)}</td>
       <td className="px-4 py-3 font-mono text-text-secondary">${trade.filledPrice.toFixed(2)}</td>
       <td className="px-4 py-3 font-mono text-text-secondary">${trade.closePrice?.toFixed(2) || '—'}</td>
       <td className="px-4 py-3 font-mono text-text-secondary">{trade.quantity.toFixed(4)}</td>
@@ -64,11 +63,11 @@ function TradeRow({ trade }: { trade: Trade }) {
           className="text-[10px] font-mono"
           style={{ color: trade.bullConviction > trade.bearConviction ? '#00D4AA' : '#FF4D6D' }}
         >
-          {trade.bullConviction > trade.bearConviction ? 'Bull ✓' : 'Bear ✓'}
+          {trade.bullConviction > trade.bearConviction ? 'Haussier ✓' : 'Baissier ✓'}
         </span>
       </td>
       <td className="px-4 py-3 text-[10px] text-text-secondary font-mono">
-        {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString() : '—'}
+        {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString('fr-FR') : '—'}
       </td>
     </tr>
   );
@@ -78,7 +77,7 @@ export function Portfolio() {
   const { portfolio, history } = usePortfolioStore();
   const [tab, setTab] = useState<'open' | 'history'>('open');
 
-  const startingValue = 10000;
+  const startingValue = portfolio.initial_capital || 10000;
   const totalPnl = portfolio.total_usd - startingValue;
   const totalPnlPct = (totalPnl / startingValue) * 100;
 
@@ -95,7 +94,7 @@ export function Portfolio() {
               className="text-sm font-mono"
               style={{ color: totalPnlPct >= 0 ? '#00D4AA' : '#FF4D6D' }}
             >
-              {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% all time
+              {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% total
               {' '}({totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)})
             </p>
           </div>
@@ -113,13 +112,13 @@ export function Portfolio() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-mono capitalize transition-colors border-b-2 -mb-px ${
+            className={`px-4 py-2 text-sm font-mono transition-colors border-b-2 -mb-px ${
               tab === t
                 ? 'border-accent-green text-text-primary'
                 : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
           >
-            {t === 'open' ? `Open (${portfolio.positions.length})` : `History (${history.length})`}
+            {t === 'open' ? `Ouvertes (${portfolio.positions.length})` : `Historique (${history.length})`}
           </button>
         ))}
       </div>
@@ -131,7 +130,7 @@ export function Portfolio() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border">
-                  {['Ticker', 'Entry', 'Current', 'Qty', 'P&L $', 'P&L %', 'Stop', 'TP'].map((h) => (
+                  {['Ticker', 'Entreprise', 'Entrée', 'Actuel', 'Qté', 'P&L $', 'P&L %', 'Stop', 'TP'].map((h) => (
                     <th key={h} className="text-left px-4 py-2 text-[10px] text-text-secondary uppercase tracking-wider font-normal">
                       {h}
                     </th>
@@ -141,8 +140,8 @@ export function Portfolio() {
               <tbody>
                 {portfolio.positions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
-                      No open positions
+                    <td colSpan={9} className="px-4 py-8 text-center text-text-secondary">
+                      Aucune position ouverte
                     </td>
                   </tr>
                 ) : (
@@ -161,7 +160,7 @@ export function Portfolio() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border">
-                  {['Ticker', 'Entry', 'Exit', 'Qty', 'P&L', 'Result', 'Who won?', 'Date'].map((h) => (
+                  {['Ticker', 'Entreprise', 'Entrée', 'Sortie', 'Qté', 'P&L', 'Résultat', 'Gagnant', 'Date'].map((h) => (
                     <th key={h} className="text-left px-4 py-2 text-[10px] text-text-secondary uppercase tracking-wider font-normal">
                       {h}
                     </th>
@@ -171,8 +170,8 @@ export function Portfolio() {
               <tbody>
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
-                      No closed trades yet
+                    <td colSpan={9} className="px-4 py-8 text-center text-text-secondary">
+                      Aucun trade fermé
                     </td>
                   </tr>
                 ) : (

@@ -143,6 +143,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   cash_usd: number;
   daily_pnl_pct: number;
   risk_regime: string;
+  initial_capital: number;
   positions: Array<{
     ticker: string;
     quantity: number;
@@ -164,8 +165,14 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   });
 
   const dailyPnl = todayTrades.reduce((sum, t) => sum + (t.pnlUsd || 0), 0);
+
+  // Calculate realized P&L from all closed trades to get actual capital
+  const closedTrades = await prisma.trade.findMany({ where: { closedAt: { not: null }, pnlUsd: { not: null } } });
+  const realizedPnl = closedTrades.reduce((sum, t) => sum + (t.pnlUsd || 0), 0);
+  const actualCapital = portfolioUsd + realizedPnl;
+
   const investedUsd = openTrades.reduce((sum, t) => sum + t.sizeUsd, 0);
-  const cashUsd = portfolioUsd - investedUsd;
+  const cashUsd = actualCapital - investedUsd;
 
   const positions = await Promise.all(
     openTrades.map(async (t) => {
@@ -186,7 +193,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   );
 
   const totalUsd = cashUsd + positions.reduce((s, p) => s + p.sizeUsd + p.pnlUsd, 0);
-  const dailyPnlPct = (dailyPnl / portfolioUsd) * 100;
+  const dailyPnlPct = (dailyPnl / actualCapital) * 100;
 
   let risk_regime = 'NORMAL';
   if (dailyPnlPct <= -2) risk_regime = 'ELEVATED';
@@ -197,6 +204,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
     cash_usd: cashUsd,
     daily_pnl_pct: dailyPnlPct,
     risk_regime,
+    initial_capital: portfolioUsd,
     positions,
   };
 }
