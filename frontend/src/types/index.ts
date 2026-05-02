@@ -28,6 +28,7 @@ export interface MarketContext {
   vix: number;
   fear_greed: number;
   nasdaq: string;
+  nasdaq_change_pct: number;
   nasdaq_status?: {
     isOpen: boolean;
     nextOpen: string;

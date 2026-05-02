@@ -186,10 +186,10 @@ export async function getFearAndGreed(): Promise<number | null> {
   }
 }
 
-/** Fetch QQQ daily change for Nasdaq direction */
-export async function getNasdaqDirection(): Promise<string> {
+/** Fetch QQQ daily change for Nasdaq direction + change % */
+export async function getNasdaqDirection(): Promise<{ direction: string; change_pct: number }> {
   const cacheKey = 'yahoo:nasdaq_dir';
-  const cached = await cacheGet<string>(cacheKey);
+  const cached = await cacheGet<{ direction: string; change_pct: number }>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -208,12 +208,13 @@ export async function getNasdaqDirection(): Promise<string> {
       const change = ((today - yesterday) / yesterday) * 100;
 
       const dir = change > 0.5 ? 'bullish' : change < -0.5 ? 'bearish' : 'neutral';
-      await cacheSet(cacheKey, dir, TTL.MARKET_CONTEXT);
-      return dir;
+      const result = { direction: dir, change_pct: Math.round(change * 100) / 100 };
+      await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
+      return result;
     }
-    return 'neutral';
+    return { direction: 'neutral', change_pct: 0 };
   } catch (err) {
     console.error('[Yahoo] getNasdaqDirection error:', (err as Error).message);
-    return 'neutral';
+    return { direction: 'neutral', change_pct: 0 };
   }
 }

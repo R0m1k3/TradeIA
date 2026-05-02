@@ -71,6 +71,7 @@ export interface CycleUpdatePayload {
     vix: number;
     fear_greed: number;
     nasdaq: string;
+    nasdaq_change_pct: number;
   };
   signals: SignalItem[];
   orders_executed: ExecutedOrder[];

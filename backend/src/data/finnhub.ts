@@ -73,9 +73,10 @@ export async function getMarketContext(): Promise<{
   vix: number;
   fear_greed: number;
   nasdaq_direction: string;
+  nasdaq_change_pct: number;
 }> {
   const cacheKey = 'finnhub:market_context';
-  const cached = await cacheGet<{ vix: number; fear_greed: number; nasdaq_direction: string }>(cacheKey);
+  const cached = await cacheGet<{ vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct: number }>(cacheKey);
   if (cached) return cached;
 
   // Fetch real data from Yahoo Finance + CNN
@@ -86,13 +87,16 @@ export async function getMarketContext(): Promise<{
     getNasdaqDirection(),
   ]);
 
+  const nasdaqData = nasdaqDir.status === 'fulfilled' ? nasdaqDir.value : { direction: 'neutral', change_pct: 0 };
+
   const result = {
     vix: vix.status === 'fulfilled' && vix.value ? vix.value : 18,
     fear_greed: fearGreed.status === 'fulfilled' && fearGreed.value ? fearGreed.value : 50,
-    nasdaq_direction: nasdaqDir.status === 'fulfilled' ? nasdaqDir.value : 'neutral',
+    nasdaq_direction: nasdaqData.direction,
+    nasdaq_change_pct: nasdaqData.change_pct,
   };
 
-  console.log(`[Market] VIX=${result.vix} FearGreed=${result.fear_greed} Nasdaq=${result.nasdaq_direction}`);
+  console.log(`[Market] VIX=${result.vix} FearGreed=${result.fear_greed} Nasdaq=${result.nasdaq_direction} (${result.nasdaq_change_pct}%)`);
   await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
   return result;
 }

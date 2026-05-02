@@ -57,6 +57,8 @@ function NasdaqStatusCard({ market }: { market: ReturnType<typeof useSignalsStor
   const trendColor = market.nasdaq === 'bullish' ? 'text-accent-green' : market.nasdaq === 'bearish' ? 'text-accent-red' : 'text-text-secondary';
   const trendArrow = market.nasdaq === 'bullish' ? '↑' : market.nasdaq === 'bearish' ? '↓' : '→';
   const trendLabel = market.nasdaq === 'bullish' ? 'Haussier' : market.nasdaq === 'bearish' ? 'Baissier' : 'Neutre';
+  const change = market.nasdaq_change_pct ?? 0;
+  const changePositive = change >= 0;
 
   return (
     <div className="bg-bg-surface rounded-lg border border-border p-4 flex items-center justify-between">
@@ -69,16 +71,24 @@ function NasdaqStatusCard({ market }: { market: ReturnType<typeof useSignalsStor
           </p>
         </div>
       </div>
-      <div className="text-right">
-        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOpen ? 'bg-accent-green/10 text-accent-green border border-accent-green/30' : 'bg-accent-red/10 text-accent-red border border-accent-red/30'}`}>
-          {isOpen ? 'OUVERT' : 'FERMÉ'}
-        </span>
-        {status && !isOpen && status.nextOpen && (
-          <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextOpen}</p>
-        )}
-        {status && isOpen && status.nextClose && (
-          <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextClose}</p>
-        )}
+      <div className="flex items-center gap-4">
+        <div className="text-center">
+          <p className="text-[10px] text-text-secondary uppercase tracking-wider">Variation</p>
+          <p className={`font-mono font-bold text-sm ${changePositive ? 'text-accent-green' : 'text-accent-red'}`}>
+            {changePositive ? '+' : ''}{change.toFixed(2)}%
+          </p>
+        </div>
+        <div className="text-right">
+          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOpen ? 'bg-accent-green/10 text-accent-green border border-accent-green/30' : 'bg-accent-red/10 text-accent-red border border-accent-red/30'}`}>
+            {isOpen ? 'OUVERT' : 'FERMÉ'}
+          </span>
+          {status && !isOpen && status.nextOpen && (
+            <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextOpen}</p>
+          )}
+          {status && isOpen && status.nextClose && (
+            <p className="text-[10px] text-text-secondary font-mono mt-1">{status.nextClose}</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -271,8 +281,11 @@ export function Dashboard({ onNavigate: _ }: DashboardProps) {
               </div>
               <div className="text-center">
                 <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">NASDAQ</p>
-                <p className={`font-syne font-bold text-sm capitalize ${market.nasdaq === 'bullish' ? 'text-accent-green' : market.nasdaq === 'bearish' ? 'text-accent-red' : 'text-text-secondary'}`}>
+                <p className={`font-syne font-bold text-sm ${market.nasdaq === 'bullish' ? 'text-accent-green' : market.nasdaq === 'bearish' ? 'text-accent-red' : 'text-text-secondary'}`}>
                   {market.nasdaq === 'bullish' ? '↑' : market.nasdaq === 'bearish' ? '↓' : '→'} {market.nasdaq === 'bullish' ? 'Haussier' : market.nasdaq === 'bearish' ? 'Baissier' : 'Neutre'}
+                </p>
+                <p className={`text-[10px] font-mono ${(market.nasdaq_change_pct ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                  {(market.nasdaq_change_pct ?? 0) >= 0 ? '+' : ''}{(market.nasdaq_change_pct ?? 0).toFixed(2)}%
                 </p>
               </div>
             </div>

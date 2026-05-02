@@ -32,7 +32,7 @@ export class ReporterAgent {
         initial_capital: 0,
         positions: [],
       },
-      market: { vix: 0, fear_greed: 0, nasdaq: '' },
+      market: { vix: 0, fear_greed: 0, nasdaq: '', nasdaq_change_pct: 0 },
       signals: [],
       orders_executed: [],
       alerts: [],
@@ -47,7 +47,7 @@ export class ReporterAgent {
     portfolioUsd: number,
     dailyLossLimitPct: number,
     portfolio?: CycleUpdatePayload['portfolio'],
-    market?: { vix: number; fear_greed: number; nasdaq_direction: string }
+    market?: { vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct?: number }
   ) {
     const durationMs = Date.now() - cycleStart;
 
@@ -111,6 +111,7 @@ export class ReporterAgent {
         vix: market?.vix || 0,
         fear_greed: market?.fear_greed || 0,
         nasdaq: market?.nasdaq_direction || 'neutral',
+        nasdaq_change_pct: (market as any)?.nasdaq_change_pct || 0,
       },
       signals,
       orders_executed,

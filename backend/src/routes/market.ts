@@ -45,6 +45,7 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
       vix: context.vix,
       fear_greed: context.fear_greed,
       nasdaq: context.nasdaq_direction,
+      nasdaq_change_pct: context.nasdaq_change_pct,
       nasdaq_status: nasdaq,
     };
   });

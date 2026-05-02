@@ -31,7 +31,7 @@ const DEFAULT_AGENTS: AgentStates = {
 
 export const useSignalsStore = create<SignalsStore>((set) => ({
   signals: [],
-  market: { vix: 0, fear_greed: 0, nasdaq: 'neutral' },
+  market: { vix: 0, fear_greed: 0, nasdaq: 'neutral', nasdaq_change_pct: 0 },
   ordersExecuted: [],
   agents: DEFAULT_AGENTS,
   alerts: [],
