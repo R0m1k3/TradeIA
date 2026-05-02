@@ -4,13 +4,14 @@ import { getCredential } from '../config/credentials';
 
 const BASE = 'https://api.polygon.io';
 
-async function polygonGet(path: string, params: Record<string, string> = {}): Promise<unknown> {
+async function polygonGet(path: string, params: Record<string, string> = {}): Promise<{ data: unknown; status: number }> {
   const key = await getCredential('polygon_key', 'POLYGON_KEY');
   const response = await axios.get(`${BASE}${path}`, {
     params: { ...params, apiKey: key },
     timeout: 15_000,
+    validateStatus: () => true, // Don't throw on non-2xx — handle errors ourselves
   });
-  return response.data;
+  return { data: response.data, status: response.status };
 }
 
 export interface OptionsData {
@@ -19,28 +20,36 @@ export interface OptionsData {
 }
 
 export async function getOptionsData(ticker: string): Promise<OptionsData> {
-
   const cacheKey = `polygon:options:${ticker}`;
   const cached = await cacheGet<OptionsData>(cacheKey);
   if (cached) return cached;
 
+  const nullResult: OptionsData = { put_call_ratio: null, iv30: null };
+
+  // Options snapshot requires a paid Polygon plan — skip if no key or plan limit
+  const key = await getCredential('polygon_key', 'POLYGON_KEY');
+  if (!key) return nullResult;
+
   try {
-    const data = await polygonGet(`/v3/snapshot/options/${ticker}`) as {
-      results?: Array<{ details?: { contract_type?: string }; implied_volatility?: number }>;
-    };
-    const results = data.results || [];
-    const calls = results.filter((r) => r.details?.contract_type === 'call').length;
-    const puts = results.filter((r) => r.details?.contract_type === 'put').length;
+    const { data, status } = await polygonGet(`/v3/snapshot/options/${ticker}`);
+    if (status === 403 || (data as any).status === 'NOT_AUTHORIZED') {
+      console.warn(`[Polygon] Options not available for ${ticker} (plan limit) — caching null`);
+      await cacheSet(cacheKey, nullResult, TTL.OPTIONS);
+      return nullResult;
+    }
+    const results = (data as any).results || [];
+    const calls = results.filter((r: any) => r.details?.contract_type === 'call').length;
+    const puts = results.filter((r: any) => r.details?.contract_type === 'put').length;
     const put_call_ratio = calls > 0 ? puts / calls : null;
-    const ivs = results.map((r) => r.implied_volatility || 0).filter(Boolean);
-    const iv30 = ivs.length > 0 ? ivs.reduce((a, b) => a + b, 0) / ivs.length : null;
+    const ivs = results.map((r: any) => r.implied_volatility || 0).filter(Boolean);
+    const iv30 = ivs.length > 0 ? ivs.reduce((a: number, b: number) => a + b, 0) / ivs.length : null;
 
     const result: OptionsData = { put_call_ratio, iv30 };
     await cacheSet(cacheKey, result, TTL.OPTIONS);
     return result;
-  } catch (err) {
-    console.error(`[Polygon] getOptionsData ${ticker} error:`, err);
-    return { put_call_ratio: null, iv30: null };
+  } catch (err: any) {
+    console.warn(`[Polygon] getOptionsData ${ticker} failed: ${err?.message || err}`);
+    return nullResult;
   }
 }
 
@@ -49,36 +58,44 @@ export async function getDailyVolume(ticker: string): Promise<number | null> {
   const cached = await cacheGet<number>(cacheKey);
   if (cached) return cached;
 
+  const key = await getCredential('polygon_key', 'POLYGON_KEY');
+  if (!key) return null;
+
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = await polygonGet(`/v2/aggs/ticker/${ticker}/prev`) as {
-      results?: Array<{ v?: number }>;
-    };
-    const vol = data.results?.[0]?.v || null;
+    const { data, status } = await polygonGet(`/v2/aggs/ticker/${ticker}/prev`);
+    if (status !== 200) {
+      console.warn(`[Polygon] getDailyVolume ${ticker}: HTTP ${status}`);
+      return null;
+    }
+    const vol = (data as any).results?.[0]?.v || null;
     if (vol) await cacheSet(cacheKey, vol, TTL.OHLCV);
     return vol;
-  } catch (err) {
-    console.error(`[Polygon] getDailyVolume ${ticker} error:`, err);
+  } catch (err: any) {
+    console.warn(`[Polygon] getDailyVolume ${ticker} failed: ${err?.message || err}`);
     return null;
   }
 }
+
 export async function getMarketSnapshot(): Promise<any[]> {
   const cacheKey = 'polygon:snapshot';
   const cached = await cacheGet<any[]>(cacheKey);
   if (cached) return cached;
 
+  const key = await getCredential('polygon_key', 'POLYGON_KEY');
+  if (!key) return [];
+
   try {
-    const data = await polygonGet('/v2/snapshot/locale/us/markets/stocks/tickers') as {
-      tickers?: any[];
-      results?: any[]; // kept for safety — some endpoint versions use results
-    };
-    // Polygon V2 market snapshot returns `tickers`, not `results`
-    const results = data.tickers || data.results || [];
-    console.log(`[Polygon] Market snapshot: ${results.length} tickers fetched`);
+    const { data, status } = await polygonGet('/v2/snapshot/locale/us/markets/stocks/tickers');
+    if (status !== 200) {
+      console.warn(`[Polygon] getMarketSnapshot: HTTP ${status}`);
+      return [];
+    }
+    const results = (data as any).tickers || (data as any).results || [];
+    console.log(`[Polygon] Market snapshot: ${results.length} tickers`);
     await cacheSet(cacheKey, results, TTL.OHLCV);
     return results;
-  } catch (err) {
-    console.error('[Polygon] getMarketSnapshot error:', err);
+  } catch (err: any) {
+    console.warn(`[Polygon] getMarketSnapshot failed: ${err?.message || err}`);
     return [];
   }
 }

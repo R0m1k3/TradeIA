@@ -40,7 +40,7 @@ export async function getTickerNews(ticker: string): Promise<NewsItem[]> {
     await cacheSet(cacheKey, news, TTL.NEWS);
     return news;
   } catch (err) {
-    console.error(`[Finnhub] getTickerNews ${ticker} error:`, err);
+    console.warn(`[Finnhub] getTickerNews ${ticker} failed: ${(err as any)?.message || err}`);
     return [];
   }
 }
@@ -64,7 +64,7 @@ export async function getSentiment(ticker: string): Promise<MarketSentiment> {
     await cacheSet(cacheKey, result, TTL.NEWS);
     return result;
   } catch (err) {
-    console.error(`[Finnhub] getSentiment ${ticker} error:`, err);
+    console.warn(`[Finnhub] getSentiment ${ticker} failed: ${(err as any)?.message || err}`);
     return { sentiment_score: 0, buzz_score: 0 };
   }
 }
@@ -110,7 +110,7 @@ export async function getUpcomingEarnings(watchlist: string[]): Promise<Record<s
       }
     }
   } catch (err) {
-    console.error('[Finnhub] getUpcomingEarnings error:', err);
+    console.warn(`[Finnhub] getUpcomingEarnings failed: ${(err as any)?.message || err}`);
   }
 
   await cacheSet(cacheKey, result, TTL.EARNINGS);

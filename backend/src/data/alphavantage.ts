@@ -63,7 +63,7 @@ export async function getIntraday(ticker: string, interval: '15min' | '60min'): 
     if (bars.length > 0) await cacheSet(cacheKey, bars, TTL.OHLCV);
     return bars;
   } catch (err) {
-    console.error(`[AlphaVantage] getIntraday ${ticker} ${interval} error:`, err);
+    console.warn(`[AlphaVantage] getIntraday ${ticker} ${interval} failed: ${(err as any)?.message || err}`);
     return [];
   }
 }
@@ -79,7 +79,7 @@ export async function getDaily(ticker: string): Promise<OHLCVBar[]> {
     if (bars.length > 0) await cacheSet(cacheKey, bars, TTL.OHLCV);
     return bars;
   } catch (err) {
-    console.error(`[AlphaVantage] getDaily ${ticker} error:`, err);
+    console.warn(`[AlphaVantage] getDaily ${ticker} failed: ${(err as any)?.message || err}`);
     return [];
   }
 }
@@ -108,7 +108,7 @@ export async function getFundamentals(ticker: string): Promise<Fundamentals> {
     await cacheSet(cacheKey, result, TTL.FUNDAMENTALS);
     return result;
   } catch (err) {
-    console.error(`[AlphaVantage] getFundamentals ${ticker} error:`, err);
+    console.warn(`[AlphaVantage] getFundamentals ${ticker} failed: ${(err as any)?.message || err}`);
     return { pe: null, eps: null, revenue_growth: null, debt_equity: null, earnings_date: null, market_cap: null };
   }
 }
@@ -125,7 +125,7 @@ export async function getCurrentPrice(ticker: string): Promise<number | null> {
     if (price) await cacheSet(cacheKey, price, TTL.PRICE);
     return price;
   } catch (err) {
-    console.error(`[AlphaVantage] getCurrentPrice ${ticker} error:`, err);
+    console.warn(`[AlphaVantage] getCurrentPrice ${ticker} failed: ${(err as any)?.message || err}`);
     return null;
   }
 }
