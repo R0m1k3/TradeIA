@@ -1,41 +1,12 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
+import { useConfigStore } from '../store/config.store';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
 import type { OHLCVBar } from '../types';
 
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
-}
-
-function Candles({ candles }: { candles: { o: number; h: number; l: number; c: number }[] }) {
-  const w = 800, h = 280, pad = 24;
-  const min = Math.min(...candles.map((c) => c.l));
-  const max = Math.max(...candles.map((c) => c.h));
-  const r = max - min || 1;
-  const cw = (w - pad * 2) / candles.length;
-  const ys = (v: number) => pad + (1 - (v - min) / r) * (h - pad * 2);
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none">
-      {[0.25, 0.5, 0.75].map((p) => (
-        <line key={p} x1={pad} x2={w - pad} y1={pad + p * (h - pad * 2)} y2={pad + p * (h - pad * 2)} stroke="var(--rule)" strokeWidth="1" strokeDasharray="2 4" />
-      ))}
-      {candles.map((c, i) => {
-        const up = c.c >= c.o;
-        const x = pad + i * cw + cw / 2;
-        const color = up ? 'var(--accent)' : 'var(--danger)';
-        return (
-          <g key={i}>
-            <line x1={x} x2={x} y1={ys(c.h)} y2={ys(c.l)} stroke={color} strokeWidth="1" />
-            <rect x={x - cw * 0.35} y={ys(Math.max(c.o, c.c))} width={cw * 0.7} height={Math.max(1, Math.abs(ys(c.o) - ys(c.c)))} fill={color} />
-          </g>
-        );
-      })}
-      {[min, (min + max) / 2, max].map((v, i) => (
-        <text key={i} x={w - pad + 4} y={ys(v) + 3} fill="var(--ink-3)" fontFamily="var(--mono)" fontSize="9">${v.toFixed(2)}</text>
-      ))}
-    </svg>
-  );
 }
 
 const AGENT_ORDER = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'];
@@ -52,18 +23,30 @@ const AGENT_PIPELINE_NAMES: Record<string, { num: string; name: string; role: st
 export function Markets() {
   const { portfolio } = usePortfolioStore();
   const { signals, market, agents, cycleTimeline, lastUpdate } = useSignalsStore();
+  const { config } = useConfigStore();
+  const [ohlcv, setOhlcv] = useState<OHLCVBar[]>([]);
+  const [chartTicker, setChartTicker] = useState('QQQ');
+  const [chartInterval, setChartInterval] = useState<'15m' | '1h' | '1d'>('1d');
 
-  const candles = useMemo(() => {
-    const arr = []; let p = 224;
-    for (let i = 0; i < 60; i++) {
-      const o = p;
-      const c = o + (Math.sin(i * 0.4) * 2 + (Math.random() - 0.5) * 1.4);
-      const h = Math.max(o, c) + Math.random() * 1.2;
-      const l = Math.min(o, c) - Math.random() * 1.2;
-      arr.push({ o, h, l, c }); p = c;
+  // Fetch real OHLCV data from backend
+  useEffect(() => {
+    const api = import.meta.env.VITE_API_URL || '/api';
+    let cancelled = false;
+    fetch(`${api}/market/ohlcv/${chartTicker}?interval=${chartInterval}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: OHLCVBar[]) => {
+        if (!cancelled && data.length > 0) setOhlcv(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [chartTicker, chartInterval]);
+
+  // Determine which ticker to chart: first position, or QQQ default
+  useEffect(() => {
+    if (portfolio.positions.length > 0 && portfolio.positions[0].ticker) {
+      setChartTicker(portfolio.positions[0].ticker);
     }
-    return arr;
-  }, []);
+  }, [portfolio.positions]);
 
   const flux = cycleTimeline.slice(-7).map((e) => ({
     t: new Date(e.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -90,7 +73,7 @@ export function Markets() {
         </div>
       </div>
 
-      {/* Onboarding banner - only show if mock broker */}
+      {/* Onboarding banner - only show if no positions */}
       {portfolio.positions.length === 0 && (
         <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(180deg, var(--accent-soft), transparent)', borderColor: 'var(--accent-line)' }}>
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
@@ -164,11 +147,22 @@ export function Markets() {
           <div className="card-h">
             <div className="flex gap-3 center">
               <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>
-                {market.nasdaq || 'NASDAQ'}
+                {chartTicker}
               </span>
               <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>
                 {market.nasdaq_change_pct !== 0 ? `${market.nasdaq_change_pct >= 0 ? '+' : ''}${market.nasdaq_change_pct.toFixed(2)}%` : '—'}
               </span>
+              <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+                {(['15m', '1h', '1d'] as const).map((iv) => (
+                  <button key={iv} onClick={() => setChartInterval(iv)} style={{
+                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
+                    border: '1px solid', cursor: 'pointer',
+                    borderColor: chartInterval === iv ? 'var(--accent)' : 'var(--rule)',
+                    background: chartInterval === iv ? 'var(--accent-soft)' : 'transparent',
+                    color: chartInterval === iv ? 'var(--accent)' : 'var(--ink-4)',
+                  }}>{iv}</button>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {market.nasdaq_status && (
@@ -179,8 +173,8 @@ export function Markets() {
             </div>
           </div>
           <div style={{ padding: 16, height: 320, position: 'relative' }}>
-            {candles.length > 0 ? (
-              <Candles candles={candles} />
+            {ohlcv.length > 0 ? (
+              <CandlestickChart data={ohlcv} ticker={chartTicker} height={288} />
             ) : (
               <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)' }}>
                 Graphique en attente de données

@@ -13,9 +13,10 @@ function toTimestamp(timeStr: string): number {
 }
 
 function computeEMA(data: number[], period: number): number[] {
+  if (data.length === 0) return [];
   const k = 2 / (period + 1);
   const result: number[] = [];
-  let ema = data[0] || 0;
+  let ema = data[0];
   for (const val of data) {
     ema = val * k + ema * (1 - k);
     result.push(ema);
