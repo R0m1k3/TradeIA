@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
@@ -58,10 +58,13 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { portfolio, history } = usePortfolioStore();
+  const { portfolio, history, typeStats, fetchTypeStats } = usePortfolioStore();
   const { signals, market, agents, alerts, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
   const [tab, setTab] = useState<'open' | 'hist'>('open');
+
+  // Fetch trade type stats on mount
+  useEffect(() => { fetchTypeStats(); }, [fetchTypeStats]);
 
   const nav = portfolio.total_usd;
   const pnl = portfolio.daily_pnl_pct;
@@ -225,12 +228,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="kpi-sub">{positions.length > 0 ? ((positions.reduce((s, p) => s + p.sizeUsd, 0) / nav) * 100).toFixed(1) : '0'}% du capital engagé</div>
         </div>
         <div className="card kpi">
-          <div className="kpi-label">Risque <Help tip="NORMAL = pas d'alerte, ELEVATED = perte > 2%, CRISIS = perte > 3%." /></div>
+          <div className="kpi-label">Risque <Help tip="NORMAL=ok, ELEVATED=perte>2%, CRISIS=perte>3%, DRAWDOWN=-10% pic, SEVERE=-15% pic" /></div>
           <div className="kpi-value" style={{
             color: portfolio.risk_regime === 'NORMAL' ? 'var(--accent)' : portfolio.risk_regime === 'ELEVATED' ? 'var(--warn)' : 'var(--danger)',
             fontFamily: 'var(--mono)', fontSize: 28,
           }}>{portfolio.risk_regime}</div>
-          <div className="kpi-sub">{lastUpdateStr}</div>
+          {portfolio.drawdown_from_peak_pct !== 0 && (
+            <div className="kpi-sub" style={{ color: portfolio.drawdown_from_peak_pct <= -5 ? 'var(--danger)' : 'var(--ink-3)' }}>
+              Pic -{Math.abs(portfolio.drawdown_from_peak_pct).toFixed(1)}%
+            </div>
+          )}
+          {!portfolio.drawdown_from_peak_pct && <div className="kpi-sub">{lastUpdateStr}</div>}
         </div>
       </div>
 
@@ -521,7 +529,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             ) : (
               [
                 ['Win rate', `${metrics.winRate.toFixed(0)}%`, 'Pourcentage de trades fermés en gain.'],
-                ['Drawdown max', `${metrics.maxDD}%`, 'Pire chute depuis le sommet du portefeuille.'],
+                ['Drawdown pic', `${metrics.maxDD}%`, 'Pire chute depuis le sommet du portefeuille.'],
                 ['Trades fermés', `${metrics.totalTrades}`, 'Nombre total de trades fermés.'],
                 ['Trades / mois', `${metrics.tradesPerMonth}`, 'Trades fermés dans les 30 derniers jours.'],
               ].map(([k, v, tip], i) => (
@@ -537,6 +545,47 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
       </div>
+
+      {/* Performance par type de trade */}
+      {typeStats && typeStats.overall.total_trades > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-h">
+            <div className="card-h-title">Performance par type <Help tip="Type A = Tendance, Type B = Swing, Type C = Range. Statistiques basées sur les trades fermés." /></div>
+          </div>
+          <div style={{ padding: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+              {Object.entries(typeStats.by_type).map(([type, stats]) => {
+                const label = type === 'A' ? 'Tendance (A)' : type === 'B' ? 'Swing (B)' : type === 'C' ? 'Range (C)' : type;
+                const color = stats.win_rate >= 55 ? 'var(--accent)' : stats.win_rate >= 45 ? 'var(--warn)' : 'var(--danger)';
+                return (
+                  <div key={type} style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--bg-elev-2)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 700, color }}>{stats.win_rate.toFixed(0)}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                      {stats.trades} trades · P&L {stats.total_pnl >= 0 ? '+' : ''}{stats.total_pnl.toFixed(0)}$
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+                      Moy. {stats.avg_pnl >= 0 ? '+' : ''}{stats.avg_pnl.toFixed(1)}$ · Hold {stats.avg_hold_hours.toFixed(0)}h
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--bg-elev-2)' }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Global</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: typeStats.overall.win_rate >= 50 ? 'var(--accent)' : 'var(--danger)' }}>
+                  {typeStats.overall.win_rate.toFixed(0)}%
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                  {typeStats.overall.total_trades} trades · P&L {typeStats.overall.total_pnl >= 0 ? '+' : ''}{typeStats.overall.total_pnl.toFixed(0)}$
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+                  DD pic max {typeStats.overall.max_drawdown_pct.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -30,7 +30,8 @@ export interface ExecutionResult {
 }
 
 function applySlippage(price: number, action: 'BUY' | 'SELL'): number {
-  const slippagePct = 0.0005 * Math.random();
+  // Realistic slippage: 0.10-0.30% random, simulates market impact + spread
+  const slippagePct = 0.001 + Math.random() * 0.002;
   return action === 'BUY' ? price * (1 + slippagePct) : price * (1 - slippagePct);
 }
 
@@ -165,6 +166,8 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   daily_pnl_pct: number;
   risk_regime: string;
   initial_capital: number;
+  equity_peak: number;
+  drawdown_from_peak_pct: number;
   positions: Array<{
     ticker: string;
     quantity: number;
@@ -220,9 +223,15 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   const totalUsd = cashUsd + positions.reduce((s, p) => s + p.sizeUsd + p.pnlUsd, 0);
   const dailyPnlPct = (dailyPnl / actualCapital) * 100;
 
+  // Drawdown from equity peak
+  const equityPeak = await getEquityPeak(portfolioUsd);
+  const drawdownPct = equityPeak > 0 ? ((totalUsd - equityPeak) / equityPeak) * 100 : 0;
+
   let risk_regime = 'NORMAL';
   if (dailyPnlPct <= -2) risk_regime = 'ELEVATED';
   if (dailyPnlPct <= -3) risk_regime = 'CRISIS';
+  if (drawdownPct <= -10) risk_regime = 'DRAWDOWN';
+  if (drawdownPct <= -15) risk_regime = 'SEVERE_DRAWDOWN';
 
   return {
     total_usd: totalUsd,
@@ -230,6 +239,28 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
     daily_pnl_pct: dailyPnlPct,
     risk_regime,
     initial_capital: portfolioUsd,
+    equity_peak: equityPeak,
+    drawdown_from_peak_pct: drawdownPct,
     positions,
   };
+}
+
+/** Track highest equity value in DB for drawdown-from-peak calculation */
+async function getEquityPeak(initialCapital: number): Promise<number> {
+  const existing = await prisma.config.findUnique({ where: { key: 'equity_peak' } });
+  const currentPeak = existing ? parseFloat(existing.value) : initialCapital;
+  return currentPeak;
+}
+
+/** Update equity peak if current value is higher */
+export async function updateEquityPeak(currentTotalUsd: number): Promise<void> {
+  const existing = await prisma.config.findUnique({ where: { key: 'equity_peak' } });
+  const currentPeak = existing ? parseFloat(existing.value) : 0;
+  if (currentTotalUsd > currentPeak) {
+    await prisma.config.upsert({
+      where: { key: 'equity_peak' },
+      update: { value: currentTotalUsd.toString() },
+      create: { key: 'equity_peak', value: currentTotalUsd.toString() },
+    });
+  }
 }

@@ -14,6 +14,7 @@ import overrideRoutes from './routes/override';
 import orchestratorRoutes from './routes/orchestrator';
 import marketRoutes from './routes/market';
 import healthRoutes from './routes/health';
+import backtestRoutes from './routes/backtest';
 
 const app = Fastify({
   logger: true,
@@ -39,6 +40,7 @@ async function main() {
   await app.register(marketRoutes, { prefix: '/api/market' });
 
   await app.register(healthRoutes, { prefix: '/api/health' });
+  await app.register(backtestRoutes, { prefix: '/api/backtest' });
 
   initCredentials(prisma);
   await warmCredentialsCache();

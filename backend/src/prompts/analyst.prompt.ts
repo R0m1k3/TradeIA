@@ -84,9 +84,13 @@ export function buildAnalystPrompt(data: {
     bb_upper: number | null;
     bb_middle: number | null;
     bb_lower: number | null;
+    bb_width: number | null;
+    bb_width_regime: string | null;
     volume_ratio: number | null;
     support_levels: number[];
     resistance_levels: number[];
+    roc_10: number | null;
+    rsi_divergence: string | null;
   };
   fundamentals?: unknown;
   news?: unknown[];
@@ -128,8 +132,10 @@ TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
 - EMA 200: ${data.indicators.ema_200?.toFixed(2) ?? 'N/A'}
 - ATR(14): ${data.indicators.atr_14?.toFixed(2) ?? 'N/A'}
 - ADX: ${data.indicators.adx?.toFixed(1) ?? 'N/A'}
-- Bollinger: Upper=${data.indicators.bb_upper?.toFixed(2) ?? 'N/A'} Mid=${data.indicators.bb_middle?.toFixed(2) ?? 'N/A'} Lower=${data.indicators.bb_lower?.toFixed(2) ?? 'N/A'}
+- Bollinger: Upper=${data.indicators.bb_upper?.toFixed(2) ?? 'N/A'} Mid=${data.indicators.bb_middle?.toFixed(2) ?? 'N/A'} Lower=${data.indicators.bb_lower?.toFixed(2) ?? 'N/A'} Width=${data.indicators.bb_width?.toFixed(3) ?? 'N/A'} Regime=${data.indicators.bb_width_regime ?? 'N/A'}
 - Volume ratio: ${data.indicators.volume_ratio?.toFixed(2) ?? 'N/A'}x average
+- ROC(10): ${data.indicators.roc_10?.toFixed(2) ?? 'N/A'}% (momentum score)
+- RSI Divergence: ${data.indicators.rsi_divergence ?? 'N/A'} (bullish=price LL + RSI HL, bearish=price HH + RSI LH)
 - Support levels: [${data.indicators.support_levels.map((l) => l.toFixed(2)).join(', ')}]
 - Resistance levels: [${data.indicators.resistance_levels.map((l) => l.toFixed(2)).join(', ')}]
 

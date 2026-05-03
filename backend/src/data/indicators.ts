@@ -25,9 +25,13 @@ export interface IndicatorValues {
   bb_upper: number | null;
   bb_middle: number | null;
   bb_lower: number | null;
+  bb_width: number | null;
+  bb_width_regime: 'narrow' | 'normal' | 'wide' | null;
   volume_ratio: number | null;
   support_levels: number[];
   resistance_levels: number[];
+  roc_10: number | null;
+  rsi_divergence: 'bullish' | 'bearish' | 'none' | null;
 }
 
 export function computeIndicators(bars_15m: OHLCVBar[], bars_1h: OHLCVBar[], bars_4h: OHLCVBar[]): IndicatorValues {
@@ -51,14 +55,19 @@ export function computeIndicators(bars_15m: OHLCVBar[], bars_1h: OHLCVBar[], bar
     bb_upper: ind_4h.bb_upper,
     bb_middle: ind_4h.bb_middle,
     bb_lower: ind_4h.bb_lower,
+    bb_width: ind_4h.bb_width,
+    bb_width_regime: ind_4h.bb_width_regime,
     volume_ratio: ind_15m.volume_ratio,
     support_levels: levels.support,
     resistance_levels: levels.resistance,
+    roc_10: ind_4h.roc_10,
+    rsi_divergence: detectRSIDivergence(bars_4h, ind_4h.rsi_series),
   };
 }
 
 interface FrameIndicators {
   rsi: number | null;
+  rsi_series: number[];
   macd_signal: 'bullish' | 'bearish' | 'neutral';
   macd_histogram: number | null;
   ema_9: number | null;
@@ -70,7 +79,10 @@ interface FrameIndicators {
   bb_upper: number | null;
   bb_middle: number | null;
   bb_lower: number | null;
+  bb_width: number | null;
+  bb_width_regime: 'narrow' | 'normal' | 'wide' | null;
   volume_ratio: number | null;
+  roc_10: number | null;
 }
 
 function computeFromBars(bars: OHLCVBar[]): FrameIndicators {
@@ -121,6 +133,30 @@ function computeFromBars(bars: OHLCVBar[]): FrameIndicators {
   const bbArr = BollingerBands.calculate({ values: closes, period: 20, stdDev: 2 });
   const lastBB = last(bbArr);
 
+  // BB Width regime: narrow = range, wide = trend
+  let bb_width: number | null = null;
+  let bb_width_regime: 'narrow' | 'normal' | 'wide' | null = null;
+  if (lastBB && lastBB.middle > 0) {
+    bb_width = (lastBB.upper - lastBB.lower) / lastBB.middle;
+    // Compare to historical BB widths
+    const recentWidths = bbArr.slice(-20).map((b) => b.middle > 0 ? (b.upper - b.lower) / b.middle : 0).filter((w) => w > 0);
+    if (recentWidths.length >= 10) {
+      const avgWidth = recentWidths.reduce((a, b) => a + b, 0) / recentWidths.length;
+      if (bb_width < avgWidth * 0.7) bb_width_regime = 'narrow';
+      else if (bb_width > avgWidth * 1.3) bb_width_regime = 'wide';
+      else bb_width_regime = 'normal';
+    }
+  }
+
+  // ROC (Rate of Change) 10 periods — momentum score
+  let roc_10: number | null = null;
+  if (closes.length > 10) {
+    const pastClose = closes[closes.length - 11];
+    if (pastClose > 0) {
+      roc_10 = ((closes[closes.length - 1] - pastClose) / pastClose) * 100;
+    }
+  }
+
   // Volume ratio
   const volAvg = volumes.length > 20
     ? volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20
@@ -131,6 +167,7 @@ function computeFromBars(bars: OHLCVBar[]): FrameIndicators {
 
   return {
     rsi,
+    rsi_series: rsiArr.map((v) => v),
     macd_signal,
     macd_histogram,
     ema_9,
@@ -142,7 +179,10 @@ function computeFromBars(bars: OHLCVBar[]): FrameIndicators {
     bb_upper: lastBB?.upper ?? null,
     bb_middle: lastBB?.middle ?? null,
     bb_lower: lastBB?.lower ?? null,
+    bb_width,
+    bb_width_regime,
     volume_ratio,
+    roc_10,
   };
 }
 
@@ -153,6 +193,7 @@ function last<T>(arr: T[]): T | undefined {
 function emptyFrame(): FrameIndicators {
   return {
     rsi: null,
+    rsi_series: [],
     macd_signal: 'neutral',
     macd_histogram: null,
     ema_9: null,
@@ -164,7 +205,10 @@ function emptyFrame(): FrameIndicators {
     bb_upper: null,
     bb_middle: null,
     bb_lower: null,
+    bb_width: null,
+    bb_width_regime: null,
     volume_ratio: null,
+    roc_10: null,
   };
 }
 
@@ -218,12 +262,31 @@ export function compute4HBias(indicators: IndicatorValues): 'BULLISH' | 'BEARISH
 }
 
 export function compute15mSignal(indicators: IndicatorValues): 'BUY' | 'SELL' | 'NEUTRAL' {
-  const { rsi_14, macd_signal, volume_ratio } = indicators;
+  const { rsi_14, macd_signal, volume_ratio, adx, bb_lower, bb_upper, rsi_divergence, support_levels, resistance_levels } = indicators;
 
   if (rsi_14 === null || macd_signal === 'neutral') return 'NEUTRAL';
 
   const highVolume = volume_ratio !== null && volume_ratio > 1.5;
 
+  // RSI divergence overrides — strongest signal
+  if (rsi_divergence === 'bullish' && rsi_14 < 40) return 'BUY';
+  if (rsi_divergence === 'bearish' && rsi_14 > 60) return 'SELL';
+
+  // Type C: Mean-reversion logic (ADX < 20 = ranging market)
+  // In ranges: buy oversold at support, sell overbought at resistance
+  const isRanging = adx !== null && adx < 20;
+  if (isRanging) {
+    // Buy when oversold near lower BB (support zone in range)
+    if (rsi_14 < 30 && macd_signal !== 'bearish') return 'BUY';
+    // Sell when overbought near upper BB (resistance zone in range)
+    if (rsi_14 > 70 && macd_signal !== 'bullish') return 'SELL';
+    // Moderate mean-reversion signals
+    if (rsi_14 < 35) return 'BUY';
+    if (rsi_14 > 65) return 'SELL';
+    return 'NEUTRAL';
+  }
+
+  // Type A/B: Momentum logic (trending market)
   if (rsi_14 < 30 && macd_signal === 'bullish' && highVolume) return 'BUY';
   if (rsi_14 > 70 && macd_signal === 'bearish' && highVolume) return 'SELL';
   if (rsi_14 < 35 && macd_signal === 'bullish') return 'BUY';
@@ -232,10 +295,57 @@ export function compute15mSignal(indicators: IndicatorValues): 'BUY' | 'SELL' | 
   return 'NEUTRAL';
 }
 
+/** Detect RSI divergence: bearish (price HH + RSI LH) or bullish (price LL + RSI HL) */
+function detectRSIDivergence(bars: OHLCVBar[], rsiSeries: number[]): 'bullish' | 'bearish' | 'none' | null {
+  if (bars.length < 20 || rsiSeries.length < 20) return null;
+
+  const recent = bars.slice(-20);
+  const recentRSI = rsiSeries.slice(-20);
+  if (recentRSI.some((v) => v === null || v === undefined)) return null;
+
+  // Find local price highs and lows (simple pivot detection)
+  const pivotHighs: { price: number; rsi: number; idx: number }[] = [];
+  const pivotLows: { price: number; rsi: number; idx: number }[] = [];
+
+  for (let i = 2; i < recent.length - 2; i++) {
+    if (recent[i].high > recent[i - 1].high && recent[i].high > recent[i - 2].high &&
+        recent[i].high > recent[i + 1].high && recent[i].high > recent[i + 2].high) {
+      pivotHighs.push({ price: recent[i].high, rsi: recentRSI[i], idx: i });
+    }
+    if (recent[i].low < recent[i - 1].low && recent[i].low < recent[i - 2].low &&
+        recent[i].low < recent[i + 1].low && recent[i].low < recent[i + 2].low) {
+      pivotLows.push({ price: recent[i].low, rsi: recentRSI[i], idx: i });
+    }
+  }
+
+  // Bearish divergence: price higher high + RSI lower high
+  if (pivotHighs.length >= 2) {
+    const last = pivotHighs[pivotHighs.length - 1];
+    const prev = pivotHighs[pivotHighs.length - 2];
+    if (last.price > prev.price && last.rsi < prev.rsi && last.rsi > 50) {
+      return 'bearish';
+    }
+  }
+
+  // Bullish divergence: price lower low + RSI higher low
+  if (pivotLows.length >= 2) {
+    const last = pivotLows[pivotLows.length - 1];
+    const prev = pivotLows[pivotLows.length - 2];
+    if (last.price < prev.price && last.rsi > prev.rsi && last.rsi < 50) {
+      return 'bullish';
+    }
+  }
+
+  return 'none';
+}
+
 export function computeTradeType(indicators: IndicatorValues): 'A' | 'B' | 'C' {
-  const { adx } = indicators;
-  if (adx !== null && adx > 25) return 'A';
+  const { adx, bb_width_regime } = indicators;
+  // Trending: ADX > 25 OR wide BB
+  if ((adx !== null && adx > 25) || bb_width_regime === 'wide') return 'A';
+  // Ranging: ADX < 20 AND narrow BB
   if (adx !== null && adx < 20) return 'C';
+  if (bb_width_regime === 'narrow') return 'C';
   return 'B';
 }
 

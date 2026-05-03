@@ -124,6 +124,8 @@ export class ReporterAgent {
       daily_pnl_pct: 0,
       risk_regime: 'NORMAL',
       initial_capital: portfolioUsd,
+      equity_peak: portfolioUsd,
+      drawdown_from_peak_pct: 0,
       positions: [],
     };
 

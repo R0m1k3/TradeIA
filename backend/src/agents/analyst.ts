@@ -88,8 +88,9 @@ export class AnalystAgent {
               rsi_14: null, rsi_1h: null, macd_signal: 'neutral', macd_histogram: null,
               ema_9: null, ema_21: null, ema_50: null, ema_200: null,
               atr_14: null, adx: null,
-              bb_upper: null, bb_middle: null, bb_lower: null,
+              bb_upper: null, bb_middle: null, bb_lower: null, bb_width: null, bb_width_regime: null,
               volume_ratio: null, support_levels: [], resistance_levels: [],
+              roc_10: null, rsi_divergence: null,
             },
             fundamentals: data.fundamentals,
             news: data.news,
@@ -148,20 +149,29 @@ export class AnalystAgent {
       else if (indicators.rsi_1h > 60 && indicators.macd_signal === 'bearish') bias_1h = 'BEARISH';
     }
 
-    // Confidence based on alignment
+    // Confidence based on alignment + new indicators
     let confidence = 30; // base
     if (bias_4h === bias_1h && bias_4h !== 'NEUTRAL') confidence += 25;
     if (signal_15m !== 'NEUTRAL' && signal_15m === (bias_4h === 'BULLISH' ? 'BUY' : 'SELL')) confidence += 20;
     if (indicators.volume_ratio !== null && indicators.volume_ratio > 1.5) confidence += 10;
     if (indicators.adx !== null && indicators.adx > 25) confidence += 10;
+    // Momentum confirmation
+    if (indicators.roc_10 !== null) {
+      if ((indicators.roc_10 > 2 && signal_15m === 'BUY') || (indicators.roc_10 < -2 && signal_15m === 'SELL')) confidence += 10;
+      if ((indicators.roc_10 > 0 && signal_15m === 'SELL') || (indicators.roc_10 < 0 && signal_15m === 'BUY')) confidence -= 10;
+    }
+    // RSI divergence boost
+    if (indicators.rsi_divergence === 'bullish' && signal_15m === 'BUY') confidence += 15;
+    if (indicators.rsi_divergence === 'bearish' && signal_15m === 'SELL') confidence += 15;
     confidence = Math.min(confidence, 95);
+    confidence = Math.max(confidence, 0);
 
     // Detect candle patterns from Bollinger Band position
-    let candle_pattern = 'none';
-    if (currentPrice < (indicators.bb_lower ?? 0) && currentPrice > 0) candle_pattern = 'below_lower_band';
-    else if (currentPrice > (indicators.bb_upper ?? 0)) candle_pattern = 'above_upper_band';
-    else if (indicators.rsi_14 !== null && indicators.rsi_14 < 30) candle_pattern = 'oversold';
-    else if (indicators.rsi_14 !== null && indicators.rsi_14 > 70) candle_pattern = 'overbought';
+    let candle_pattern = 'aucun';
+    if (currentPrice < (indicators.bb_lower ?? 0) && currentPrice > 0) candle_pattern = 'sous_bande_inferieure';
+    else if (currentPrice > (indicators.bb_upper ?? 0)) candle_pattern = 'au_dessus_bande_superieure';
+    else if (indicators.rsi_14 !== null && indicators.rsi_14 < 30) candle_pattern = 'survente';
+    else if (indicators.rsi_14 !== null && indicators.rsi_14 > 70) candle_pattern = 'surachat';
 
     return {
       ticker,

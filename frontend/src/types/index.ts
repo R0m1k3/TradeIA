@@ -1,5 +1,5 @@
 export type Signal = 'BUY' | 'SELL' | 'HOLD';
-export type RiskRegime = 'NORMAL' | 'ELEVATED' | 'CRISIS';
+export type RiskRegime = 'NORMAL' | 'ELEVATED' | 'CRISIS' | 'DRAWDOWN' | 'SEVERE_DRAWDOWN';
 export type AgentStatus = 'idle' | 'running' | 'ok' | 'error';
 export type AlertLevel = 'info' | 'warning' | 'critical';
 
@@ -21,6 +21,8 @@ export interface Portfolio {
   daily_pnl_pct: number;
   risk_regime: RiskRegime;
   initial_capital: number;
+  equity_peak: number;
+  drawdown_from_peak_pct: number;
   positions: Position[];
 }
 

@@ -65,6 +65,8 @@ export interface CycleUpdatePayload {
     daily_pnl_pct: number;
     risk_regime: string;
     initial_capital: number;
+    equity_peak: number;
+    drawdown_from_peak_pct: number;
     positions: PortfolioPosition[];
   };
   market?: {

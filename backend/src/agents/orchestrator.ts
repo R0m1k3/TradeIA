@@ -5,7 +5,7 @@ import { ResearcherAgent } from './researcher';
 import { StrategistAgent } from './strategist';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
-import { executeOrder, getPortfolioState, markToMarket, closeTrade } from '../broker/mock';
+import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquityPeak } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 import { broadcastAlert } from '../websocket';
@@ -29,10 +29,13 @@ async function checkCircuitBreaker(
   reporter: ReporterAgent
 ): Promise<boolean> {
   const portfolio = await getPortfolioState(portfolioUsd);
-  const drawdownPct = ((portfolio.initial_capital - portfolio.total_usd) / portfolio.initial_capital) * 100;
 
-  if (drawdownPct >= maxDrawdownPct) {
-    console.error(`[Orchestrator] CIRCUIT BREAKER: drawdown ${drawdownPct.toFixed(2)}% >= ${maxDrawdownPct}%`);
+  // Drawdown from equity peak (not initial capital)
+  const drawdownPct = portfolio.drawdown_from_peak_pct;
+  const drawdownFromCapital = ((portfolio.initial_capital - portfolio.total_usd) / portfolio.initial_capital) * 100;
+
+  if (drawdownPct <= -maxDrawdownPct || drawdownFromCapital >= maxDrawdownPct) {
+    console.error(`[Orchestrator] CIRCUIT BREAKER: drawdown-from-peak ${drawdownPct.toFixed(2)}%, from-capital ${drawdownFromCapital.toFixed(2)}%`);
 
     // Fermer toutes les positions ouvertes
     const openTrades = await prisma.trade.findMany({ where: { closedAt: null, action: 'BUY' } });
@@ -53,11 +56,11 @@ async function checkCircuitBreaker(
     });
 
     broadcastAlert('critical',
-      `🚨 CIRCUIT BREAKER DÉCLENCHÉ — Drawdown ${drawdownPct.toFixed(2)}% — ${openTrades.length} positions fermées — Trading suspendu`
+      `🚨 CIRCUIT BREAKER — Drawdown pic ${drawdownPct.toFixed(2)}% — ${openTrades.length} positions fermées — Trading suspendu`
     );
 
     reporter.updateAgent('reporter', { status: 'error', error: 'Circuit breaker triggered' });
-    return true; // déclenché
+    return true;
   }
   return false;
 }
@@ -172,6 +175,12 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   // Step 10: Report + AgentPrediction logging
   reporter.updateAgent('reporter', { status: 'running' });
   const finalPortfolio = await getPortfolioState(portfolioUsd);
+
+  // Update equity peak for drawdown-from-peak tracking
+  if (finalPortfolio.total_usd > 0) {
+    await updateEquityPeak(finalPortfolio.total_usd);
+  }
+
   await reporter.finalize(
     cycleStart,
     debateOutputs,
