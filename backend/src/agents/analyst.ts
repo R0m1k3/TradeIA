@@ -36,13 +36,44 @@ export class AnalystAgent {
           console.log(`[Analyst] Skipping ${ticker} — missing data`);
           return;
         }
-
         const indicators: IndicatorValues | null = (data as any).indicators ?? null;
 
         // Deterministic fallback when no LLM available or indicators are pre-computed
         if (indicators) {
-          console.log(`[Analyst] Skipping LLM for ${ticker} — using deterministic analysis`);
           const deterministic = this.deterministicAnalysis(ticker, data.current_price, indicators);
+          // Try LLM for qualitative interpretation, fall back to deterministic
+          try {
+            const prompt = buildAnalystPrompt({
+              ticker,
+              current_price: data.current_price,
+              indicators,
+              fundamentals: data.fundamentals,
+              news: data.news,
+              sentiment: data.sentiment,
+              tweets: data.tweets,
+              reddit: data.reddit,
+              stocktwits: data.stocktwits,
+              rss_news: data.rss_news,
+            });
+
+            const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
+            const parsed = parseJsonResponse<{ analyses: AnalystOutput[] }>(response.content);
+
+            if (parsed.analyses && parsed.analyses.length > 0) {
+              // Validate LLM output against deterministic values
+              for (const analysis of parsed.analyses) {
+                if (analysis.confidence <= 0) {
+                  analysis.skip_reason = analysis.skip_reason || 'LLM low confidence';
+                }
+                results.push(analysis);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn(`[Analyst] LLM failed for ${ticker}, using deterministic:`, (err as Error).message);
+          }
+
+          // Deterministic fallback
           results.push(deterministic);
           return;
         }

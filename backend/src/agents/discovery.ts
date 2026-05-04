@@ -49,28 +49,40 @@ export class DiscoveryAgent {
           volume: c.day?.v,
         }));
 
-        const MODELS = await getModels();
-        try {
-          const response = await callLLM('discovery', MODELS.LIGHT, DISCOVERY_SYSTEM,
-            `Analyze these 50 top movers and pick the 10-15 most interesting for a long/short day-trading strategy:\n${JSON.stringify(input)}`);
-          const selectedTickers = parseJsonResponse<string[]>(response.content);
-          console.log(`[Discovery] AI selected: ${selectedTickers.join(', ')}`);
-          return selectedTickers;
-        } catch (err) {
-          console.warn('[Discovery] AI selection failed, using top movers:', (err as Error).message);
-          return candidates.slice(0, 15).map((c: any) => c.ticker);
-        }
+        const selected = await this.selectWithAI(JSON.stringify(input), candidates.map((c: any) => c.ticker));
+        if (selected.length > 0) return selected;
       }
     }
 
     // Try Yahoo Finance screener
     console.log('[Discovery] Polygon unavailable, trying Yahoo Finance screener');
     const yahooTickers = await this.yahooScreener();
-    if (yahooTickers.length > 0) return yahooTickers;
+    if (yahooTickers.length > 0) {
+      console.log(`[Discovery] Passing ${yahooTickers.length} Yahoo trending tickers to AI...`);
+      const selected = await this.selectWithAI(JSON.stringify(yahooTickers), yahooTickers);
+      if (selected.length > 0) return selected;
+    }
 
     // Fallback to NASDAQ 100
-    console.log('[Discovery] All sources unavailable, using NASDAQ 100 fallback');
-    return NASDAQ_100.slice(0, 15);
+    console.log('[Discovery] All sources unavailable, passing NASDAQ 100 fallback to AI');
+    // Shuffle the array to give variety if LLM fails
+    const shuffledNasdaq = [...NASDAQ_100].sort(() => 0.5 - Math.random());
+    const selected = await this.selectWithAI(JSON.stringify(NASDAQ_100), shuffledNasdaq);
+    return selected.length > 0 ? selected : shuffledNasdaq.slice(0, 15);
+  }
+
+  private async selectWithAI(candidatesInfo: string, fallbackCandidates: string[]): Promise<string[]> {
+    const MODELS = await getModels();
+    try {
+      const response = await callLLM('discovery', MODELS.LIGHT, DISCOVERY_SYSTEM,
+        `Analyze these candidates and pick the 10-15 most interesting for a long/short day-trading strategy:\n${candidatesInfo}`);
+      const selectedTickers = parseJsonResponse<string[]>(response.content);
+      console.log(`[Discovery] AI selected: ${selectedTickers.join(', ')}`);
+      return selectedTickers;
+    } catch (err) {
+      console.warn('[Discovery] AI selection failed:', (err as Error).message);
+      return fallbackCandidates.slice(0, 15);
+    }
   }
 
   /** Yahoo Finance screener for top movers */
@@ -83,9 +95,7 @@ export class DiscoveryAgent {
 
       const quotes = response.data?.finance?.result?.[0]?.quotes;
       if (quotes && quotes.length > 0) {
-        const tickers = quotes
-          .slice(0, 15)
-          .map((q: any) => q.symbol);
+          const tickers = quotes.map((q: any) => q.symbol);
         console.log(`[Discovery] Yahoo trending: ${tickers.join(', ')}`);
         return tickers;
       }

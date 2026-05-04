@@ -81,7 +81,7 @@ export class RiskAgent {
           stop_loss: o.stop_loss,
           take_profit: o.take_profit,
           invalidation_condition: o.invalidation_condition,
-          risk_pct: o.size_usd / portfolioUsd * 100,
+          size_pct: o.size_usd / portfolioUsd * 100,
           confidence: o.confidence,
           debate_score: o.debate_score,
           bull_conviction: o.bull_conviction,
@@ -211,20 +211,9 @@ export class RiskAgent {
     }
 
     for (const p of proposals) {
-      // Kelly-based sizing: fraction = (bp - (1-b)/p_w) where b=win_rate, p=profit/loss ratio
-      // Simplified: use half-Kelly for safety
-      const kellyFraction = this.getKellyFraction(p.trade_type);
-
-      // ATR-based sizing: risk_amount / (ATR_distance * multiplier)
-      // Stop loss distance = entry - stop_loss for BUY
-      const stopDistance = Math.abs(p.limit_price - p.stop_loss);
-      const atrSizing = stopDistance > 0
-        ? (portfolioUsd * (p.risk_pct / 100) * 0.02) / stopDistance // risk 2% of portfolio per trade
-        : portfolioUsd * 0.02; // fallback
-
-      // Base sizing = min(Kelly sizing, ATR sizing) * confidence * regime multiplier
-      const kellySize = portfolioUsd * kellyFraction * (p.confidence / 100);
-      let sizeUsd = Math.min(kellySize, atrSizing) * sizingMultiplier;
+      // AI Autonomous Sizing: Use the size_pct defined by the Strategist AI
+      // The AI is instructed to maximize profit and choose its own sizing based on conviction.
+      let sizeUsd = portfolioUsd * (p.size_pct / 100) * sizingMultiplier;
 
       // Réduction si IV30 Expected Move dépasse l'objectif
       const td = tickerData?.[p.ticker];
@@ -240,8 +229,8 @@ export class RiskAgent {
         sizeUsd *= reductionFactor;
       }
 
-      // Max 5% of portfolio per position
-      sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.05);
+      // Max 50% of portfolio per position (Autonomous AI allowance)
+      sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.50);
 
       // Sector concentration check: max 40% of NAV in one sector
       if (p.action === 'BUY') {

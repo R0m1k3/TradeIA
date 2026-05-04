@@ -84,7 +84,7 @@ async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMRes
       stream: false,
       options: { temperature: 0.1 },
     },
-    { timeout: 180_000 }
+    { timeout: 900_000 } // 15 minutes to allow for large queues
   );
 
   const content = response.data.message?.content || '';

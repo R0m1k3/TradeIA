@@ -13,13 +13,13 @@ import { getNasdaqStatus } from '../routes/market';
 
 const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
 
-const CYCLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max par cycle
+const CYCLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes max par cycle
 
 let isRunning = false;
 
 function cycleTimeout(): Promise<never> {
   return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Cycle timeout after 30 minutes')), CYCLE_TIMEOUT_MS)
+    setTimeout(() => reject(new Error('Cycle timeout after 60 minutes')), CYCLE_TIMEOUT_MS)
   );
 }
 
@@ -99,15 +99,9 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     tickers = WATCHLIST_DEFAULT;
   }
 
-  // Limit tickers per cycle to avoid timeout with slow LLM calls
-  if (tickers.length > 8) {
-    const held = (await getPortfolioState(portfolioUsd)).positions.map((p) => p.ticker);
-    // Prioritize held positions, then fill up to 8
-    const prioritized = [...held.filter((t) => tickers.includes(t))];
-    const remaining = tickers.filter((t) => !prioritized.includes(t));
-    tickers = [...prioritized, ...remaining].slice(0, 8);
-    console.log(`[Orchestrator] Limiting to ${tickers.length} tickers: ${tickers.join(', ')}`);
-  }
+  // We no longer limit tickers to 8 to give the AI maximum freedom of choice.
+  // The Orchestrator timeout is now 30 minutes, accommodating up to 15-20 tickers easily.
+  console.log(`[Orchestrator] Processing ${tickers.length} tickers: ${tickers.join(', ')}`);
 
   // Step 4: Collect data
   const collector = new CollectorAgent();

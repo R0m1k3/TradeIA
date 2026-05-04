@@ -11,7 +11,7 @@ export interface OrderProposal {
   stop_loss: number;
   take_profit: number;
   invalidation_condition: string;
-  risk_pct: number;
+  size_pct: number;
   confidence: number;
   debate_score: number;
   bull_conviction: number;
