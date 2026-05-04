@@ -1,7 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { getMarketContext } from '../data/finnhub';
-import { getYahooOHLCV } from '../data/yahoo';
-import { getDaily } from '../data/alphavantage';
+import { getYahooOHLCV, getMarketContext } from '../data/yahoo';
 import { getCredential } from '../config/credentials';
 
 export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
@@ -76,20 +74,9 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
     const query = req.query as { interval?: string };
     const interval = (query.interval || '1d') as '15m' | '1h' | '4h' | '1d';
 
-    // Try Yahoo first (free, no key needed), then AlphaVantage as fallback
+    // Fetch OHLCV strictly from Yahoo
     const yahooBars = await getYahooOHLCV(ticker, interval === '15m' ? '15m' : interval === '1h' ? '1h' : interval === '4h' ? '4h' : '1d');
-    if (yahooBars.length > 0) return yahooBars;
-
-    // Fallback to AlphaVantage daily
-    if (interval === '1d') {
-      const avKey = await getCredential('alpha_vantage_key', 'ALPHA_VANTAGE_KEY') || await getCredential('alpha_vantage_key', 'ALPHAVANTAGE_KEY');
-      if (avKey) {
-        const avBars = await getDaily(ticker);
-        if (avBars.length > 0) return avBars;
-      }
-    }
-
-    return [];
+    return yahooBars.length > 0 ? yahooBars : [];
   });
 };
 

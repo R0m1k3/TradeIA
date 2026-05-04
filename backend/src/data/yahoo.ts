@@ -341,3 +341,18 @@ export async function getNasdaqDirection(): Promise<{ direction: string; change_
     return { direction: 'neutral', change_pct: 0 };
   }
 }
+
+export async function getMarketContext(): Promise<{ vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct: number }> {
+  try {
+    const vix = await getYahooCurrentPrice('^VIX') || 20;
+    const { direction, change_pct } = await getNasdaqDirection();
+    return {
+      vix,
+      fear_greed: vix > 25 ? 20 : vix < 15 ? 80 : 50,
+      nasdaq_direction: direction,
+      nasdaq_change_pct: change_pct,
+    };
+  } catch {
+    return { vix: 20, fear_greed: 50, nasdaq_direction: 'neutral', nasdaq_change_pct: 0 };
+  }
+}
