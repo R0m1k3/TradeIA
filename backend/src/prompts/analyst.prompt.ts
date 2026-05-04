@@ -34,10 +34,9 @@ STOP & TARGET (medium-term — wide to survive noise):
 - Target: 6.0 × ATR(14) from entry minimum (minimum R/R = 2.0, prefer 3.0+)
 - Only enter if expected move > 3% to cover transaction costs
 
-CONVICTION THRESHOLDS (be selective):
-- Confidence < 65 → skip (not enough edge to justify transaction cost)
-- Confidence 65-75 → trade only with strong 4H trend alignment
-- Confidence > 75 → full position allowed
+CONVICTION THRESHOLDS:
+- Provide your honest confidence score from 0 to 100 based on the technical setup.
+- DO NOT set skip_reason unless the data is literally corrupted or missing. We want to forward the analysis to the Researcher for a full debate, even for mediocre setups.
 
 IMPORTANT: All text fields (candle_pattern, skip_reason, etc.) MUST be written in French.
 
@@ -154,6 +153,6 @@ STOCKTWITS SIGNALS: ${formatSocial(data.stocktwits as any[], 'stocktwits')}
 FRESH NEWS (RSS): ${formatNews(data.rss_news as any[])}
 
 Based on these indicators, generate your analysis. Use ATR for stop/target calculations.
-If indicators are insufficient (many nulls), set skip_reason and confidence=0.
+Even if fundamentals, news, or sentiment are "N/A", you MUST provide a technical analysis based solely on the indicators. Do not set skip_reason unless the price or technical indicator data itself is completely missing.
 Output JSON only.`;
 }
