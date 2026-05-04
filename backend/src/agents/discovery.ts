@@ -84,7 +84,6 @@ export class DiscoveryAgent {
       const quotes = response.data?.finance?.result?.[0]?.quotes;
       if (quotes && quotes.length > 0) {
         const tickers = quotes
-          .filter((q: any) => q.regularMarketPrice > 5 && q.regularMarketVolume > 500000)
           .slice(0, 15)
           .map((q: any) => q.symbol);
         console.log(`[Discovery] Yahoo trending: ${tickers.join(', ')}`);

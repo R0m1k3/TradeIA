@@ -13,13 +13,13 @@ import { getNasdaqStatus } from '../routes/market';
 
 const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
 
-const CYCLE_TIMEOUT_MS = 8 * 60 * 1000; // 8 minutes max par cycle
+const CYCLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max par cycle
 
 let isRunning = false;
 
 function cycleTimeout(): Promise<never> {
   return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Cycle timeout after 8 minutes')), CYCLE_TIMEOUT_MS)
+    setTimeout(() => reject(new Error('Cycle timeout after 30 minutes')), CYCLE_TIMEOUT_MS)
   );
 }
 
