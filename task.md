@@ -1,15 +1,21 @@
 ## Context
-The user feels the list of tickers proposed to the AI is too weak/limited, especially when falling back to the NASDAQ 100 list (which was previously truncated to the first 15 alphabetically). The user wants the AI to be able to pick from the entire NASDAQ.
+The user wants to analyze the entire NASDAQ 100 + Crypto market per cycle (120 tickers) and replace all broken/limited APIs with 100% free and unmetered alternatives (Binance, TradingView, Finviz, Yahoo).
 
 ## Current Focus
-Update the `Discovery` agent so that when it falls back to the NASDAQ list, it passes the entire `NASDAQ_100` (or asks the LLM to freely pick 15-20 tickers from the NASDAQ) instead of rigidly slicing the first 15 alphabetically. We will ask the Discovery LLM to select the tickers from the full NASDAQ 100 list.
+Execution of the Global Market API Cleanup & Integration Plan.
 
 ## Master Plan
-- [x] Modify `discovery.ts` to use the `Discovery` LLM to pick 15 tickers from the full `NASDAQ_100` list when falling back, instead of `.slice(0, 15)`.
-- [x] Apply the same LLM selection logic to the Yahoo screener results to ensure the AI always decides which tickers to analyze.
+- [x] 1. Delete broken APIs (`polygon.ts`, `alphavantage.ts`, `finnhub.ts`, `twitter.ts`, `stocktwits.ts`).
+- [x] 2. Create `tradingview.ts` for technical signals.
+- [x] 3. Create `binance.ts` for crypto OHLCV.
+- [x] 4. Create `finviz.ts` for macro market sentiment.
+- [x] 5. Update `yahoo.ts` to be the sole US stock provider.
+- [x] 6. Update `discovery.ts` to fetch and return the 120 combined tickers.
+- [x] 7. Update `collector.ts` to use the new sources efficiently.
+- [x] 8. Update `orchestrator.ts` timeout to 4 hours.
+- [x] 9. Update prompts (Analyst) to use TV signals and drop social APIs.
+- [x] 10. Update frontend (remove social/API config, add crypto support if needed).
 
 ## Progress Log
-- Added plan to expand discovery ticker selection using AI.
-- Restored LLM logic in `analyst.ts`.
-- Increased Orchestrator timeout to 60 minutes to safely allow all AI agents to process sequentially/in queues.
-- Updated `discovery.ts` to use a helper function `selectWithAI` to let the AI LLM pick from Yahoo and NASDAQ results, rather than defaulting to static slices.
+- Plan approved by user.
+- Updated `task.md` to begin execution.

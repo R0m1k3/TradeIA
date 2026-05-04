@@ -1,3 +1,5 @@
+import type { TradingViewSignal } from '../data/tradingview';
+
 export const ANALYST_SYSTEM = `You are a MEDIUM-TERM technical analyst (swing trading, 5-20 day holds). You receive PRE-COMPUTED technical indicators and must interpret them to generate a trading signal.
 
 CRITICAL: Transaction costs make short-term trading unprofitable. Every trade costs ~0.1-0.5% in commissions and slippage. You must target moves large enough to absorb these costs. Prefer FEWER, HIGHER-CONVICTION trades over frequent small trades.
@@ -19,10 +21,8 @@ ANALYSIS FRAMEWORK (prioritize longer timeframes):
 - Key support/resistance levels proximity
 - Used for ENTRY TIMING only, not for trade direction
 
-15min Layer (Precision entry — optional):
-- Use only to fine-tune entry within a medium-term thesis
-- RSI overbought/oversold for pullback entries
-- Volume ratio (>1.5 = unusual activity)
+TradingView Confirmation:
+- The TradingView signal (STRONG_BUY, BUY, NEUTRAL, SELL, STRONG_SELL) is provided as an external technical consensus. Use it to confirm your bias.
 
 TRADE CLASSIFICATION (medium-term):
 - Type A: Medium-term trend-following, 2% portfolio risk, requires 4H trend + 1H alignment, target 5-15 day hold
@@ -68,6 +68,7 @@ Output STRICT JSON only:
 
 export function buildAnalystPrompt(data: {
   ticker: string;
+  is_crypto: boolean;
   current_price: number;
   indicators: {
     rsi_14: number | null;
@@ -91,24 +92,11 @@ export function buildAnalystPrompt(data: {
     roc_10: number | null;
     rsi_divergence: string | null;
   };
+  tradingview: TradingViewSignal;
   fundamentals?: unknown;
   news?: unknown[];
-  sentiment?: unknown;
-  tweets?: unknown[];
-  reddit?: unknown[];
-  stocktwits?: unknown[];
   rss_news?: unknown[];
 }): string {
-  const formatSocial = (items: any[], label: string) => {
-    if (!items || items.length === 0) return 'N/A';
-    return items.slice(0, 5).map((t: any) => {
-      const text = t.title || t.body || t.text || '';
-      const hint = t.sentiment_hint || t.sentiment || 'neutral';
-      const author = t.author || t.username || 'unknown';
-      return `[${hint}] ${author}: ${text.slice(0, 150)}`;
-    }).join('\n');
-  };
-
   const formatNews = (items: any[]) => {
     if (!items || items.length === 0) return 'N/A';
     return items.slice(0, 8).map((n: any) => {
@@ -117,7 +105,7 @@ export function buildAnalystPrompt(data: {
     }).join('\n');
   };
 
-  return `Analyze ${data.ticker} using the PRE-COMPUTED indicators below.
+  return `Analyze ${data.ticker} (${data.is_crypto ? 'CRYPTO' : 'STOCK'}) using the PRE-COMPUTED indicators below.
 
 Current price: $${data.current_price}
 
@@ -138,17 +126,12 @@ TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
 - Support levels: [${data.indicators.support_levels.map((l) => l.toFixed(2)).join(', ')}]
 - Resistance levels: [${data.indicators.resistance_levels.map((l) => l.toFixed(2)).join(', ')}]
 
+EXTERNAL SIGNALS:
+- TradingView Consensus: ${data.tradingview.recommendation} (Score: ${data.tradingview.score.toFixed(2)})
+
 FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}
 
-RECENT NEWS: ${data.news ? JSON.stringify(data.news) : 'N/A'}
-
-SENTIMENT: ${data.sentiment ? JSON.stringify(data.sentiment) : 'N/A'}
-
-TWITTER/X SIGNALS: ${formatSocial(data.tweets as any[], 'twitter')}
-
-REDDIT SIGNALS: ${formatSocial(data.reddit as any[], 'reddit')}
-
-STOCKTWITS SIGNALS: ${formatSocial(data.stocktwits as any[], 'stocktwits')}
+RECENT NEWS (Yahoo): ${data.news ? JSON.stringify(data.news) : 'N/A'}
 
 FRESH NEWS (RSS): ${formatNews(data.rss_news as any[])}
 

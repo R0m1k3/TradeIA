@@ -16,11 +16,7 @@ interface Config {
 
 interface ConfigSecrets {
   openrouter_api_key: boolean;
-  alpha_vantage_key: boolean;
-  polygon_key: boolean;
-  finnhub_key: boolean;
   fred_api_key: boolean;
-  socialdata_key: boolean;
 }
 
 interface ConfigStore {
@@ -51,11 +47,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   },
   secretsConfigured: {
     openrouter_api_key: false,
-    alpha_vantage_key: false,
-    polygon_key: false,
-    finnhub_key: false,
     fred_api_key: false,
-    socialdata_key: false,
   },
   paused: false,
 

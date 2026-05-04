@@ -1,38 +1,24 @@
-import { getIntraday, getDaily, getFundamentals, getCurrentPrice } from '../data/alphavantage';
-import { getOptionsData, getDailyVolume } from '../data/polygon';
-import { getTickerNews, getSentiment, getMarketContext, getUpcomingEarnings } from '../data/finnhub';
 import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../data/yahoo';
+import { getBinanceOHLCV, getBinanceCurrentPrice } from '../data/binance';
+import { getTradingViewSignal, type TradingViewSignal } from '../data/tradingview';
+import { getFinvizMacro, type FinvizMacro } from '../data/finviz';
 import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
-import { getTickerTweets, getFinancialSentimentTweets, type TweetData } from '../data/twitter';
-import { getTickerRedditPosts, getFinanceRedditPosts, type RedditPost } from '../data/reddit';
-import { getTickerStockTwits, getTrendingStockTwits, type StockTwitsMessage } from '../data/stocktwits';
 import { getFinanceNews, getTickerNewsRSS, type NewsItem } from '../data/news-rss';
-
-// Track tickers where AlphaVantage consistently returns insufficient data
-// so we skip it and go straight to Yahoo on subsequent cycles
-const avInsufficient = new Set<string>();
 
 export interface TickerData {
   data_quality: 'ok' | 'stale' | 'partial' | 'missing';
-  earnings_blackout: boolean;
-  upcoming_earnings?: unknown;
+  is_crypto: boolean;
   sector?: string;
   current_price: number;
   ohlcv_15m: unknown[];
   ohlcv_1h: unknown[];
   ohlcv_4h: unknown[];
   fundamentals: unknown;
-  options: unknown;
   news: unknown[];
-  sentiment: unknown;
-  daily_volume: number | null;
   indicators: IndicatorValues | null;
-  tweets: TweetData[];
-  reddit: RedditPost[];
-  stocktwits: StockTwitsMessage[];
-  rss_news: NewsItem[];
+  tradingview: TradingViewSignal;
 }
 
 export interface CollectorOutput {
@@ -41,13 +27,10 @@ export interface CollectorOutput {
     vix: number;
     fear_greed: number;
     nasdaq_direction: string;
-    fed_next_meeting: string;
     macro: MacroData;
+    finviz: FinvizMacro;
     sector_biases: Record<string, SectorBias>;
   };
-  financial_tweets: TweetData[];
-  reddit_trending: RedditPost[];
-  stocktwits_trending: StockTwitsMessage[];
   finance_rss_news: NewsItem[];
   collected_at: string;
 }
@@ -56,231 +39,110 @@ function resolve<T>(promise: PromiseSettledResult<T>, fallback: T): T {
   return promise.status === 'fulfilled' ? promise.value : fallback;
 }
 
-/** Fetch OHLCV data — skip AlphaVantage for known-insufficient tickers */
-async function fetchOHLCV(ticker: string): Promise<{ bars_15m: unknown[]; bars_1h: unknown[]; bars_4h: unknown[] }> {
-  // If AlphaVantage has been insufficient before, go straight to Yahoo
-  if (avInsufficient.has(ticker)) {
-    const [y15m, y1h, y4h] = await Promise.allSettled([
-      getYahooOHLCV(ticker, '15m'),
-      getYahooOHLCV(ticker, '1h'),
-      getYahooOHLCV(ticker, '4h'),
-    ]);
-    return {
-      bars_15m: resolve(y15m, []),
-      bars_1h: resolve(y1h, []),
-      bars_4h: resolve(y4h, []),
-    };
-  }
-
-  // Try AlphaVantage first
-  const [av15m, av1h, avDaily] = await Promise.allSettled([
-    getIntraday(ticker, '15min'),
-    getIntraday(ticker, '60min'),
-    getDaily(ticker),
-  ]);
-
-  const bars_15m = resolve(av15m, []);
-  const bars_1h = resolve(av1h, []);
-  const bars_daily = resolve(avDaily, []);
-
-  // If AlphaVantage gave us data, use it
-  if (bars_15m.length > 20 && bars_1h.length > 10) {
-    return { bars_15m, bars_1h, bars_4h: bars_daily };
-  }
-
-  // AlphaVantage insufficient — remember for next cycle and fall back to Yahoo
-  avInsufficient.add(ticker);
-  console.log(`[Collector] AlphaVantage data insufficient for ${ticker}, trying Yahoo`);
-  const [y15m, y1h, y4h] = await Promise.allSettled([
-    getYahooOHLCV(ticker, '15m'),
-    getYahooOHLCV(ticker, '1h'),
-    getYahooOHLCV(ticker, '4h'),
-  ]);
-
-  const yahoo_15m = resolve(y15m, []);
-  const yahoo_1h = resolve(y1h, []);
-  const yahoo_4h = resolve(y4h, []);
-
-  // Use Yahoo where AlphaVantage failed, prefer AlphaVantage where it worked
-  return {
-    bars_15m: bars_15m.length > yahoo_15m.length ? bars_15m : yahoo_15m,
-    bars_1h: bars_1h.length > yahoo_1h.length ? bars_1h : yahoo_1h,
-    bars_4h: bars_daily.length > yahoo_4h.length ? bars_daily : yahoo_4h,
-  };
-}
-
-/** Fetch current price — skip AlphaVantage for known-insufficient tickers */
-async function fetchPrice(ticker: string): Promise<number | null> {
-  if (avInsufficient.has(ticker)) {
-    return getYahooCurrentPrice(ticker);
-  }
-  const [avPrice, yahooPrice] = await Promise.allSettled([
-    getCurrentPrice(ticker),
-    getYahooCurrentPrice(ticker),
-  ]);
-  const p1 = resolve(avPrice, null);
-  const p2 = resolve(yahooPrice, null);
-  return p1 ?? p2;
-}
-
-/** Fetch fundamentals — skip AlphaVantage for known-insufficient tickers */
-async function fetchFundamentals(ticker: string): Promise<unknown> {
-  if (avInsufficient.has(ticker)) {
-    return getYahooFundamentals(ticker);
-  }
-  const [avFund, yahooFund] = await Promise.allSettled([
-    getFundamentals(ticker),
-    getYahooFundamentals(ticker),
-  ]);
-  const f1 = resolve(avFund, null);
-  const f2 = resolve(yahooFund, null);
-  return f1 ?? f2 ?? {};
-}
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER'
+]);
 
 export class CollectorAgent {
   async run(watchlist: string[]): Promise<CollectorOutput | null> {
-    console.log(`[Collector] Fetching data for: ${watchlist.join(', ')}`);
+    console.log(`[Collector] Fetching data for ${watchlist.length} assets...`);
 
     try {
-      // Données marché + macro + secteurs + earnings + tweets financiers en parallèle
-      const [market, macro, sectorBiases, earningsCalendar, financialTweets, redditTrending, stocktwitsTrending, financeRSS] = await Promise.all([
-        getMarketContext(),
+      // Parallel fetch for macro data
+      const [macro, sectorBiases, financeRSS, finvizMacro] = await Promise.all([
         getMacroData(),
         getSectorBiases(),
-        getUpcomingEarnings(watchlist),
-        getFinancialSentimentTweets(),
-        getFinanceRedditPosts(),
-        getTrendingStockTwits(),
         getFinanceNews(),
+        getFinvizMacro(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
-      console.log(`[Collector] Earnings à venir: ${Object.keys(earningsCalendar).join(', ') || 'aucun'}`);
 
       const rawData: Record<string, unknown> = {};
 
-      await Promise.all(
-        watchlist.map(async (ticker) => {
-          try {
-            const [ohlcvData, price, fundamentals, options, news, sentiment, daily_volume, tweets, reddit, stocktwits, rssNews] =
-              await Promise.allSettled([
-                fetchOHLCV(ticker),
-                fetchPrice(ticker),
-                fetchFundamentals(ticker),
-                getOptionsData(ticker),
-                getTickerNews(ticker),
-                getSentiment(ticker),
-                getDailyVolume(ticker),
-                getTickerTweets(ticker),
-                getTickerRedditPosts(ticker),
-                getTickerStockTwits(ticker),
+      // Process tickers in chunks of 10 to avoid overwhelming endpoints
+      for (let i = 0; i < watchlist.length; i += 10) {
+        const chunk = watchlist.slice(i, i + 10);
+        await Promise.all(
+          chunk.map(async (ticker) => {
+            try {
+              const isCrypto = CRYPTO_TICKERS.has(ticker);
+
+              const [ohlcv15m, ohlcv1h, ohlcv4h, price, fundamentals, news, tvSignal] = await Promise.allSettled([
+                isCrypto ? getBinanceOHLCV(ticker, '15m') : getYahooOHLCV(ticker, '15m'),
+                isCrypto ? getBinanceOHLCV(ticker, '1h') : getYahooOHLCV(ticker, '1h'),
+                isCrypto ? getBinanceOHLCV(ticker, '4h') : getYahooOHLCV(ticker, '4h'),
+                isCrypto ? getBinanceCurrentPrice(ticker) : getYahooCurrentPrice(ticker),
+                isCrypto ? Promise.resolve({}) : getYahooFundamentals(ticker),
                 getTickerNewsRSS(ticker),
+                getTradingViewSignal(ticker, isCrypto),
               ]);
 
-            const bars_15m = resolve(ohlcvData, { bars_15m: [], bars_1h: [], bars_4h: [] } as any);
-            const p = resolve(price, null);
-            const funds = resolve(fundamentals, {});
-            const opts = resolve(options, { put_call_ratio: null, iv30: null } as any);
-            const newsData = resolve(news, []);
-            const sent = resolve(sentiment, { sentiment_score: 0, buzz_score: 0 } as any);
-            const vol = resolve(daily_volume, null);
-            const tweetData = resolve(tweets, []);
-            const redditData = resolve(reddit, []);
-            const stocktwitsData = resolve(stocktwits, []);
-            const rssNewsData = resolve(rssNews, []);
+              const bars_15m = resolve(ohlcv15m, []);
+              const bars_1h = resolve(ohlcv1h, []);
+              const bars_4h = resolve(ohlcv4h, []);
+              const p = resolve(price, null);
+              const funds = resolve(fundamentals, {});
+              const newsData = resolve(news, []);
+              const tv = resolve(tvSignal, { recommendation: 'UNKNOWN', score: 0 });
 
-            const ohlcv15 = (bars_15m as any).bars_15m || [];
-            const ohlcv1h = (bars_15m as any).bars_1h || [];
-            const ohlcv4h = (bars_15m as any).bars_4h || [];
+              // Compute indicators locally from OHLCV data
+              const indicators = computeIndicators(
+                bars_15m as any[],
+                bars_1h as any[],
+                bars_4h as any[],
+              );
 
-            // Compute indicators locally from OHLCV data
-            const indicators = computeIndicators(
-              ohlcv15 as any[],
-              ohlcv1h as any[],
-              ohlcv4h as any[],
-            );
+              const sector = isCrypto ? 'Crypto' : getTickerSector(ticker);
 
-            // Earnings blackout: soit depuis le calendrier Finnhub (fiable), soit depuis les fundamentals
-            const upcomingEarning = earningsCalendar[ticker];
-            let earningsBlackout = false;
-            if (upcomingEarning) {
-              const earningsTs = new Date(upcomingEarning.date).getTime();
-              const hoursUntil = (earningsTs - Date.now()) / 3600000;
-              earningsBlackout = hoursUntil >= -24 && hoursUntil <= 48; // 24h après jusqu'à 48h avant
-            } else {
-              const earningsDate = (funds as { earnings_date?: string | null })?.earnings_date;
-              earningsBlackout = earningsDate
-                ? Math.abs(new Date(earningsDate).getTime() - Date.now()) < 48 * 3600 * 1000
-                : false;
+              let quality: 'ok' | 'stale' | 'partial' | 'missing' = 'ok';
+              if (!p || bars_15m.length === 0) quality = 'missing';
+              else if (bars_15m.length < 50) quality = 'partial';
+
+              rawData[ticker] = {
+                data_quality: quality,
+                is_crypto: isCrypto,
+                sector,
+                current_price: p || 0,
+                ohlcv_15m: bars_15m,
+                ohlcv_1h: bars_1h,
+                ohlcv_4h: bars_4h,
+                fundamentals: funds,
+                news: newsData,
+                indicators,
+                tradingview: tv,
+              };
+            } catch (err) {
+              console.error(`[Collector] Failed to fetch ${ticker}:`, err);
+              rawData[ticker] = {
+                data_quality: 'missing',
+                is_crypto: CRYPTO_TICKERS.has(ticker),
+                current_price: 0,
+                ohlcv_15m: [],
+                ohlcv_1h: [],
+                ohlcv_4h: [],
+                fundamentals: {},
+                news: [],
+                indicators: null,
+                tradingview: { recommendation: 'UNKNOWN', score: 0 },
+              };
             }
+          })
+        );
+      }
 
-            const sector = getTickerSector(ticker);
-
-            let quality: 'ok' | 'stale' | 'partial' | 'missing' = 'ok';
-            if (!p || ohlcv15.length === 0) quality = 'missing';
-            else if (ohlcv15.length < 50) quality = 'partial';
-
-            rawData[ticker] = {
-              data_quality: quality,
-              earnings_blackout: earningsBlackout,
-              upcoming_earnings: upcomingEarning || null,
-              sector,
-              current_price: p || 0,
-              ohlcv_15m: ohlcv15,
-              ohlcv_1h: ohlcv1h,
-              ohlcv_4h: ohlcv4h,
-              fundamentals: funds,
-              options: opts,
-              news: newsData,
-              sentiment: sent,
-              daily_volume: vol,
-              tweets: tweetData,
-              reddit: redditData,
-              stocktwits: stocktwitsData,
-              rss_news: rssNewsData,
-              indicators,
-            };
-          } catch (err) {
-            console.error(`[Collector] Failed to fetch ${ticker}:`, err);
-            rawData[ticker] = {
-              data_quality: 'missing',
-              earnings_blackout: false,
-              current_price: 0,
-              ohlcv_15m: [],
-              ohlcv_1h: [],
-              ohlcv_4h: [],
-              fundamentals: {},
-              options: {},
-              news: [],
-              sentiment: {},
-              daily_volume: null,
-              tweets: [],
-              reddit: [],
-              stocktwits: [],
-              rss_news: [],
-              indicators: null,
-            };
-          }
-        })
-      );
-
-      // Skip LLM for collector — data is already structured locally.
-      // The LLM call just reformats what we already have, wasting 2+ minutes.
-      // Use local data directly (same as the catch branch).
       console.log('[Collector] Skipping LLM — using locally structured data with indicators');
       return {
         tickers: rawData as Record<string, TickerData>,
         market: {
-          vix: market.vix,
-          fear_greed: market.fear_greed,
-          nasdaq_direction: market.nasdaq_direction,
-          fed_next_meeting: '',
+          vix: 20, // default if no yahoo
+          fear_greed: 50,
+          nasdaq_direction: 'neutral',
           macro,
+          finviz: finvizMacro,
           sector_biases: sectorBiases,
         },
-        financial_tweets: financialTweets,
-        reddit_trending: redditTrending,
-        stocktwits_trending: stocktwitsTrending,
         finance_rss_news: financeRSS,
         collected_at: new Date().toISOString(),
       };
@@ -289,4 +151,4 @@ export class CollectorAgent {
       return null;
     }
   }
-}
+}

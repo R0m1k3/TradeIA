@@ -45,15 +45,13 @@ export class AnalystAgent {
           try {
             const prompt = buildAnalystPrompt({
               ticker,
+              is_crypto: data.is_crypto,
               current_price: data.current_price,
               indicators,
+              tradingview: data.tradingview,
               fundamentals: data.fundamentals,
               news: data.news,
-              sentiment: data.sentiment,
-              tweets: data.tweets,
-              reddit: data.reddit,
-              stocktwits: data.stocktwits,
-              rss_news: data.rss_news,
+              rss_news: data.news, // Map local news to rss format for prompt simplification
             });
 
             const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
@@ -82,6 +80,7 @@ export class AnalystAgent {
         try {
           const prompt = buildAnalystPrompt({
             ticker,
+            is_crypto: data.is_crypto,
             current_price: data.current_price,
             indicators: {
               rsi_14: null, rsi_1h: null, macd_signal: 'neutral', macd_histogram: null,
@@ -91,12 +90,10 @@ export class AnalystAgent {
               volume_ratio: null, support_levels: [], resistance_levels: [],
               roc_10: null, rsi_divergence: null,
             },
+            tradingview: data.tradingview,
             fundamentals: data.fundamentals,
             news: data.news,
-            sentiment: data.sentiment,
-            tweets: data.tweets,
-            reddit: data.reddit,
-            stocktwits: data.stocktwits,
+            rss_news: data.news,
           });
 
           const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
