@@ -93,6 +93,8 @@ export function buildAnalystPrompt(data: {
     rsi_divergence: string | null;
   };
   tradingview: TradingViewSignal;
+  crypto_metrics?: unknown;
+  market_context?: unknown;
   fundamentals?: unknown;
   news?: unknown[];
   rss_news?: unknown[];
@@ -138,6 +140,12 @@ TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
 
 EXTERNAL SIGNALS:
 - TradingView Consensus: ${data.tradingview.recommendation} (Score: ${data.tradingview.score.toFixed(2)})
+
+MARKET CONTEXT:
+${data.market_context ? JSON.stringify(data.market_context) : 'N/A'}
+
+${data.is_crypto ? `CRYPTO 24H METRICS:
+${data.crypto_metrics ? JSON.stringify(data.crypto_metrics) : 'N/A'}` : ''}
 
 ${data.is_crypto ? 'FUNDAMENTALS: N/A (cryptocurrency — no earnings, P/E, or revenue data)' : `FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}`}
 

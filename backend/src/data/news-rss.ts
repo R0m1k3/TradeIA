@@ -29,6 +29,11 @@ const KNOWN_TICKERS = new Set([
   'KO', 'PEP', 'MCD', 'SBUX', 'NKE', 'COST', 'WMT', 'TGT', 'HD', 'LOW',
 ]);
 
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
+
 function detectSentiment(text: string): 'bullish' | 'bearish' | 'neutral' {
   const lower = text.toLowerCase();
   const bullishWords = ['rally', 'gain', 'rise', 'surge', 'beat', 'upgrade', 'growth', 'bullish', 'buy', 'breakout', 'record', 'upside', 'soar', 'jump'];
@@ -138,18 +143,45 @@ export async function getFinanceNews(limit = 20): Promise<NewsItem[]> {
   return items;
 }
 
-/**
- * Fetch news specific to a ticker using Google News RSS.
- * No API key required.
- */
-export async function getTickerNewsRSS(ticker: string, limit = 10): Promise<NewsItem[]> {
-  const cacheKey = `news:ticker_rss:${ticker}`;
+export async function getCryptoNews(limit = 20): Promise<NewsItem[]> {
+  const cacheKey = 'news:crypto_rss';
   const cached = await cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
 
   try {
     const response = await axios.get(
-      `https://news.google.com/rss/search?q=${encodeURIComponent(ticker)}+stock+earnings+OR+revenue+OR+guidance&hl=en-US&gl=US&ceid=US:en`,
+      'https://news.google.com/rss/search?q=crypto+bitcoin+ethereum+solana+ETF+regulation+market&hl=en-US&gl=US&ceid=US:en',
+      {
+        timeout: 8_000,
+        validateStatus: () => true,
+        headers: { 'User-Agent': 'TradeIA/1.0' },
+      }
+    );
+    if (response.status !== 200) return [];
+
+    const items = parseXMLItems(response.data, 'GoogleNewsCrypto').slice(0, limit);
+    await cacheSet(cacheKey, items, TTL.NEWS);
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch news specific to a ticker using Google News RSS.
+ * No API key required.
+ */
+export async function getTickerNewsRSS(ticker: string, limit = 10, isCrypto = false): Promise<NewsItem[]> {
+  const cacheKey = `news:ticker_rss:${ticker}:${isCrypto ? 'crypto' : 'stock'}`;
+  const cached = await cacheGet<NewsItem[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const query = isCrypto
+      ? `${ticker} crypto OR cryptocurrency OR token OR blockchain OR ETF OR regulation`
+      : `${ticker} stock earnings OR revenue OR guidance`;
+    const response = await axios.get(
+      `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`,
       {
         timeout: 8_000,
         validateStatus: () => true,
@@ -160,7 +192,7 @@ export async function getTickerNewsRSS(ticker: string, limit = 10): Promise<News
     if (response.status !== 200) return [];
 
     const items = parseXMLItems(response.data, 'GoogleNews')
-      .filter((item) => item.tickers.includes(ticker) || item.title.toUpperCase().includes(ticker))
+      .filter((item) => item.tickers.includes(ticker) || item.title.toUpperCase().includes(ticker) || (isCrypto && CRYPTO_TICKERS.has(ticker)))
       .slice(0, limit);
 
     await cacheSet(cacheKey, items, TTL.NEWS);

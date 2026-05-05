@@ -1,12 +1,13 @@
 import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../data/yahoo';
-import { getBinanceOHLCV, getBinanceCurrentPrice } from '../data/binance';
+import { getBinanceOHLCV, getBinanceCurrentPrice, getBinanceTicker24h, type CryptoTicker24h } from '../data/binance';
 import { getTradingViewSignal, type TradingViewSignal } from '../data/tradingview';
 import { getFinvizMacro, type FinvizMacro } from '../data/finviz';
 import { getCryptoContext, type CryptoContext } from '../data/crypto-context';
+import { getMarketInternals, type MarketInternals } from '../data/market-internals';
 import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
-import { getFinanceNews, getTickerNewsRSS, type NewsItem } from '../data/news-rss';
+import { getCryptoNews, getFinanceNews, getTickerNewsRSS, type NewsItem } from '../data/news-rss';
 
 export interface TickerData {
   data_quality: 'ok' | 'stale' | 'partial' | 'missing';
@@ -20,6 +21,7 @@ export interface TickerData {
   news: unknown[];
   indicators: IndicatorValues | null;
   tradingview: TradingViewSignal;
+  crypto_metrics?: CryptoTicker24h;
   earnings_blackout?: boolean;
   options?: { iv30?: number | null };
 }
@@ -33,9 +35,11 @@ export interface CollectorOutput {
     macro: MacroData;
     finviz: FinvizMacro;
     crypto: CryptoContext;
+    internals: MarketInternals;
     sector_biases: Record<string, SectorBias>;
   };
   finance_rss_news: NewsItem[];
+  crypto_rss_news: NewsItem[];
   collected_at: string;
 }
 
@@ -54,12 +58,14 @@ export class CollectorAgent {
 
     try {
       // Parallel fetch for macro data
-      const [macro, sectorBiases, financeRSS, finvizMacro, cryptoContext] = await Promise.all([
+      const [macro, sectorBiases, financeRSS, cryptoRSS, finvizMacro, cryptoContext, internals] = await Promise.all([
         getMacroData(),
         getSectorBiases(),
         getFinanceNews(),
+        getCryptoNews(),
         getFinvizMacro(),
         getCryptoContext(),
+        getMarketInternals(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -74,14 +80,15 @@ export class CollectorAgent {
             try {
               const isCrypto = CRYPTO_TICKERS.has(ticker);
 
-              const [ohlcv15m, ohlcv1h, ohlcv4h, price, fundamentals, news, tvSignal] = await Promise.allSettled([
+              const [ohlcv15m, ohlcv1h, ohlcv4h, price, fundamentals, news, tvSignal, cryptoMetrics] = await Promise.allSettled([
                 isCrypto ? getBinanceOHLCV(ticker, '15m') : getYahooOHLCV(ticker, '15m'),
                 isCrypto ? getBinanceOHLCV(ticker, '1h') : getYahooOHLCV(ticker, '1h'),
                 isCrypto ? getBinanceOHLCV(ticker, '4h') : getYahooOHLCV(ticker, '4h'),
                 isCrypto ? getBinanceCurrentPrice(ticker) : getYahooCurrentPrice(ticker),
                 isCrypto ? Promise.resolve({}) : getYahooFundamentals(ticker),
-                getTickerNewsRSS(ticker),
+                getTickerNewsRSS(ticker, 10, isCrypto),
                 getTradingViewSignal(ticker, isCrypto),
+                isCrypto ? getBinanceTicker24h(ticker) : Promise.resolve(undefined),
               ]);
 
               const bars_15m = resolve(ohlcv15m, []);
@@ -91,6 +98,7 @@ export class CollectorAgent {
               const funds = resolve(fundamentals, {});
               const newsData = resolve(news, []);
               const tv = resolve(tvSignal, { recommendation: 'UNKNOWN', score: 0 });
+              const crypto24h = resolve(cryptoMetrics, undefined);
 
               // Compute indicators locally from OHLCV data
               const indicators = computeIndicators(
@@ -117,6 +125,7 @@ export class CollectorAgent {
                 news: newsData,
                 indicators,
                 tradingview: tv,
+                crypto_metrics: crypto24h,
                 earnings_blackout: false,
                 options: {},
               };
@@ -133,6 +142,7 @@ export class CollectorAgent {
                 news: [],
                 indicators: null,
                 tradingview: { recommendation: 'UNKNOWN', score: 0 },
+                crypto_metrics: undefined,
                 earnings_blackout: false,
                 options: {},
               };
@@ -151,9 +161,11 @@ export class CollectorAgent {
           macro,
           finviz: finvizMacro,
           crypto: cryptoContext,
+          internals,
           sector_biases: sectorBiases,
         },
         finance_rss_news: financeRSS,
+        crypto_rss_news: cryptoRSS,
         collected_at: new Date().toISOString(),
       };
     } catch (err) {

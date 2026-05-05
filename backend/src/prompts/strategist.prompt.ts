@@ -15,6 +15,11 @@ DECISION LOGIC (apply in order):
 5. You have FULL AUTONOMY to choose the invested amount based on your conviction. Set "size_pct" between 5 and 50 (percentage of total capital). For an exceptional deal, allocate a larger portion. The goal is to maximize profit.
 6. Do NOT generate duplicate orders for already-held positions.
 
+MARKET CONTEXT USAGE:
+- Use market.internals.risk_regime and sector_momentum to avoid fighting broad equity flows.
+- For crypto, use market.crypto and each debate's crypto metrics/news context; do not apply equity-only earnings or sector rules.
+- Prefer smaller size_pct when market internals are RISK_OFF or BTC momentum is weak.
+
 IMPORTANT: The "reasoning" field MUST be written in French.
 
 Output: JSON array of order proposals.

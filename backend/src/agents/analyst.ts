@@ -49,6 +49,8 @@ export class AnalystAgent {
               current_price: data.current_price,
               indicators,
               tradingview: data.tradingview,
+              crypto_metrics: data.crypto_metrics,
+              market_context: collectorOutput.market,
               fundamentals: data.fundamentals,
               news: data.news,
               rss_news: data.news, // Map local news to rss format for prompt simplification
@@ -91,6 +93,8 @@ export class AnalystAgent {
               roc_10: null, rsi_divergence: null,
             },
             tradingview: data.tradingview,
+            crypto_metrics: data.crypto_metrics,
+            market_context: collectorOutput.market,
             fundamentals: data.fundamentals,
             news: data.news,
             rss_news: data.news,
