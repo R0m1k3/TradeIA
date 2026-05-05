@@ -1,6 +1,12 @@
 import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
 import { getYahooCurrentPrice } from '../data/yahoo';
+import { getBinanceCurrentPrice } from '../data/binance';
+
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
 
 export interface ApprovedOrder {
   ticker: string;
@@ -99,7 +105,10 @@ export async function markToMarket(): Promise<void> {
   });
 
   for (const trade of openTrades) {
-    const currentPrice = await getYahooCurrentPrice(trade.ticker);
+    const isCrypto = CRYPTO_TICKERS.has(trade.ticker);
+    const currentPrice = isCrypto 
+      ? await getBinanceCurrentPrice(trade.ticker) 
+      : await getYahooCurrentPrice(trade.ticker);
     if (!currentPrice) continue;
 
     // Trailing stop logic — déplacer le stop selon progression
@@ -200,7 +209,11 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
 
   const positions = await Promise.all(
     openTrades.map(async (t) => {
-      const cp = (await getYahooCurrentPrice(t.ticker)) || t.filledPrice;
+      const isCrypto = CRYPTO_TICKERS.has(t.ticker);
+      const fetchedPrice = isCrypto 
+        ? await getBinanceCurrentPrice(t.ticker) 
+        : await getYahooCurrentPrice(t.ticker);
+      const cp = fetchedPrice || t.filledPrice;
       const pnlUsd = (cp - t.filledPrice) * t.quantity;
       return {
         ticker: t.ticker,

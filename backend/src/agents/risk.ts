@@ -131,7 +131,12 @@ export class RiskAgent {
     tickerData?: Record<string, TickerData>,
     cryptoMaxPct: number = 20
   ): OrderProposal[] {
-    const sectorCounts = countPositionsBySector(portfolio.positions);
+    // Count positions correctly identifying Crypto
+    const sectorCounts: Record<string, number> = {};
+    for (const pos of portfolio.positions) {
+      const sector = CRYPTO_TICKERS.has(pos.ticker) ? 'Crypto' : getTickerSector(pos.ticker);
+      sectorCounts[sector] = (sectorCounts[sector] || 0) + 1;
+    }
 
     // Current crypto exposure in USD
     const currentCryptoUsd = portfolio.positions
@@ -189,16 +194,18 @@ export class RiskAgent {
         pendingCryptoUsd += proposedUsd;
       }
 
-      // Concentration sectorielle max
+      // Concentration sectorielle max (exempt Crypto as it has its own cap)
       if (p.action === 'BUY') {
-        const sector = getTickerSector(p.ticker);
-        const currentCount = sectorCounts[sector] || 0;
-        if (currentCount >= MAX_POSITIONS_PER_SECTOR) {
-          console.log(`[Risk] Pre-filter ${p.ticker}: sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
-          continue;
+        const sector = CRYPTO_TICKERS.has(p.ticker) ? 'Crypto' : getTickerSector(p.ticker);
+        if (sector !== 'Crypto') {
+          const currentCount = sectorCounts[sector] || 0;
+          if (currentCount >= MAX_POSITIONS_PER_SECTOR) {
+            console.log(`[Risk] Pre-filter ${p.ticker}: sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
+            continue;
+          }
+          // Incrémenter provisoirement pour éviter plusieurs approbations sur le même secteur
+          sectorCounts[sector] = currentCount + 1;
         }
-        // Incrémenter provisoirement pour éviter plusieurs approbations sur le même secteur
-        sectorCounts[sector] = currentCount + 1;
       }
 
       filtered.push(p);
@@ -231,8 +238,8 @@ export class RiskAgent {
     // Calculate sector exposure for concentration check
     const sectorExposure: Record<string, number> = {};
     for (const pos of portfolio.positions) {
-      const sector = getTickerSector(pos.ticker);
-      sectorExposure[sector] = (sectorExposure[sector] || 0) + pos.sizeUsd;
+      const sector = CRYPTO_TICKERS.has(pos.ticker) ? 'Crypto' : getTickerSector(pos.ticker);
+      sectorExposure[sector] = (sectorExposure[sector] || 0) + (pos.sizeUsd || 0);
     }
 
     for (const p of proposals) {
@@ -257,22 +264,24 @@ export class RiskAgent {
       // Max 50% of portfolio per position (Autonomous AI allowance)
       sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.50);
 
-      // Sector concentration check: max 40% of NAV in one sector
+      // Sector concentration check: max 40% of NAV in one sector (exempt Crypto)
       if (p.action === 'BUY') {
-        const sector = getTickerSector(p.ticker);
-        const currentExposure = sectorExposure[sector] || 0;
-        const maxSectorUsd = portfolioUsd * MAX_SECTOR_NAV_PCT;
-        if (currentExposure + sizeUsd > maxSectorUsd) {
-          const adjustedSize = maxSectorUsd - currentExposure;
-          if (adjustedSize > 0) {
-            console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV, reducing from $${sizeUsd.toFixed(0)} to $${adjustedSize.toFixed(0)}`);
-            sizeUsd = adjustedSize;
-          } else {
-            console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap, skipping`);
-            continue;
+        const sector = CRYPTO_TICKERS.has(p.ticker) ? 'Crypto' : getTickerSector(p.ticker);
+        if (sector !== 'Crypto') {
+          const currentExposure = sectorExposure[sector] || 0;
+          const maxSectorUsd = portfolioUsd * MAX_SECTOR_NAV_PCT;
+          if (currentExposure + sizeUsd > maxSectorUsd) {
+            const adjustedSize = maxSectorUsd - currentExposure;
+            if (adjustedSize > 0) {
+              console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV, reducing from $${sizeUsd.toFixed(0)} to $${adjustedSize.toFixed(0)}`);
+              sizeUsd = adjustedSize;
+            } else {
+              console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap, skipping`);
+              continue;
+            }
           }
+          sectorExposure[sector] = (sectorExposure[sector] || 0) + sizeUsd;
         }
-        sectorExposure[sector] = (sectorExposure[sector] || 0) + sizeUsd;
       }
 
       approved.push({
