@@ -78,7 +78,12 @@ async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMRes
   const baseUrl = (await getCredential('ollama_base_url', 'OLLAMA_BASE_URL') || 'http://ollama:11434').replace(/\/+$/, '');
   const apiKey = await getCredential('ollama_api_key', 'OLLAMA_API_KEY');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    console.log(`[Ollama] Sending auth header for model: ${model}`);
+  } else {
+    console.warn(`[Ollama] No API key — calling ${model} without auth`);
+  }
 
   const response = await axios.post(
     `${baseUrl}/api/chat`,
