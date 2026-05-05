@@ -146,8 +146,10 @@ export async function callLLM(
     } catch (err) {
       const axiosErr = err as AxiosError;
       const status = axiosErr.response?.status;
+      const body = axiosErr.response?.data;
       console.error(
-        `[LLM] ${agentName} attempt ${attempt + 1}/${maxAttempts} failed — status ${status}: ${axiosErr.message}`
+        `[LLM] ${agentName} attempt ${attempt + 1}/${maxAttempts} failed — status ${status}: ${axiosErr.message}`,
+        body ? JSON.stringify(body) : ''
       );
 
       // Model fallback: if 401/403/429 (auth/rate limit), try smaller model
