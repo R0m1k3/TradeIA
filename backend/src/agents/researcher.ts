@@ -45,12 +45,16 @@ export class ResearcherAgent {
 
     // Process tickers sequentially to avoid overwhelming Ollama rate limits.
     // Bull + bear for each ticker still run in parallel (2 calls), but tickers are sequential.
-    const validAnalyses = analystOutputs.filter((a) => a.confidence > 0 && !a.skip_reason);
+    // Cap at top 10 by confidence to keep cycle time under ~15 minutes.
+    const validAnalyses = analystOutputs
+      .filter((a) => a.confidence > 0 && !a.skip_reason)
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
     const debates: (DebateOutput | null)[] = [];
 
     for (const analysis of validAnalyses) {
           const tickerData = collector.tickers[analysis.ticker];
-          if (!tickerData) return null;
+          if (!tickerData) continue;
 
           const inputData = {
             ticker: analysis.ticker,
