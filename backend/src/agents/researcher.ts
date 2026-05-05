@@ -41,81 +41,81 @@ export interface DebateOutput {
 
 export class ResearcherAgent {
   async run(analystOutputs: AnalystOutput[], collector: CollectorOutput): Promise<DebateOutput[]> {
-    console.log(`[Researcher] Starting bull/bear debates for ${analystOutputs.length} tickers`);
-
-    // Process tickers sequentially to avoid overwhelming Ollama rate limits.
-    // Bull + bear for each ticker still run in parallel (2 calls), but tickers are sequential.
-    // Cap at top 10 by confidence to keep cycle time under ~15 minutes.
+    // Top 10 by confidence — keeps cycle time bounded (~60-90s total in parallel)
     const validAnalyses = analystOutputs
       .filter((a) => a.confidence > 0 && !a.skip_reason)
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, 10);
-    const debates: (DebateOutput | null)[] = [];
 
-    for (const analysis of validAnalyses) {
-          const tickerData = collector.tickers[analysis.ticker];
-          if (!tickerData) continue;
+    console.log(`[Researcher] Starting bull/bear debates for ${validAnalyses.length} tickers (parallel)`);
 
-          const inputData = {
-            ticker: analysis.ticker,
-            analyst_output: analysis,
-            fundamentals: tickerData.fundamentals,
-            news: tickerData.news,
-            sentiment: tickerData.sentiment,
-            tweets: tickerData.tweets,
-            current_price: tickerData.current_price,
-          };
+    // Run all debates in parallel — bull+bear per ticker also in parallel
+    const results = await Promise.allSettled(
+      validAnalyses.map(async (analysis) => {
+        const tickerData = collector.tickers[analysis.ticker];
+        if (!tickerData) return null;
 
-          // Run bull and bear in parallel
-          const [bullResult, bearResult] = await Promise.allSettled([
-            this.runBull(inputData),
-            this.runBear(inputData),
-          ]);
+        const inputData = {
+          ticker: analysis.ticker,
+          analyst_output: analysis,
+          fundamentals: tickerData.fundamentals,
+          news: tickerData.news,
+          sentiment: (tickerData as any).sentiment,
+          tweets: (tickerData as any).tweets,
+          current_price: tickerData.current_price,
+        };
 
-          const bull: BullOutput =
-            bullResult.status === 'fulfilled'
-              ? bullResult.value
-              : {
-                  ticker: analysis.ticker,
-                  upside_pct: 0,
-                  technical_case: 'analysis unavailable',
-                  fundamental_catalyst: '',
-                  sentiment_driver: '',
-                  bear_rebuttal_1: '',
-                  bear_rebuttal_2: '',
-                  conviction: 1,
-                  invalidation_condition: '',
-                  key_risk: '',
-                };
+        const [bullResult, bearResult] = await Promise.allSettled([
+          this.runBull(inputData),
+          this.runBear(inputData),
+        ]);
 
-          const bear: BearOutput =
-            bearResult.status === 'fulfilled'
-              ? bearResult.value
-              : {
-                  ticker: analysis.ticker,
-                  downside_pct: 0,
-                  technical_case: 'analysis unavailable',
-                  structural_weakness: '',
-                  macro_headwind: '',
-                  bull_rebuttal_1: '',
-                  bull_rebuttal_2: '',
-                  conviction: 1,
-                  invalidation_condition: '',
-                  strongest_bull_argument: '',
-                };
+        const bull: BullOutput =
+          bullResult.status === 'fulfilled'
+            ? bullResult.value
+            : {
+                ticker: analysis.ticker,
+                upside_pct: 0,
+                technical_case: 'analysis unavailable',
+                fundamental_catalyst: '',
+                sentiment_driver: '',
+                bear_rebuttal_1: '',
+                bear_rebuttal_2: '',
+                conviction: 1,
+                invalidation_condition: '',
+                key_risk: '',
+              };
 
-          const debate_score = bull.conviction - bear.conviction;
+        const bear: BearOutput =
+          bearResult.status === 'fulfilled'
+            ? bearResult.value
+            : {
+                ticker: analysis.ticker,
+                downside_pct: 0,
+                technical_case: 'analysis unavailable',
+                structural_weakness: '',
+                macro_headwind: '',
+                bull_rebuttal_1: '',
+                bull_rebuttal_2: '',
+                conviction: 1,
+                invalidation_condition: '',
+                strongest_bull_argument: '',
+              };
 
-          debates.push({
-            ticker: analysis.ticker,
-            bull,
-            bear,
-            debate_score,
-            analyst_output: analysis,
-          } as DebateOutput);
-    }
+        return {
+          ticker: analysis.ticker,
+          bull,
+          bear,
+          debate_score: bull.conviction - bear.conviction,
+          analyst_output: analysis,
+        } as DebateOutput;
+      })
+    );
 
-    const validDebates = debates.filter((d): d is DebateOutput => d !== null);
+    const validDebates = results
+      .filter((r): r is PromiseFulfilledResult<DebateOutput> => r.status === 'fulfilled' && r.value !== null)
+      .map((r) => r.value);
+
     console.log(`[Researcher] Completed ${validDebates.length} debates`);
     return validDebates;
   }
