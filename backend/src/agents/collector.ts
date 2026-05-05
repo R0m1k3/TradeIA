@@ -2,6 +2,7 @@ import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../da
 import { getBinanceOHLCV, getBinanceCurrentPrice } from '../data/binance';
 import { getTradingViewSignal, type TradingViewSignal } from '../data/tradingview';
 import { getFinvizMacro, type FinvizMacro } from '../data/finviz';
+import { getCryptoContext, type CryptoContext } from '../data/crypto-context';
 import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
@@ -19,6 +20,8 @@ export interface TickerData {
   news: unknown[];
   indicators: IndicatorValues | null;
   tradingview: TradingViewSignal;
+  earnings_blackout?: boolean;
+  options?: { iv30?: number | null };
 }
 
 export interface CollectorOutput {
@@ -29,6 +32,7 @@ export interface CollectorOutput {
     nasdaq_direction: string;
     macro: MacroData;
     finviz: FinvizMacro;
+    crypto: CryptoContext;
     sector_biases: Record<string, SectorBias>;
   };
   finance_rss_news: NewsItem[];
@@ -50,11 +54,12 @@ export class CollectorAgent {
 
     try {
       // Parallel fetch for macro data
-      const [macro, sectorBiases, financeRSS, finvizMacro] = await Promise.all([
+      const [macro, sectorBiases, financeRSS, finvizMacro, cryptoContext] = await Promise.all([
         getMacroData(),
         getSectorBiases(),
         getFinanceNews(),
         getFinvizMacro(),
+        getCryptoContext(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -112,6 +117,8 @@ export class CollectorAgent {
                 news: newsData,
                 indicators,
                 tradingview: tv,
+                earnings_blackout: false,
+                options: {},
               };
             } catch (err) {
               console.error(`[Collector] Failed to fetch ${ticker}:`, err);
@@ -126,6 +133,8 @@ export class CollectorAgent {
                 news: [],
                 indicators: null,
                 tradingview: { recommendation: 'UNKNOWN', score: 0 },
+                earnings_blackout: false,
+                options: {},
               };
             }
           })
@@ -141,6 +150,7 @@ export class CollectorAgent {
           nasdaq_direction: 'neutral',
           macro,
           finviz: finvizMacro,
+          crypto: cryptoContext,
           sector_biases: sectorBiases,
         },
         finance_rss_news: financeRSS,
@@ -151,4 +161,4 @@ export class CollectorAgent {
       return null;
     }
   }
-}
+}

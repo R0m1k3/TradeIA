@@ -1,6 +1,15 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
-import type { OHLCVBar, Fundamentals } from './alphavantage';
+import type { OHLCVBar } from './indicators';
+
+export interface Fundamentals {
+  pe: number | null;
+  eps: number | null;
+  revenue_growth: number | null;
+  debt_equity: number | null;
+  earnings_date: string | null;
+  market_cap: number | null;
+}
 
 const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const SUMMARY = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary';

@@ -34,13 +34,22 @@ Output STRICT JSON only:
 
 export function buildBearPrompt(data: {
   ticker: string;
+  is_crypto?: boolean;
   analyst_output: unknown;
   fundamentals: unknown;
   news: unknown[];
   sentiment: unknown;
   current_price: number;
 }): string {
-  return `Build the strongest bearish case for ${data.ticker}.
+  const cryptoNote = data.is_crypto ? `
+Crypto-specific instructions:
+- Treat this as a cryptocurrency, not an equity.
+- Ignore P/E, EPS, earnings, margin compression and sector rotation.
+- Focus on BTC weakness, crypto fear/greed, regulatory/liquidity risk, momentum exhaustion and 24/7 volatility.
+` : '';
+
+  return `Build the strongest bearish case for ${data.ticker} (${data.is_crypto ? 'CRYPTO' : 'STOCK'}).
+${cryptoNote}
 
 Current price: $${data.current_price}
 
