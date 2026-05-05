@@ -45,6 +45,8 @@ export async function getCryptoContext(): Promise<CryptoContext> {
   }
 
   const result: CryptoContext = { crypto_fear_greed, btc_dominance, btc_change_24h };
-  await cacheSet('crypto:context', result, TTL.FUNDAMENTALS);
+  // Only cache long-term if at least one API succeeded
+  const hasData = crypto_fear_greed !== null || btc_change_24h !== null || btc_dominance !== null;
+  await cacheSet('crypto:context', result, hasData ? TTL.FUNDAMENTALS : 60);
   return result;
 }

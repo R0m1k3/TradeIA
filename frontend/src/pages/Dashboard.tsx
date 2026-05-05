@@ -307,30 +307,38 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             </div>
           )}
-          {/* Crypto Fear & Greed */}
-          {cryptoCtx?.crypto_fear_greed && (() => {
-            const v = cryptoCtx.crypto_fear_greed!.value;
-            const color = v <= 25 ? 'var(--danger)' : v <= 45 ? 'var(--warn)' : v <= 55 ? 'var(--ink-3)' : 'var(--accent)';
-            return (
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Crypto Sentiment</div>
-                <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>{v}</div>
-                <div style={{ fontSize: 12, color, marginTop: 2 }}>{cryptoCtx.crypto_fear_greed!.label}</div>
-              </div>
-            );
-          })()}
+          {/* Crypto Sentiment */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Crypto Sentiment</div>
+            {cryptoCtx?.crypto_fear_greed ? (() => {
+              const v = cryptoCtx.crypto_fear_greed!.value;
+              const color = v <= 25 ? 'var(--danger)' : v <= 45 ? 'var(--warn)' : v <= 55 ? 'var(--ink-3)' : 'var(--accent)';
+              return (
+                <>
+                  <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>{v}</div>
+                  <div style={{ fontSize: 12, color, marginTop: 2 }}>{cryptoCtx.crypto_fear_greed!.label}</div>
+                </>
+              );
+            })() : (
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-4)' }}>—</div>
+            )}
+          </div>
           {/* BTC 24h */}
-          {cryptoCtx?.btc_change_24h != null && (
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>BTC 24h</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: cryptoCtx.btc_change_24h >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-                {cryptoCtx.btc_change_24h >= 0 ? '+' : ''}{cryptoCtx.btc_change_24h.toFixed(2)}%
-              </div>
-              {cryptoCtx.btc_dominance != null && (
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Dom. {cryptoCtx.btc_dominance}%</div>
-              )}
-            </div>
-          )}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>BTC 24h</div>
+            {cryptoCtx?.btc_change_24h != null ? (
+              <>
+                <div style={{ fontSize: 20, fontWeight: 600, color: cryptoCtx.btc_change_24h >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                  {cryptoCtx.btc_change_24h >= 0 ? '+' : ''}{cryptoCtx.btc_change_24h.toFixed(2)}%
+                </div>
+                {cryptoCtx.btc_dominance != null && (
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Dom. {cryptoCtx.btc_dominance}%</div>
+                )}
+              </>
+            ) : (
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-4)' }}>—</div>
+            )}
+          </div>
           {/* Market status fallback when no macro */}
           {!(market as any).macro && (
             <div>
