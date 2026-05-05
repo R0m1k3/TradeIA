@@ -1,5 +1,4 @@
-import { callLLM, parseJsonResponse } from '../llm/client';
-import { getModels } from '../llm/models';
+import { getNasdaqStatus } from '../routes/market';
 
 /** NASDAQ 100 fallback tickers (full list) */
 const NASDAQ_100 = [
@@ -23,15 +22,19 @@ const CRYPTO_TOP_20 = [
 
 export class DiscoveryAgent {
   async run(): Promise<string[]> {
-    console.log('[Discovery] Scanning global market (100% coverage)...');
+    const nasdaq = getNasdaqStatus();
 
-    // Combine NASDAQ 100 and Crypto Top 20 for full market coverage
+    if (!nasdaq.isOpen) {
+      // Market closed — crypto trades 24/7, stocks don't move after hours
+      const shuffled = [...CRYPTO_TOP_20].sort(() => 0.5 - Math.random());
+      console.log(`[Discovery] Market closed — crypto-only mode: ${shuffled.length} tickers`);
+      return shuffled;
+    }
+
+    // Market open — full scan: NASDAQ 100 + crypto
     const allTickers = [...NASDAQ_100, ...CRYPTO_TOP_20];
-    
-    // We shuffle the array so that if the cycle crashes halfway, it doesn't always miss the same ones at the end
     const shuffled = allTickers.sort(() => 0.5 - Math.random());
-    
-    console.log(`[Discovery] Selected ${shuffled.length} tickers for deep analysis.`);
+    console.log(`[Discovery] Market open — full scan: ${shuffled.length} tickers (stocks + crypto)`);
     return shuffled;
   }
 }
