@@ -50,7 +50,7 @@ function ApiKeyInput({
 }
 
 export function Config() {
-  const { config, secretsConfigured, fetchConfig, saveConfig, saveSecret } = useConfigStore();
+  const { config, secretsConfigured, fetchConfig, saveConfig, saveSecret, setConfig } = useConfigStore();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -285,7 +285,8 @@ export function Config() {
                 max={10}
                 step={0.5}
                 value={parseFloat(config.daily_loss_limit_pct || '3')}
-                onChange={(e) => saveConfig({ daily_loss_limit_pct: e.target.value })}
+                onChange={(e) => setConfig({ daily_loss_limit_pct: e.target.value })}
+                onPointerUp={(e) => saveConfig({ daily_loss_limit_pct: (e.target as HTMLInputElement).value })}
                 style={{ width: '100%', accentColor: 'var(--warn)', marginBottom: 4 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
@@ -305,7 +306,8 @@ export function Config() {
                 max={30}
                 step={1}
                 value={parseFloat(config.max_drawdown_pct || '10')}
-                onChange={(e) => saveConfig({ max_drawdown_pct: e.target.value })}
+                onChange={(e) => setConfig({ max_drawdown_pct: e.target.value })}
+                onPointerUp={(e) => saveConfig({ max_drawdown_pct: (e.target as HTMLInputElement).value })}
                 style={{ width: '100%', accentColor: 'var(--danger)', marginBottom: 4 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
@@ -330,7 +332,8 @@ export function Config() {
                 max={50}
                 step={5}
                 value={parseFloat(config.crypto_max_pct || '20')}
-                onChange={(e) => saveConfig({ crypto_max_pct: e.target.value })}
+                onChange={(e) => setConfig({ crypto_max_pct: e.target.value })}
+                onPointerUp={(e) => saveConfig({ crypto_max_pct: (e.target as HTMLInputElement).value })}
                 style={{ width: '100%', accentColor: 'var(--info)', marginBottom: 4 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>

@@ -66,10 +66,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL || '/api';
-    fetch(`${api}/market/crypto-context`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => d && setCryptoCtx(d))
-      .catch(() => {});
+    let attempts = 0;
+    function fetchCtx() {
+      fetch(`${api}/market/crypto-context`)
+        .then((r) => {
+          if (r.status === 429 && attempts < 3) {
+            attempts++;
+            setTimeout(fetchCtx, 10_000);
+            return null;
+          }
+          return r.ok ? r.json() : null;
+        })
+        .then((d) => d && setCryptoCtx(d))
+        .catch(() => {});
+    }
+    fetchCtx();
   }, []);
 
   // Fetch trade type stats on mount
