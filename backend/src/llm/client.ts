@@ -76,6 +76,10 @@ async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LL
 async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMResponse> {
   const start = Date.now();
   const baseUrl = (await getCredential('ollama_base_url', 'OLLAMA_BASE_URL') || 'http://ollama:11434').replace(/\/+$/, '');
+  const apiKey = await getCredential('ollama_api_key', 'OLLAMA_API_KEY');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const response = await axios.post(
     `${baseUrl}/api/chat`,
     {
@@ -84,7 +88,7 @@ async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMRes
       stream: false,
       options: { temperature: 0.1 },
     },
-    { timeout: 900_000 } // 15 minutes to allow for large queues
+    { headers, timeout: 900_000 }
   );
 
   const content = response.data.message?.content || '';

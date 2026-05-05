@@ -11,6 +11,7 @@ const KEYS_TO_INVALIDATE = new Set([
   'finnhub_key',
   'fred_api_key',
   'socialdata_key',
+  'ollama_api_key',
   'ollama_base_url',
   'portfolio_usd',
   'daily_loss_limit_pct',
@@ -30,7 +31,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const c of configs) {
       if (KEYS_TO_INVALIDATE.has(c.key)) {
-        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key'].includes(c.key)) {
+        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key'].includes(c.key)) {
           secretsConfigured[c.key] = c.value.length > 0;
         } else {
           result[c.key] = c.value;
@@ -41,7 +42,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Ensure all sensitive keys appear in secrets_configured
-    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key']) {
+    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key']) {
       if (!(key in secretsConfigured)) secretsConfigured[key] = false;
     }
 
@@ -105,7 +106,11 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
           || 'http://ollama:11434';
         // Strip trailing slash
         baseUrl = baseUrl.replace(/\/+$/, '');
-        const res = await axios.get(`${baseUrl}/api/tags`, { timeout: 15000 });
+        const ollamaApiKey = (await prisma.config.findUnique({ where: { key: 'ollama_api_key' } }))?.value
+          || process.env.OLLAMA_API_KEY || '';
+        const ollamaHeaders: Record<string, string> = {};
+        if (ollamaApiKey) ollamaHeaders['Authorization'] = `Bearer ${ollamaApiKey}`;
+        const res = await axios.get(`${baseUrl}/api/tags`, { timeout: 15000, headers: ollamaHeaders });
         const models = (res.data.models || []).map((m: any) => m.name);
         console.log(`[Config] Fetched ${models.length} Ollama models from ${baseUrl}`);
         return models;
@@ -182,10 +187,13 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       // For Ollama: verify connection first, then pick a valid model
       if (provider === 'ollama') {
         const baseUrl = (await getCredential('ollama_base_url', 'OLLAMA_BASE_URL') || 'http://ollama:11434').replace(/\/+$/, '');
+        const ollamaApiKey = await getCredential('ollama_api_key', 'OLLAMA_API_KEY');
+        const ollamaHeaders: Record<string, string> = {};
+        if (ollamaApiKey) ollamaHeaders['Authorization'] = `Bearer ${ollamaApiKey}`;
 
         // Step 1: check Ollama is reachable
         try {
-          const tagsRes = await axios.get(`${baseUrl}/api/tags`, { timeout: 10000 });
+          const tagsRes = await axios.get(`${baseUrl}/api/tags`, { timeout: 10000, headers: ollamaHeaders });
           const availableModels: string[] = (tagsRes.data.models || []).map((m: any) => m.name);
 
           if (availableModels.length === 0) {

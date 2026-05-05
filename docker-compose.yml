@@ -26,6 +26,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
       - MODEL_LIGHT=${MODEL_LIGHT:-anthropic/claude-haiku-4-5}
       - MODEL_MID=${MODEL_MID:-anthropic/claude-sonnet-4-5}
       - MODEL_STRONG=${MODEL_STRONG:-anthropic/claude-opus-4}

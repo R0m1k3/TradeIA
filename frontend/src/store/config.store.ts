@@ -17,6 +17,7 @@ interface Config {
 interface ConfigSecrets {
   openrouter_api_key: boolean;
   fred_api_key: boolean;
+  ollama_api_key: boolean;
 }
 
 interface ConfigStore {
@@ -48,6 +49,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   secretsConfigured: {
     openrouter_api_key: false,
     fred_api_key: false,
+    ollama_api_key: false,
   },
   paused: false,
 

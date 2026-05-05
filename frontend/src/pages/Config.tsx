@@ -170,6 +170,15 @@ export function Config() {
               </div>
             )}
 
+            {config.llm_provider === 'ollama' && (
+              <ApiKeyInput
+                label="Clé API Ollama (cloud models)"
+                configured={secretsConfigured.ollama_api_key}
+                placeholder="Requis pour les modèles :cloud"
+                onSave={(val) => saveSecret('ollama_api_key', val)}
+              />
+            )}
+
             <label className="label">Modèle Léger <Help tip="Modèle rapide pour les tâches simples (screening, formatage)." /></label>
             <select
               className="select"
