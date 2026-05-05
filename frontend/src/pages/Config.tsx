@@ -317,6 +317,33 @@ export function Config() {
               </p>
             </div>
 
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="label" style={{ marginBottom: 0 }}>
+                  Allocation max Crypto <Help tip="Pourcentage maximum du portefeuille pouvant être investi en cryptomonnaies simultanément. 0% = aucun trade crypto. 50% = équilibre stocks / crypto." />
+                </span>
+                <span className="mono" style={{ fontSize: 13, color: 'var(--info)' }}>{config.crypto_max_pct}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={50}
+                step={5}
+                value={parseFloat(config.crypto_max_pct || '20')}
+                onChange={(e) => saveConfig({ crypto_max_pct: e.target.value })}
+                style={{ width: '100%', accentColor: 'var(--info)', marginBottom: 4 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
+                <span>0% — actions uniquement</span>
+                <span>50% — équilibre</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                {parseFloat(config.crypto_max_pct || '20') === 0
+                  ? 'Les cryptomonnaies sont surveillées mais aucun capital ne leur est alloué.'
+                  : `Maximum $${((parseFloat(config.portfolio_usd || '10000') * parseFloat(config.crypto_max_pct || '20')) / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })} en crypto sur $${parseFloat(config.portfolio_usd || '10000').toLocaleString()}.`}
+              </div>
+            </div>
+
             <div style={{ padding: 12, background: 'var(--warn-soft)', borderRadius: 6, fontSize: 12, color: 'var(--warn)', borderLeft: '3px solid var(--warn)' }}>
               Au-delà de 3% par trade, le drawdown peut dépasser votre seuil cible.
             </div>

@@ -3,6 +3,7 @@ import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
+import { isCryptoTicker } from '../data/tickerNames';
 import type { OHLCVBar } from '../types';
 
 function Help({ tip }: { tip: string }) {
@@ -165,11 +166,13 @@ export function Markets() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {market.nasdaq_status && (
+              {isCryptoTicker(chartTicker) ? (
+                <span style={{ fontSize: 11, color: 'var(--accent)' }}>Ouvert 24/7</span>
+              ) : market.nasdaq_status ? (
                 <span style={{ fontSize: 11, color: market.nasdaq_status.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
                   {market.nasdaq_status.isOpen ? 'Ouvert' : market.nasdaq_status.nextOpen || 'Fermé'}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
           <div style={{ padding: 16, height: 320, position: 'relative' }}>

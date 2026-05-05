@@ -65,37 +65,13 @@ Your reverse proxy should forward:
 | `MODEL_LIGHT` | No | Model for collector/reporter agents |
 | `MODEL_MID` | No | Model for analyst/researcher agents |
 | `MODEL_STRONG` | No | Model for strategist/risk agents |
-| `ALPHA_VANTAGE_KEY` | Recommended | Market OHLCV + fundamentals data |
-| `POLYGON_KEY` | Optional | Options data (put/call ratio, IV30) |
-| `FINNHUB_KEY` | Optional | News sentiment data |
 | `MOCK_BROKER` | No | `true` = simulated trades (default), `false` = real |
 | `PORTFOLIO_USD` | No | Starting portfolio size (default: 10000) |
 | `DAILY_LOSS_LIMIT_PCT` | No | Daily loss limit % (default: 3) |
-| `WATCHLIST` | No | Comma-separated tickers (default: AAPL,MSFT,...) |
 | `DB_PASS` | No | PostgreSQL password (default: trading123) |
 | `ADMIN_PASSWORD` | Yes | Password for override API endpoints |
 
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `LLM_PROVIDER` | No | `openrouter` (default) or `ollama` |
-| `OPENROUTER_API_KEY` | Yes* | OpenRouter API key (*if using cloud) |
-| `OLLAMA_BASE_URL` | No | Ollama endpoint (default: http://ollama:11434) |
-| `MODEL_LIGHT` | No | Model for collector/reporter agents |
-| `MODEL_MID` | No | Model for analyst/researcher agents |
-| `MODEL_STRONG` | No | Model for strategist/risk agents |
-| `ALPHA_VANTAGE_KEY` | Recommended | Market OHLCV + fundamentals data |
-| `POLYGON_KEY` | Optional | Options data (put/call ratio, IV30) |
-| `FINNHUB_KEY` | Optional | News sentiment data |
-| `MOCK_BROKER` | No | `true` = simulated trades (default), `false` = real |
-| `PORTFOLIO_USD` | No | Starting portfolio size (default: 10000) |
-| `DAILY_LOSS_LIMIT_PCT` | No | Daily loss limit % (default: 3) |
-| `WATCHLIST` | No | Comma-separated tickers (default: AAPL,MSFT,...) |
-| `DB_PASS` | No | PostgreSQL password (default: trading123) |
-| `ADMIN_PASSWORD` | Yes | Password for override API endpoints |
+> **Note:** No third-party API keys are required. Market data is sourced 100% from free, unmetered APIs: Yahoo Finance (NASDAQ 100), Binance (crypto OHLCV), TradingView (technical signals), Finviz (macro sentiment), FRED (macro indicators), and alternative.me (crypto fear & greed).
 
 ---
 

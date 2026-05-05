@@ -43,6 +43,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     portfolio_usd: '10000',
     daily_loss_limit_pct: '3',
     max_drawdown_pct: '10',
+    crypto_max_pct: '20',
     mock_broker: 'true',
     ollama_base_url: '',
   },

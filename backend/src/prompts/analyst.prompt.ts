@@ -105,8 +105,18 @@ export function buildAnalystPrompt(data: {
     }).join('\n');
   };
 
-  return `Analyze ${data.ticker} (${data.is_crypto ? 'CRYPTO' : 'STOCK'}) using the PRE-COMPUTED indicators below.
+  const cryptoNote = data.is_crypto ? `
+CRYPTO-SPECIFIC RULES (MANDATORY):
+- This asset trades 24/7 — no overnight gap risk, but weekend liquidity can be thinner.
+- Fundamentals (P/E, EPS, revenue) are IRRELEVANT for crypto — ignore them entirely.
+- Crypto volatility is 3-5x higher than equities. Use wider ATR multiples: Stop = 3.5×ATR, Target = 7×ATR.
+- On-chain sentiment and BTC correlation matter more than sector rotation.
+- Higher ADX threshold for trend confirmation: require ADX > 30 (not 25) before calling a trend.
+- Volume spikes on crypto are common — only flag volume_ratio > 2.5x as truly significant.
+` : '';
 
+  return `Analyze ${data.ticker} (${data.is_crypto ? 'CRYPTOCURRENCY' : 'STOCK'}) using the PRE-COMPUTED indicators below.
+${cryptoNote}
 Current price: $${data.current_price}
 
 TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
@@ -129,7 +139,7 @@ TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
 EXTERNAL SIGNALS:
 - TradingView Consensus: ${data.tradingview.recommendation} (Score: ${data.tradingview.score.toFixed(2)})
 
-FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}
+${data.is_crypto ? 'FUNDAMENTALS: N/A (cryptocurrency — no earnings, P/E, or revenue data)' : `FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}`}
 
 RECENT NEWS (Yahoo): ${data.news ? JSON.stringify(data.news) : 'N/A'}
 

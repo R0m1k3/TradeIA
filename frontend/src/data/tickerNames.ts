@@ -1,4 +1,44 @@
+export const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
+
+export function isCryptoTicker(ticker: string): boolean {
+  return CRYPTO_TICKERS.has(ticker.toUpperCase());
+}
+
+export function formatPrice(price: number): string {
+  if (price === 0) return '0.00';
+  if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (price >= 1) return price.toFixed(2);
+  if (price >= 0.01) return price.toFixed(4);
+  if (price >= 0.0001) return price.toFixed(6);
+  return price.toFixed(8);
+}
+
 export const TICKER_NAMES: Record<string, string> = {
+  // Crypto
+  BTC: 'Bitcoin',
+  ETH: 'Ethereum',
+  BNB: 'BNB',
+  SOL: 'Solana',
+  XRP: 'XRP',
+  DOGE: 'Dogecoin',
+  ADA: 'Cardano',
+  AVAX: 'Avalanche',
+  SHIB: 'Shiba Inu',
+  DOT: 'Polkadot',
+  LINK: 'Chainlink',
+  TRX: 'TRON',
+  MATIC: 'Polygon',
+  BCH: 'Bitcoin Cash',
+  LTC: 'Litecoin',
+  NEAR: 'NEAR Protocol',
+  UNI: 'Uniswap',
+  APT: 'Aptos',
+  INJ: 'Injective',
+  RENDER: 'Render',
+  // NASDAQ 100
   AAPL: 'Apple',
   ABNB: 'Airbnb',
   ADBE: 'Adobe',

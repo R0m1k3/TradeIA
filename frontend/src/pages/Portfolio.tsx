@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { PortfolioChart } from '../components/charts/PortfolioChart';
-import { getTickerName } from '../data/tickerNames';
+import { getTickerName, formatPrice } from '../data/tickerNames';
 import type { Trade } from '../types';
 
 function Help({ tip }: { tip: string }) {
@@ -64,7 +64,7 @@ function PositionCard({ position, signal }: {
               <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{getTickerName(position.ticker)}</span>
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-              {position.quantity.toFixed(4)} actions @ ${position.entryPrice.toFixed(2)}
+              {position.quantity.toFixed(4)} unités @ ${formatPrice(position.entryPrice)}
             </p>
           </div>
         </div>
@@ -80,7 +80,7 @@ function PositionCard({ position, signal }: {
           </div>
           <div style={{ textAlign: 'right' }}>
             <p className="label" style={{ marginBottom: 2 }}>Prix actuel</p>
-            <p className="mono" style={{ fontSize: 14 }}>${position.currentPrice.toFixed(2)}</p>
+            <p className="mono" style={{ fontSize: 14 }}>${formatPrice(position.currentPrice)}</p>
           </div>
           <span style={{ color: 'var(--ink-4)', fontSize: 14, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
         </div>
@@ -98,7 +98,7 @@ function PositionCard({ position, signal }: {
                 width: `${(riskAmount / (riskAmount + gainAmount)) * 100}%`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span className="mono" style={{ fontSize: 9, color: 'var(--danger)' }}>Stop ${position.stopLoss.toFixed(0)}</span>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--danger)' }}>Stop ${formatPrice(position.stopLoss)}</span>
               </div>
               <div style={{
                 position: 'absolute', right: 0, top: 0, height: '100%',
@@ -106,7 +106,7 @@ function PositionCard({ position, signal }: {
                 width: `${(gainAmount / (riskAmount + gainAmount)) * 100}%`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <span className="mono" style={{ fontSize: 9, color: 'var(--accent)' }}>TP ${position.takeProfit.toFixed(0)}</span>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--accent)' }}>TP ${formatPrice(position.takeProfit)}</span>
               </div>
               {(() => {
                 const range = position.takeProfit - position.stopLoss;
@@ -177,8 +177,8 @@ function TradeRow({ trade }: { trade: Trade }) {
     <tr style={{ borderBottom: '1px solid var(--rule)' }}>
       <td className="mono" style={{ padding: '10px 12px', fontWeight: 600, fontSize: 12 }}>{trade.ticker}</td>
       <td style={{ padding: '10px 12px', fontSize: 11, color: 'var(--ink-3)' }}>{getTickerName(trade.ticker)}</td>
-      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>${trade.filledPrice.toFixed(2)}</td>
-      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>${trade.closePrice?.toFixed(2) || '—'}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>${formatPrice(trade.filledPrice)}</td>
+      <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>{trade.closePrice != null ? `$${formatPrice(trade.closePrice)}` : '—'}</td>
       <td className="mono" style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>{trade.quantity.toFixed(4)}</td>
       <td className="mono" style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: pnlPositive ? 'var(--accent)' : 'var(--danger)' }}>
         {pnlPositive ? '+' : ''}${(trade.pnlUsd || 0).toFixed(2)}

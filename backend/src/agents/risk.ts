@@ -10,6 +10,11 @@ import { prisma } from '../lib/prisma';
 const MAX_POSITIONS_PER_SECTOR = 3;
 const MAX_SECTOR_NAV_PCT = 0.40; // max 40% of NAV in a single sector
 
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
+
 interface RiskOutput {
   approved: ApprovedOrder[];
   rejected: Array<{ ticker: string; action: string; rejection_reason: string }>;
@@ -28,7 +33,8 @@ export class RiskAgent {
     portfolio: { daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     dailyLossLimitPct: number,
-    tickerData?: Record<string, TickerData>
+    tickerData?: Record<string, TickerData>,
+    cryptoMaxPct: number = 20
   ): Promise<ApprovedOrder[]> {
     console.log(`[Risk] Validating ${proposals.length} proposals`);
 
@@ -41,7 +47,8 @@ export class RiskAgent {
       portfolio,
       market,
       dailyLossLimitPct,
-      tickerData
+      tickerData,
+      cryptoMaxPct
     );
 
     if (preFiltered.length === 0) return [];
@@ -121,9 +128,17 @@ export class RiskAgent {
     portfolio: { daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     market: { vix: number },
     dailyLossLimitPct: number,
-    tickerData?: Record<string, TickerData>
+    tickerData?: Record<string, TickerData>,
+    cryptoMaxPct: number = 20
   ): OrderProposal[] {
     const sectorCounts = countPositionsBySector(portfolio.positions);
+
+    // Current crypto exposure in USD
+    const currentCryptoUsd = portfolio.positions
+      .filter((p) => CRYPTO_TICKERS.has(p.ticker))
+      .reduce((s, p) => s + (p.sizeUsd ?? 0), 0);
+    const cryptoCapUsd = portfolioUsd * (cryptoMaxPct / 100);
+    let pendingCryptoUsd = 0;
     const filtered: OrderProposal[] = [];
 
     for (const p of proposals) {
@@ -162,6 +177,16 @@ export class RiskAgent {
       if (tickerData?.[p.ticker]?.earnings_blackout) {
         console.log(`[Risk] Pre-filter ${p.ticker}: earnings blackout`);
         continue;
+      }
+
+      // Crypto capital cap
+      if (p.action === 'BUY' && CRYPTO_TICKERS.has(p.ticker)) {
+        const proposedUsd = portfolioUsd * (p.size_pct / 100);
+        if (currentCryptoUsd + pendingCryptoUsd + proposedUsd > cryptoCapUsd) {
+          console.log(`[Risk] Pre-filter ${p.ticker}: crypto cap ${cryptoMaxPct}% reached (current $${(currentCryptoUsd + pendingCryptoUsd).toFixed(0)} / cap $${cryptoCapUsd.toFixed(0)})`);
+          continue;
+        }
+        pendingCryptoUsd += proposedUsd;
       }
 
       // Concentration sectorielle max

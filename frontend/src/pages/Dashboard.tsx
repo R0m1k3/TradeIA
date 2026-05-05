@@ -4,7 +4,7 @@ import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import { HeatMap } from '../components/charts/HeatMap';
 import type { Page } from '../App';
-import type { SectorBias } from '../types';
+import type { SectorBias, CryptoContext } from '../types';
 
 const SIGNAL_COLOR: Record<string, string> = {
   BUY: 'var(--accent)',
@@ -62,6 +62,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { signals, market, agents, alerts, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
   const [tab, setTab] = useState<'open' | 'hist'>('open');
+  const [cryptoCtx, setCryptoCtx] = useState<CryptoContext | null>(null);
+
+  useEffect(() => {
+    const api = import.meta.env.VITE_API_URL || '/api';
+    fetch(`${api}/market/crypto-context`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setCryptoCtx(d))
+      .catch(() => {});
+  }, []);
 
   // Fetch trade type stats on mount
   useEffect(() => { fetchTypeStats(); }, [fetchTypeStats]);
@@ -285,6 +294,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
                 Fed {(market as any).macro.fed_funds_rate ?? '—'}% · Courbe {(market as any).macro.yield_curve != null ? `${(market as any).macro.yield_curve > 0 ? '+' : ''}${(market as any).macro.yield_curve}` : '—'}% · CPI {(market as any).macro.cpi_yoy ?? '—'}
               </div>
+            </div>
+          )}
+          {/* Crypto Fear & Greed */}
+          {cryptoCtx?.crypto_fear_greed && (() => {
+            const v = cryptoCtx.crypto_fear_greed!.value;
+            const color = v <= 25 ? 'var(--danger)' : v <= 45 ? 'var(--warn)' : v <= 55 ? 'var(--ink-3)' : 'var(--accent)';
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Crypto Sentiment</div>
+                <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>{v}</div>
+                <div style={{ fontSize: 12, color, marginTop: 2 }}>{cryptoCtx.crypto_fear_greed!.label}</div>
+              </div>
+            );
+          })()}
+          {/* BTC 24h */}
+          {cryptoCtx?.btc_change_24h != null && (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>BTC 24h</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: cryptoCtx.btc_change_24h >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                {cryptoCtx.btc_change_24h >= 0 ? '+' : ''}{cryptoCtx.btc_change_24h.toFixed(2)}%
+              </div>
+              {cryptoCtx.btc_dominance != null && (
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Dom. {cryptoCtx.btc_dominance}%</div>
+              )}
             </div>
           )}
           {/* Market status fallback when no macro */}

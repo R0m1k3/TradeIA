@@ -1,6 +1,13 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getYahooOHLCV, getMarketContext } from '../data/yahoo';
+import { getBinanceOHLCV } from '../data/binance';
+import { getCryptoContext } from '../data/crypto-context';
 import { getCredential } from '../config/credentials';
+
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
 
 export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
   const now = new Date();
@@ -74,9 +81,17 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
     const query = req.query as { interval?: string };
     const interval = (query.interval || '1d') as '15m' | '1h' | '4h' | '1d';
 
-    // Fetch OHLCV strictly from Yahoo
-    const yahooBars = await getYahooOHLCV(ticker, interval === '15m' ? '15m' : interval === '1h' ? '1h' : interval === '4h' ? '4h' : '1d');
+    if (CRYPTO_TICKERS.has(ticker.toUpperCase())) {
+      const bars = await getBinanceOHLCV(ticker.toUpperCase(), interval === '4h' ? '4h' : interval === '1h' ? '1h' : interval === '15m' ? '15m' : '1d');
+      return bars.length > 0 ? bars : [];
+    }
+
+    const yahooBars = await getYahooOHLCV(ticker, interval);
     return yahooBars.length > 0 ? yahooBars : [];
+  });
+
+  fastify.get('/crypto-context', async () => {
+    return getCryptoContext();
   });
 };
 

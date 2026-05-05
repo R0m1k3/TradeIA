@@ -41,6 +41,12 @@ export interface SectorBias {
   change_pct: number;
 }
 
+export interface CryptoContext {
+  crypto_fear_greed: { value: number; label: string } | null;
+  btc_dominance: number | null;
+  btc_change_24h: number | null;
+}
+
 export interface MarketContext {
   vix: number;
   fear_greed: number;
@@ -53,6 +59,7 @@ export interface MarketContext {
   };
   macro?: MacroData;
   sector_biases?: Record<string, SectorBias>;
+  crypto?: CryptoContext;
 }
 
 export interface AgentTimelineEvent {
