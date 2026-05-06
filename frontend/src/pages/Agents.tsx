@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import type { AgentState, DebateOutput, AnalysisEvent } from '../types';
@@ -14,6 +14,7 @@ const AGENT_META: Record<string, { n: string; name: string; role: string; color:
 };
 
 const AGENT_IDS = ['collector', 'analyst', 'bull', 'bear', 'risk', 'strategist', 'reporter'];
+const PERF_REFRESH_MS = 5 * 60 * 1000;
 
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
@@ -97,8 +98,12 @@ export function Agents() {
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
   const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
   const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
+  const lastPerfFetchRef = useRef(0);
 
   useEffect(() => {
+    const now = Date.now();
+    if (lastPerfFetchRef.current && now - lastPerfFetchRef.current < PERF_REFRESH_MS) return;
+    lastPerfFetchRef.current = now;
     const api = import.meta.env.VITE_API_URL || '/api';
     fetch(`${api}/portfolio/ai-performance`)
       .then((r) => (r.ok ? r.json() : null))

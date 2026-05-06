@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
@@ -29,6 +29,7 @@ const AGENT_PIPELINE_NAMES: Record<string, { num: string; name: string; role: st
   strategist: { num: '06', name: 'Modérateur', role: 'Tranche', color: 'oklch(0.74 0.10 280)' },
   reporter: { num: '07', name: 'Reporter', role: 'Archive', color: 'var(--ink-4)' },
 };
+const OHLCV_REFRESH_MS = 60 * 1000;
 
 export function Markets() {
   const { portfolio } = usePortfolioStore();
@@ -37,9 +38,16 @@ export function Markets() {
   const [ohlcv, setOhlcv] = useState<OHLCVBar[]>([]);
   const [chartTicker, setChartTicker] = useState('QQQ');
   const [chartInterval, setChartInterval] = useState<'15m' | '1h' | '1d'>('1d');
+  const lastOhlcvFetchRef = useRef(0);
+  const lastOhlcvKeyRef = useRef('');
 
   // Fetch real OHLCV data from backend
   useEffect(() => {
+    const key = `${chartTicker}:${chartInterval}`;
+    const now = Date.now();
+    if (lastOhlcvKeyRef.current === key && lastOhlcvFetchRef.current && now - lastOhlcvFetchRef.current < OHLCV_REFRESH_MS) return;
+    lastOhlcvKeyRef.current = key;
+    lastOhlcvFetchRef.current = now;
     const api = import.meta.env.VITE_API_URL || '/api';
     let cancelled = false;
     fetch(`${api}/market/ohlcv/${chartTicker}?interval=${chartInterval}`)

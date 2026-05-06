@@ -74,34 +74,12 @@ export class ResearcherAgent {
         const bull: BullOutput =
           bullResult.status === 'fulfilled'
             ? bullResult.value
-            : {
-                ticker: analysis.ticker,
-                upside_pct: 0,
-                technical_case: 'analysis unavailable',
-                fundamental_catalyst: '',
-                sentiment_driver: '',
-                bear_rebuttal_1: '',
-                bear_rebuttal_2: '',
-                conviction: 1,
-                invalidation_condition: '',
-                key_risk: '',
-              };
+            : this.buildFallbackBull(analysis);
 
         const bear: BearOutput =
           bearResult.status === 'fulfilled'
             ? bearResult.value
-            : {
-                ticker: analysis.ticker,
-                downside_pct: 0,
-                technical_case: 'analysis unavailable',
-                structural_weakness: '',
-                macro_headwind: '',
-                bull_rebuttal_1: '',
-                bull_rebuttal_2: '',
-                conviction: 1,
-                invalidation_condition: '',
-                strongest_bull_argument: '',
-              };
+            : this.buildFallbackBear(analysis);
 
         return {
           ticker: analysis.ticker,
@@ -133,5 +111,49 @@ export class ResearcherAgent {
     const models = await getModels();
     const response = await callLLM('bear-researcher', models.MID, BEAR_SYSTEM, prompt);
     return parseJsonResponse<BearOutput>(response.content);
+  }
+
+  private buildFallbackBull(analysis: AnalystOutput): BullOutput {
+    const hasBullBias = analysis.bias_4h === 'BULLISH' || analysis.bias_1h === 'BULLISH' || analysis.signal_15m === 'BUY';
+    const upsidePct = analysis.entry_price > 0
+      ? Math.max(0, ((analysis.take_profit - analysis.entry_price) / analysis.entry_price) * 100)
+      : 0;
+
+    return {
+      ticker: analysis.ticker,
+      upside_pct: Math.round(upsidePct * 100) / 100,
+      technical_case: hasBullBias
+        ? `${analysis.ticker}: biais haussier partiel, RSI ${analysis.rsi_15m.toFixed(1)} et MACD ${analysis.macd_signal}.`
+        : `${analysis.ticker}: pas assez de confirmation haussière, signal technique majoritairement neutre.`,
+      fundamental_catalyst: 'Non évalué sur ce cycle; décision basée sur les indicateurs techniques disponibles.',
+      sentiment_driver: `Confiance analyste ${analysis.confidence}%, fraîcheur données ${analysis.data_freshness_score ?? 'N/A'}/100.`,
+      bear_rebuttal_1: `Support principal ${analysis.key_levels.support[0]?.toFixed(4) ?? 'non identifié'}.`,
+      bear_rebuttal_2: `Objectif technique ${analysis.take_profit.toFixed(4)} si le prix confirme.`,
+      conviction: hasBullBias ? Math.max(2, Math.round(analysis.confidence / 20)) : 1,
+      invalidation_condition: `Cassure sous ${analysis.stop_loss.toFixed(4)} ou perte du support.`,
+      key_risk: 'Débat LLM indisponible; conviction réduite automatiquement.',
+    };
+  }
+
+  private buildFallbackBear(analysis: AnalystOutput): BearOutput {
+    const hasBearBias = analysis.bias_4h === 'BEARISH' || analysis.bias_1h === 'BEARISH' || analysis.signal_15m === 'SELL';
+    const downsidePct = analysis.entry_price > 0
+      ? Math.max(0, ((analysis.entry_price - analysis.stop_loss) / analysis.entry_price) * 100)
+      : 0;
+
+    return {
+      ticker: analysis.ticker,
+      downside_pct: Math.round(downsidePct * 100) / 100,
+      technical_case: hasBearBias
+        ? `${analysis.ticker}: pression baissière possible, RSI ${analysis.rsi_15m.toFixed(1)} et MACD ${analysis.macd_signal}.`
+        : `${analysis.ticker}: risque baissier contenu, mais setup encore trop neutre pour acheter fort.`,
+      structural_weakness: `Résistance proche ${analysis.key_levels.resistance[0]?.toFixed(4) ?? 'non identifiée'}.`,
+      macro_headwind: 'Contexte macro/sentiment non tranché sur ce cycle.',
+      bull_rebuttal_1: `Le signal 15m est ${analysis.signal_15m}, donc pas de rejet fort sans cassure.`,
+      bull_rebuttal_2: `La confiance analyste reste à ${analysis.confidence}%, prudence avant toute exposition.`,
+      conviction: hasBearBias ? Math.max(2, Math.round(analysis.confidence / 20)) : 1,
+      invalidation_condition: `Reprise au-dessus de ${analysis.take_profit.toFixed(4)} avec volume.`,
+      strongest_bull_argument: 'La thèse haussière reprendrait du poids si support tenu et momentum positif.',
+    };
   }
 }

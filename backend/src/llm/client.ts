@@ -21,7 +21,7 @@ function stripMarkdownJson(raw: string): string {
 }
 
 // ── Concurrency limiter for Ollama (cloud models have rate limits) ──
-const MAX_CONCURRENT = 3;
+const MAX_CONCURRENT = Math.max(1, parseInt(process.env.LLM_MAX_CONCURRENT || '1', 10));
 let activeCalls = 0;
 const callQueue: (() => void)[] = [];
 
@@ -152,8 +152,8 @@ export async function callLLM(
         body ? JSON.stringify(body) : ''
       );
 
-      // Model fallback: if 401/403/429 (auth/rate limit), try smaller model
-      if (attempt === maxAttempts - 2 && (status === 401 || status === 403 || status === 429)) {
+      // Model fallback: if auth/rate-limit/gateway overload, try a smaller cloud model.
+      if (attempt === maxAttempts - 2 && (status === 401 || status === 403 || status === 429 || status === 502 || status === 503)) {
         const fallbackModel = downgradeModel(model);
         if (fallbackModel !== model) {
           console.warn(`[LLM] Retrying ${agentName} with fallback model: ${fallbackModel}`);

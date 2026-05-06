@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { PortfolioChart } from '../components/charts/PortfolioChart';
@@ -6,6 +6,7 @@ import { getTickerName, formatPrice } from '../data/tickerNames';
 import type { Trade } from '../types';
 
 const API = import.meta.env.VITE_API_URL || '/api';
+const HISTORY_REFRESH_MS = 60 * 1000;
 
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
@@ -229,9 +230,14 @@ export function Portfolio() {
   const { signals, lastUpdate } = useSignalsStore();
   const [tab, setTab] = useState<'open' | 'history'>('open');
   const [closingTicker, setClosingTicker] = useState<string | null>(null);
+  const lastHistoryFetchRef = useRef(0);
 
   useEffect(() => {
-    if (lastUpdate) void fetchHistory();
+    if (!lastUpdate) return;
+    const now = Date.now();
+    if (lastHistoryFetchRef.current && now - lastHistoryFetchRef.current < HISTORY_REFRESH_MS) return;
+    lastHistoryFetchRef.current = now;
+    void fetchHistory();
   }, [fetchHistory, lastUpdate]);
 
   const startingValue = portfolio.initial_capital || 10000;

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
@@ -62,6 +62,8 @@ const AGENT_PIPELINE = [
   { id: 'reporter', name: 'Reporter' },
 ];
 
+const STATS_REFRESH_MS = 5 * 60 * 1000;
+
 interface DashboardProps {
   onNavigate: (page: Page) => void;
 }
@@ -72,6 +74,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { config } = useConfigStore();
   const [tab, setTab] = useState<'open' | 'hist'>('open');
   const [cryptoCtx, setCryptoCtx] = useState<CryptoContext | null>(null);
+  const lastStatsFetchRef = useRef(0);
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL || '/api';
@@ -96,7 +99,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (market.crypto) setCryptoCtx(market.crypto);
   }, [market.crypto]);
 
-  useEffect(() => { fetchTypeStats(); }, [fetchTypeStats, lastUpdate]);
+  useEffect(() => {
+    const now = Date.now();
+    if (lastStatsFetchRef.current && now - lastStatsFetchRef.current < STATS_REFRESH_MS) return;
+    lastStatsFetchRef.current = now;
+    void fetchTypeStats();
+  }, [fetchTypeStats, lastUpdate]);
 
   const nav = portfolio.total_usd;
   const pnl = portfolio.daily_pnl_pct;

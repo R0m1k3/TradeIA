@@ -31,6 +31,9 @@ export class AnalystAgent {
     console.log('[Analyst] Starting multi-timeframe analysis');
     const results: AnalystOutput[] = [];
     const MODELS = await getModels();
+    const maxLlmAnalyses = Math.max(0, parseInt(process.env.ANALYST_LLM_MAX_PER_CYCLE || '3', 10));
+    const minLlmConfidence = Math.max(0, parseInt(process.env.ANALYST_LLM_MIN_CONFIDENCE || '55', 10));
+    let llmAnalysesUsed = 0;
 
     await Promise.all(
       Object.entries(collectorOutput.tickers).map(async ([ticker, data]) => {
@@ -43,6 +46,22 @@ export class AnalystAgent {
         // Deterministic fallback when no LLM available or indicators are pre-computed
         if (indicators) {
           const deterministic = this.deterministicAnalysis(ticker, data.current_price, indicators);
+          const shouldUseLlm =
+            maxLlmAnalyses > 0 &&
+            deterministic.confidence >= minLlmConfidence &&
+            llmAnalysesUsed++ < maxLlmAnalyses;
+
+          if (!shouldUseLlm) {
+            results.push({
+              ...deterministic,
+              data_quality: data.data_quality,
+              data_freshness_score: data.data_freshness.score,
+              confidence: data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence,
+              skip_reason: data.data_freshness.score < 40 ? 'Données trop anciennes ou incomplètes' : deterministic.skip_reason,
+            });
+            return;
+          }
+
           // Try LLM for qualitative interpretation, fall back to deterministic
           try {
             const prompt = buildAnalystPrompt({
