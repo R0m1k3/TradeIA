@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
-import type { AgentState } from '../types';
+import type { AgentState, DebateOutput, AnalysisEvent } from '../types';
 
 const AGENT_META: Record<string, { n: string; name: string; role: string; color: string; desc: string }> = {
   collector: { n: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)', desc: 'Ingère les flux OHLC, données fondamentales, macro et secteur pour alimenter les autres agents.' },
@@ -38,11 +38,65 @@ interface PredictionStats {
   };
 }
 
+interface LiveAnalysisItem {
+  id: string;
+  timestamp: string;
+  agent: string;
+  title: string;
+  summarySimple: string;
+  summaryExpert: string;
+  confidence?: number;
+  ticker?: string;
+  freshnessScore?: number;
+}
+
+function simplifySignal(signal: string): string {
+  if (signal === 'BUY') return 'L IA veut acheter';
+  if (signal === 'SELL') return 'L IA veut vendre';
+  return 'L IA préfère attendre';
+}
+
+function buildDebateAnalysisItems(debates: DebateOutput[]): LiveAnalysisItem[] {
+  return debates.flatMap((d, idx) => {
+    const baseTs = new Date(Date.now() - (debates.length - idx) * 1000).toISOString();
+    return [
+      {
+        id: `${d.ticker}-analyst-${idx}`,
+        timestamp: baseTs,
+        agent: 'analyst',
+        title: `${d.ticker} - lecture technique`,
+        summarySimple: `Confiance ${d.analyst_output.confidence}% sur ${d.ticker}.`,
+        summaryExpert: `Bias 4H/1H: ${d.analyst_output.bias_4h}/${d.analyst_output.bias_1h}, signal 15m ${d.analyst_output.signal_15m}, RSI15 ${d.analyst_output.rsi_15m}.`,
+        confidence: d.analyst_output.confidence,
+        ticker: d.ticker,
+        freshnessScore: d.analyst_output.data_freshness_score,
+      },
+      {
+        id: `${d.ticker}-debate-${idx}`,
+        timestamp: new Date(new Date(baseTs).getTime() + 200).toISOString(),
+        agent: 'strategist',
+        title: `${d.ticker} - débat bull vs bear`,
+        summarySimple: d.debate_score > 0
+          ? `Avantage haussier sur ${d.ticker}.`
+          : d.debate_score < 0
+            ? `Avantage baissier sur ${d.ticker}.`
+            : `Les avis sont partagés sur ${d.ticker}.`,
+        summaryExpert: `Debate score ${d.debate_score}, bull ${d.bull.conviction}/10, bear ${d.bear.conviction}/10.`,
+        confidence: d.analyst_output.confidence,
+        ticker: d.ticker,
+        freshnessScore: d.analyst_output.data_freshness_score,
+      },
+    ];
+  });
+}
+
 export function Agents() {
-  const { agents, signals, debates, cycleTimeline, lastUpdate } = useSignalsStore();
+  const { agents, signals, debates, cycleTimeline, analysisEvents, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
   const [active, setActive] = useState('bull');
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
+  const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
+  const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL || '/api';
@@ -67,6 +121,47 @@ export function Agents() {
 
   // Latest signal for bull/bear/strategist
   const latestSignal = signals.length > 0 ? signals[0] : null;
+  const fallbackItems: LiveAnalysisItem[] = [
+    ...cycleTimeline.slice(-10).map((ev, i) => ({
+      id: `timeline-${i}-${ev.agent}-${ev.timestamp}`,
+      timestamp: ev.timestamp,
+      agent: ev.agent,
+      title: AGENT_META[ev.agent]?.name || ev.agent,
+      summarySimple: ev.status === 'running'
+        ? `${AGENT_META[ev.agent]?.name || ev.agent} est en train d analyser.`
+        : ev.status === 'ok'
+          ? `${AGENT_META[ev.agent]?.name || ev.agent} a terminé son étape.`
+          : `${AGENT_META[ev.agent]?.name || ev.agent} a rencontré un problème.`,
+      summaryExpert: `${ev.label} - statut: ${ev.status}`,
+    })),
+    ...buildDebateAnalysisItems(debates.slice(0, 4)),
+    ...signals.slice(0, 4).map((s, i) => ({
+      id: `signal-${s.ticker}-${i}`,
+      timestamp: new Date(Date.now() - i * 400).toISOString(),
+      agent: 'strategist',
+      title: `${s.ticker} - décision`,
+      summarySimple: `${simplifySignal(s.signal)} avec confiance ${s.confidence}%.`,
+      summaryExpert: `Signal ${s.signal}, débat ${s.debate_score}, bull ${s.bull_conviction}, bear ${s.bear_conviction}.`,
+      confidence: s.confidence,
+      ticker: s.ticker,
+    })),
+  ];
+
+  const backendItems: LiveAnalysisItem[] = (analysisEvents || []).map((item: AnalysisEvent) => ({
+    id: item.id,
+    timestamp: item.timestamp,
+    agent: item.agent,
+    title: item.title,
+    summarySimple: item.summary_simple,
+    summaryExpert: item.summary_expert,
+    confidence: item.confidence,
+    ticker: item.ticker,
+    freshnessScore: item.freshness_score,
+  }));
+
+  const timelineItems: LiveAnalysisItem[] = (backendItems.length > 0 ? backendItems : fallbackItems)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 20);
 
   return (
     <div className="page">
@@ -217,6 +312,73 @@ export function Agents() {
                 </div>
               </div>
             )}
+
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div className="card-h-title" style={{ padding: 0, border: 'none' }}>
+                  Journal d analyses live <Help tip="Clique une ligne pour ouvrir le détail de ce que l agent a vu, conclu, et avec quel niveau de confiance." />
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setReadingMode('beginner')}
+                    style={{ borderColor: readingMode === 'beginner' ? 'var(--accent)' : undefined, color: readingMode === 'beginner' ? 'var(--accent)' : undefined }}
+                  >
+                    Débutant
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setReadingMode('expert')}
+                    style={{ borderColor: readingMode === 'expert' ? 'var(--accent)' : undefined, color: readingMode === 'expert' ? 'var(--accent)' : undefined }}
+                  >
+                    Expert
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflow: 'auto', paddingRight: 4 }}>
+                {timelineItems.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>
+                    Le journal se remplit automatiquement au fur et à mesure du cycle.
+                  </div>
+                )}
+                {timelineItems.map((item) => {
+                  const meta = AGENT_META[item.agent] || AGENT_META.reporter;
+                  const activeItem = selectedItem?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setSelectedItem(item)}
+                      style={{
+                        textAlign: 'left',
+                        border: `1px solid ${activeItem ? meta.color : 'var(--rule)'}`,
+                        background: activeItem ? 'var(--bg-elev-2)' : 'transparent',
+                        borderRadius: 8,
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        color: 'inherit',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{item.title}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                          {new Date(item.timestamp).toLocaleTimeString('fr-FR')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.45 }}>
+                        {readingMode === 'beginner' ? item.summarySimple : item.summaryExpert}
+                      </div>
+                      {(item.confidence != null || item.freshnessScore != null) && (
+                        <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 10 }} className="mono">
+                          {item.confidence != null && <span style={{ color: 'var(--accent)' }}>Confiance {item.confidence}%</span>}
+                          {item.freshnessScore != null && <span style={{ color: item.freshnessScore >= 70 ? 'var(--accent)' : item.freshnessScore >= 50 ? 'var(--warn)' : 'var(--danger)' }}>Fraîcheur {item.freshnessScore}/100</span>}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -269,6 +431,58 @@ export function Agents() {
           </div>
         </div>
       </div>
+
+      {selectedItem && (
+        <div
+          onClick={() => setSelectedItem(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'grid',
+            justifyItems: 'end', zIndex: 80,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(520px, 100vw)', height: '100%', background: 'var(--bg-elev)',
+              borderLeft: '1px solid var(--rule)', padding: 18, overflow: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <div className="eyebrow">Détail analyse</div>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>{selectedItem.title}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedItem(null)}>Fermer</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <span className="badge">{AGENT_META[selectedItem.agent]?.name || selectedItem.agent}</span>
+              {selectedItem.ticker && <span className="badge">{selectedItem.ticker}</span>}
+              {selectedItem.confidence != null && <span className="badge badge-up">Confiance {selectedItem.confidence}%</span>}
+              {selectedItem.freshnessScore != null && (
+                <span className={`badge ${selectedItem.freshnessScore >= 70 ? 'badge-up' : selectedItem.freshnessScore >= 50 ? 'badge-warn' : 'badge-down'}`}>
+                  Fraîcheur {selectedItem.freshnessScore}/100
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div className="card" style={{ padding: 12 }}>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>Version simple</div>
+                <div style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.55 }}>{selectedItem.summarySimple}</div>
+              </div>
+              <div className="card" style={{ padding: 12 }}>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>Version détaillée</div>
+                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>{selectedItem.summaryExpert}</div>
+              </div>
+              <div className="card" style={{ padding: 12 }}>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>Conseil lecture</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.55 }}>
+                  Si la fraîcheur est basse ou la confiance est faible, la décision doit être prise avec prudence ou reportée.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function useWebSocket() {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { setPortfolio } = usePortfolioStore();
-  const { setSignals, setMarket, setOrdersExecuted, setAgents, addAlert, setLastUpdate } = useSignalsStore();
+  const { setSignals, setMarket, setOrdersExecuted, setAgents, addAlert, setLastUpdate, setAnalysisEvents } = useSignalsStore();
 
   /** Fetch initial data from REST endpoints before first WS cycle */
   async function fetchInitialData() {
@@ -35,9 +35,10 @@ export function useWebSocket() {
       }
 
       if (signalsRes.status === 'fulfilled' && signalsRes.value.ok) {
-        const data = await signalsRes.value.json() as { signals: SignalItem[]; market?: MarketContext };
+        const data = await signalsRes.value.json() as { signals: SignalItem[]; market?: MarketContext; analysis_events?: any[] };
         if (data.signals?.length) setSignals(data.signals);
         if (data.market) setMarket(data.market);
+        if (data.analysis_events?.length) setAnalysisEvents(data.analysis_events as any);
       }
 
       if (portfolioRes.status === 'fulfilled' && portfolioRes.value.ok) {
@@ -58,6 +59,7 @@ export function useWebSocket() {
       if (payload.market) setMarket(payload.market);
       if (payload.signals) setSignals(payload.signals);
       if (payload.orders_executed) setOrdersExecuted(payload.orders_executed);
+      if (payload.analysis_events) setAnalysisEvents(payload.analysis_events);
       if (payload.agents) setAgents(payload.agents);
       if (payload.alerts) {
         for (const alert of payload.alerts) addAlert(alert);

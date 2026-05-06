@@ -87,6 +87,19 @@ export interface AgentTimelineEvent {
   label: string;
 }
 
+export interface AnalysisEvent {
+  id: string;
+  timestamp: string;
+  agent: string;
+  stage: 'collect' | 'analyze' | 'debate' | 'risk' | 'decision' | 'execute' | 'report';
+  title: string;
+  summary_simple: string;
+  summary_expert: string;
+  confidence?: number;
+  ticker?: string;
+  freshness_score?: number;
+}
+
 export interface SignalItem {
   ticker: string;
   signal: Signal;
@@ -137,6 +150,7 @@ export interface CycleUpdate {
   signals: SignalItem[];
   orders_executed: ExecutedOrder[];
   alerts: Omit<AlertItem, 'id' | 'timestamp'>[];
+  analysis_events?: AnalysisEvent[];
   agents: AgentStates;
 }
 

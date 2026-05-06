@@ -69,6 +69,62 @@ export class ReporterAgent {
       orderId: r.order_id,
     }));
 
+    const analysisEvents: NonNullable<CycleUpdatePayload['analysis_events']> = [];
+    for (const debate of debates.slice(0, 12)) {
+      analysisEvents.push({
+        id: `analyst-${debate.ticker}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        agent: 'analyst',
+        stage: 'analyze',
+        title: `${debate.ticker} - lecture technique`,
+        summary_simple: `Signal ${debate.analyst_output.signal_15m} avec confiance ${debate.analyst_output.confidence}%.`,
+        summary_expert: `Bias 4H/1H ${debate.analyst_output.bias_4h}/${debate.analyst_output.bias_1h}, RSI15 ${debate.analyst_output.rsi_15m}, débat ${debate.debate_score}.`,
+        confidence: debate.analyst_output.confidence,
+        ticker: debate.ticker,
+        freshness_score: debate.analyst_output.data_freshness_score,
+      });
+      analysisEvents.push({
+        id: `debate-${debate.ticker}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        agent: 'strategist',
+        stage: 'debate',
+        title: `${debate.ticker} - arbitrage bull/bear`,
+        summary_simple: debate.debate_score > 0
+          ? `Le camp haussier prend l avantage sur ${debate.ticker}.`
+          : debate.debate_score < 0
+            ? `Le camp baissier prend l avantage sur ${debate.ticker}.`
+            : `Les signaux sont partagés sur ${debate.ticker}.`,
+        summary_expert: `Score ${debate.debate_score}, bull ${debate.bull.conviction}/10, bear ${debate.bear.conviction}/10.`,
+        confidence: debate.analyst_output.confidence,
+        ticker: debate.ticker,
+        freshness_score: debate.analyst_output.data_freshness_score,
+      });
+    }
+    for (const order of orders_executed.slice(0, 12)) {
+      analysisEvents.push({
+        id: `exec-${order.ticker}-${order.orderId}`,
+        timestamp: new Date().toISOString(),
+        agent: 'reporter',
+        stage: 'execute',
+        title: `${order.ticker} - ordre exécuté`,
+        summary_simple: `Ordre ${order.action} exécuté à ${order.filledPrice.toFixed(2)} pour ${order.sizeUsd.toFixed(0)}$.`,
+        summary_expert: `orderId ${order.orderId}, side ${order.action}, fill ${order.filledPrice}, sizeUsd ${order.sizeUsd}.`,
+        ticker: order.ticker,
+      });
+    }
+    if (market?.data_freshness) {
+      analysisEvents.push({
+        id: `collect-freshness-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        agent: 'collector',
+        stage: 'collect',
+        title: 'Qualité des données du cycle',
+        summary_simple: `Score de fraîcheur ${market.data_freshness.score}/100 (${market.data_freshness.status}).`,
+        summary_expert: `Sources: ${market.data_freshness.sources.map((s) => `${s.source}:${s.status}`).join(', ')}`,
+        freshness_score: market.data_freshness.score,
+      });
+    }
+
     // Alertes en français naturel
     let alerts: CycleUpdatePayload['alerts'] = [];
 
@@ -150,6 +206,7 @@ export class ReporterAgent {
       } as any,
       signals,
       orders_executed,
+      analysis_events: analysisEvents,
       alerts,
       agents: this.agentStates,
     });

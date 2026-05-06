@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SignalItem, MarketContext, ExecutedOrder, AgentStates, AlertItem, DebateOutput, AgentTimelineEvent } from '../types';
+import type { SignalItem, MarketContext, ExecutedOrder, AgentStates, AlertItem, DebateOutput, AgentTimelineEvent, AnalysisEvent } from '../types';
 
 interface SignalsStore {
   signals: SignalItem[];
@@ -8,6 +8,7 @@ interface SignalsStore {
   agents: AgentStates;
   alerts: AlertItem[];
   debates: DebateOutput[];
+  analysisEvents: AnalysisEvent[];
   lastUpdate: string | null;
   cycleTimeline: AgentTimelineEvent[];
   setSignals: (signals: SignalItem[]) => void;
@@ -17,6 +18,7 @@ interface SignalsStore {
   addAlert: (alert: Omit<AlertItem, 'id' | 'timestamp'>) => void;
   removeAlert: (id: string) => void;
   setDebates: (debates: DebateOutput[]) => void;
+  setAnalysisEvents: (events: AnalysisEvent[]) => void;
   setLastUpdate: (ts: string) => void;
   clearTimeline: () => void;
 }
@@ -48,6 +50,7 @@ export const useSignalsStore = create<SignalsStore>((set) => ({
   agents: DEFAULT_AGENTS,
   alerts: [],
   debates: [],
+  analysisEvents: [],
   lastUpdate: null,
   cycleTimeline: [],
 
@@ -55,6 +58,7 @@ export const useSignalsStore = create<SignalsStore>((set) => ({
   setMarket: (market) => set((state) => ({ market: { ...state.market, ...market } })),
   setOrdersExecuted: (ordersExecuted) => set({ ordersExecuted }),
   setDebates: (debates) => set({ debates }),
+  setAnalysisEvents: (analysisEvents) => set((state) => ({ analysisEvents: [...state.analysisEvents.slice(-80), ...analysisEvents].slice(-80) })),
   setLastUpdate: (lastUpdate) => set({ lastUpdate }),
   clearTimeline: () => set({ cycleTimeline: [] }),
 

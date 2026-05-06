@@ -84,6 +84,7 @@ export interface CycleUpdatePayload {
   signals?: SignalItem[];
   orders_executed?: ExecutedOrder[];
   alerts?: AlertItem[];
+  analysis_events?: AnalysisEvent[];
   agents?: AgentStatus;
 }
 
@@ -121,6 +122,19 @@ export interface AlertItem {
   level: 'info' | 'warning' | 'critical';
   message: string;
   ticker?: string;
+}
+
+export interface AnalysisEvent {
+  id: string;
+  timestamp: string;
+  agent: string;
+  stage: 'collect' | 'analyze' | 'debate' | 'risk' | 'decision' | 'execute' | 'report';
+  title: string;
+  summary_simple: string;
+  summary_expert: string;
+  confidence?: number;
+  ticker?: string;
+  freshness_score?: number;
 }
 
 export interface AgentStatus {
