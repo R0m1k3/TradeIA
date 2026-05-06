@@ -11,6 +11,33 @@ const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
     return state;
   });
 
+  fastify.post('/reset', async () => {
+    const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
+    const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
+    const initialCapital = Number.isFinite(portfolioUsd) ? portfolioUsd : 10000;
+
+    const [trades, cycles, predictions] = await prisma.$transaction([
+      prisma.trade.deleteMany(),
+      prisma.cycleLog.deleteMany(),
+      (prisma as any).agentPrediction.deleteMany(),
+      prisma.config.upsert({
+        where: { key: 'equity_peak' },
+        update: { value: initialCapital.toString() },
+        create: { key: 'equity_peak', value: initialCapital.toString() },
+      }),
+    ]);
+
+    return {
+      success: true,
+      reset: {
+        trades: trades.count,
+        cycles: cycles.count,
+        predictions: predictions.count,
+        equity_peak: initialCapital,
+      },
+    };
+  });
+
   fastify.get('/trades', async (req) => {
     const query = req.query as { limit?: string; open?: string };
     const limit = parseInt(query.limit || '50');

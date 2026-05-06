@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
 import { getYahooCurrentPrice } from '../data/yahoo';
 import { getBinanceCurrentPrice } from '../data/binance';
+import { getCredential } from '../config/credentials';
 
 const CRYPTO_TICKERS = new Set([
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
@@ -35,6 +36,8 @@ export interface ExecutionResult {
   commission: number;
 }
 
+const MIN_ORDER_USD = 1;
+
 function applySlippage(price: number, action: 'BUY' | 'SELL'): number {
   // Realistic slippage: 0.10-0.30% random, simulates market impact + spread
   const slippagePct = 0.001 + Math.random() * 0.002;
@@ -49,9 +52,24 @@ async function simulateLatency(): Promise<void> {
 export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResult> {
   await simulateLatency();
 
+  const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
+  const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
+  const state = await getPortfolioState(Number.isFinite(portfolioUsd) ? portfolioUsd : 10000);
+  const executableSizeUsd = order.action === 'BUY'
+    ? Math.min(order.size_usd, Math.max(0, state.cash_usd))
+    : order.size_usd;
+
+  if (order.action === 'BUY' && executableSizeUsd < MIN_ORDER_USD) {
+    throw new Error(`Insufficient cash for ${order.ticker}: available $${state.cash_usd.toFixed(2)}, requested $${order.size_usd.toFixed(2)}`);
+  }
+
+  if (order.action === 'BUY' && executableSizeUsd < order.size_usd) {
+    console.warn(`[Broker] ${order.ticker}: reducing order from $${order.size_usd.toFixed(2)} to available cash $${executableSizeUsd.toFixed(2)}`);
+  }
+
   const filledPrice = applySlippage(order.limit_price, order.action);
-  const filledQty = order.size_usd / filledPrice;
-  const commission = order.size_usd * 0.001;
+  const filledQty = executableSizeUsd / filledPrice;
+  const commission = executableSizeUsd * 0.001;
   const orderId = `MOCK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
   await prisma.trade.create({
@@ -62,7 +80,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
       tradeType: order.trade_type,
       filledPrice,
       quantity: filledQty,
-      sizeUsd: order.size_usd,
+      sizeUsd: executableSizeUsd,
       stopLoss: order.stop_loss,
       takeProfit: order.take_profit,
       invalidationCondition: order.invalidation_condition,
@@ -82,7 +100,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
       ticker: order.ticker,
       action: order.action,
       filled_price: filledPrice,
-      size_usd: order.size_usd,
+      size_usd: executableSizeUsd,
       commission,
     })
   );
@@ -93,7 +111,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
     action: order.action,
     filled_price: filledPrice,
     filled_qty: filledQty,
-    size_usd: order.size_usd,
+    size_usd: executableSizeUsd,
     timestamp: new Date().toISOString(),
     commission,
   };

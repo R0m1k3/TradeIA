@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useConfigStore } from '../store/config.store';
+import { usePortfolioStore } from '../store/portfolio.store';
 import { WatchlistEditor } from '../components/controls/WatchlistEditor';
 import { OverridePanel } from '../components/controls/OverridePanel';
 
@@ -51,11 +52,14 @@ function ApiKeyInput({
 
 export function Config() {
   const { config, secretsConfigured, fetchConfig, saveConfig, saveSecret, setConfig } = useConfigStore();
+  const { fetchPortfolio, fetchHistory, fetchTypeStats } = usePortfolioStore();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetResult, setResetResult] = useState<string | null>(null);
 
   async function fetchModels() {
     setLoadingModels(true);
@@ -112,6 +116,25 @@ export function Config() {
       setTestResult('✗ Connexion échouée');
     }
     setTesting(false);
+  }
+
+  async function resetPortfolio() {
+    const confirmed = window.confirm('Réinitialiser le portefeuille, les positions ouvertes et tout l’historique des trades ?');
+    if (!confirmed) return;
+
+    setResetting(true);
+    setResetResult(null);
+    try {
+      const res = await fetch(`${API}/portfolio/reset`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      await Promise.all([fetchPortfolio(), fetchHistory(), fetchTypeStats()]);
+      setResetResult(`Réinitialisé : ${data.reset?.trades ?? 0} trades supprimés`);
+    } catch {
+      setResetResult('Réinitialisation échouée');
+    } finally {
+      setResetting(false);
+    }
   }
 
   return (
@@ -409,6 +432,27 @@ export function Config() {
                 Contrôles manuels <Help tip="Bloquez un ticker, fermez une position ou forcez une action sur les signaux actifs." />
               </div>
               <OverridePanel />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 16, marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>Remise à zéro</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Supprime trades, positions et historique IA</div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={resetPortfolio} disabled={resetting}>
+                  {resetting ? 'Reset...' : 'Reset'}
+                </button>
+              </div>
+              {resetResult && (
+                <div className="mono" style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: resetResult.includes('échouée') ? 'var(--danger)' : 'var(--accent)',
+                }}>
+                  {resetResult}
+                </div>
+              )}
             </div>
           </div>
         </div>

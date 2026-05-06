@@ -30,7 +30,7 @@ export class RiskAgent {
   async run(
     proposals: OrderProposal[],
     portfolioUsd: number,
-    portfolio: { daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
+    portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
@@ -73,7 +73,7 @@ export class RiskAgent {
 
     if (ambiguousOrders.length === 0) {
       console.log(`[Risk] All ${deterministicApproved.length} orders validated deterministically`);
-      return deterministicApproved;
+      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio);
     }
 
     // Try LLM for ambiguous orders only
@@ -115,17 +115,17 @@ export class RiskAgent {
       // Combine: non-ambiguous from deterministic + LLM-filtered ambiguous
       const nonAmbiguous = deterministicApproved.filter((o) => o.confidence >= 70 && market.vix <= 25);
       console.log(`[Risk] Final: ${nonAmbiguous.length} deterministic + ${llmApproved.length} LLM-validated`);
-      return [...nonAmbiguous, ...llmApproved];
+      return this.enforceCashBudget([...nonAmbiguous, ...llmApproved], portfolioUsd, portfolio);
     } catch (err) {
       console.warn('[Risk] LLM failed, using deterministic results:', (err as Error).message);
-      return deterministicApproved;
+      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio);
     }
   }
 
   private deterministicPreFilter(
     proposals: OrderProposal[],
     portfolioUsd: number,
-    portfolio: { daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
+    portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     market: { vix: number },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
@@ -217,7 +217,7 @@ export class RiskAgent {
   private deterministicValidation(
     proposals: OrderProposal[],
     portfolioUsd: number,
-    portfolio: { daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
+    portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     vix: number,
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>
@@ -302,6 +302,43 @@ export class RiskAgent {
     }
 
     return approved;
+  }
+
+  private enforceCashBudget(
+    orders: ApprovedOrder[],
+    portfolioUsd: number,
+    portfolio: { cash_usd?: number; positions: { sizeUsd?: number }[] }
+  ): ApprovedOrder[] {
+    let remainingCash = portfolio.cash_usd;
+
+    if (remainingCash === undefined) {
+      const investedUsd = portfolio.positions.reduce((sum, p) => sum + (p.sizeUsd || 0), 0);
+      remainingCash = Math.max(0, portfolioUsd - investedUsd);
+    }
+
+    const budgeted: ApprovedOrder[] = [];
+
+    for (const order of orders) {
+      if (order.action !== 'BUY') {
+        budgeted.push(order);
+        continue;
+      }
+
+      const sizeUsd = Math.min(order.size_usd, Math.max(0, remainingCash));
+      if (sizeUsd < 1) {
+        console.log(`[Risk] ${order.ticker}: rejected, no cash left (requested $${order.size_usd.toFixed(0)})`);
+        continue;
+      }
+
+      if (sizeUsd < order.size_usd) {
+        console.log(`[Risk] ${order.ticker}: cash cap, reducing from $${order.size_usd.toFixed(0)} to $${sizeUsd.toFixed(0)}`);
+      }
+
+      budgeted.push({ ...order, size_usd: sizeUsd });
+      remainingCash -= sizeUsd;
+    }
+
+    return budgeted;
   }
 
   /** Get Kelly fraction based on historical win rate by trade type */
