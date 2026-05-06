@@ -106,7 +106,7 @@ export function Agents() {
         if (data) setPerfStats(data);
       })
       .catch(() => {});
-  }, []);
+  }, [lastUpdate]);
 
   const meta = AGENT_META[active] || AGENT_META.bull;
   const realAgent: AgentState = (agents as any)[active] || { status: 'idle' };

@@ -96,8 +96,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (market.crypto) setCryptoCtx(market.crypto);
   }, [market.crypto]);
 
-  // Fetch trade type stats on mount
-  useEffect(() => { fetchTypeStats(); }, [fetchTypeStats]);
+  useEffect(() => { fetchTypeStats(); }, [fetchTypeStats, lastUpdate]);
 
   const nav = portfolio.total_usd;
   const pnl = portfolio.daily_pnl_pct;

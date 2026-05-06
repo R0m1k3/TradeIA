@@ -49,7 +49,7 @@ export function Markets() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [chartTicker, chartInterval]);
+  }, [chartTicker, chartInterval, lastUpdate]);
 
   // Determine which ticker to chart: first position, or QQQ default
   useEffect(() => {

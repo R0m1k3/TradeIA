@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { PortfolioChart } from '../components/charts/PortfolioChart';
@@ -226,9 +226,13 @@ function TradeRow({ trade }: { trade: Trade }) {
 
 export function Portfolio() {
   const { portfolio, history, fetchPortfolio, fetchHistory } = usePortfolioStore();
-  const { signals } = useSignalsStore();
+  const { signals, lastUpdate } = useSignalsStore();
   const [tab, setTab] = useState<'open' | 'history'>('open');
   const [closingTicker, setClosingTicker] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lastUpdate) void fetchHistory();
+  }, [fetchHistory, lastUpdate]);
 
   const startingValue = portfolio.initial_capital || 10000;
   const totalPnl = portfolio.total_usd - startingValue;
