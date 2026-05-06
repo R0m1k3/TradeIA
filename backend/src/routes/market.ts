@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { getYahooOHLCV, getMarketContext } from '../data/yahoo';
+import { getEquityOHLCV, getMarketContext } from '../data/yahoo';
 import { getBinanceOHLCV } from '../data/binance';
 import { getCryptoContext } from '../data/crypto-context';
 import { getCredential } from '../config/credentials';
@@ -95,8 +95,8 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
       return bars.length > 0 ? bars : [];
     }
 
-    const yahooBars = await getYahooOHLCV(ticker, interval);
-    return yahooBars.length > 0 ? yahooBars : [];
+    const equityBars = await getEquityOHLCV(ticker, interval);
+    return equityBars.length > 0 ? equityBars : [];
   });
 
   fastify.get('/crypto-context', async () => {

@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
-import { getYahooCurrentPrice } from '../data/yahoo';
+import { getEquityCurrentPrice } from '../data/yahoo';
 import { getBinanceCurrentPrice } from '../data/binance';
 import { getCredential } from '../config/credentials';
 
@@ -126,7 +126,7 @@ export async function markToMarket(): Promise<void> {
     const isCrypto = CRYPTO_TICKERS.has(trade.ticker);
     const currentPrice = isCrypto 
       ? await getBinanceCurrentPrice(trade.ticker) 
-      : await getYahooCurrentPrice(trade.ticker);
+      : await getEquityCurrentPrice(trade.ticker);
     if (!currentPrice) continue;
 
     // Trailing stop logic — déplacer le stop selon progression
@@ -230,7 +230,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
       const isCrypto = CRYPTO_TICKERS.has(t.ticker);
       const fetchedPrice = isCrypto 
         ? await getBinanceCurrentPrice(t.ticker) 
-        : await getYahooCurrentPrice(t.ticker);
+        : await getEquityCurrentPrice(t.ticker);
       const cp = fetchedPrice || t.filledPrice;
       const pnlUsd = (cp - t.filledPrice) * t.quantity;
       return {

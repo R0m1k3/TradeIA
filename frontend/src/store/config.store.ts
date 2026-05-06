@@ -19,6 +19,7 @@ interface ConfigSecrets {
   alpha_vantage_key: boolean;
   polygon_key: boolean;
   finnhub_key: boolean;
+  twelve_data_key: boolean;
   fred_api_key: boolean;
   ollama_api_key: boolean;
 }
@@ -56,6 +57,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     alpha_vantage_key: false,
     polygon_key: false,
     finnhub_key: false,
+    twelve_data_key: false,
     fred_api_key: false,
     ollama_api_key: false,
   },

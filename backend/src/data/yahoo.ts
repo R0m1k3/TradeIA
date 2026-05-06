@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { cacheGet, cacheSet, TTL } from './cache';
 import type { OHLCVBar } from './indicators';
+import { getTwelveDataCurrentPrice, getTwelveDataOHLCV } from './twelve-data';
 
 export interface Fundamentals {
   pe: number | null;
@@ -364,4 +365,13 @@ export async function getMarketContext(): Promise<{ vix: number; fear_greed: num
   } catch {
     return { vix: 20, fear_greed: 50, nasdaq_direction: 'neutral', nasdaq_change_pct: 0 };
   }
+}
+
+export async function getEquityOHLCV(ticker: string, interval: '15m' | '1h' | '4h' | '1d'): Promise<OHLCVBar[]> {
+  const twelveBars = await getTwelveDataOHLCV(ticker, interval);
+  return twelveBars.length > 0 ? twelveBars : getYahooOHLCV(ticker, interval);
+}
+
+export async function getEquityCurrentPrice(ticker: string): Promise<number | null> {
+  return (await getTwelveDataCurrentPrice(ticker)) || getYahooCurrentPrice(ticker);
 }

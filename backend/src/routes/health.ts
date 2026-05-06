@@ -10,11 +10,12 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
       prisma.$queryRaw`SELECT 1`,
       getCredential('polygon_key', 'POLYGON_KEY'),
       getCredential('finnhub_key', 'FINNHUB_KEY'),
+      getCredential('twelve_data_key', 'TWELVE_DATA_KEY'),
       getCredential('alpha_vantage_key', 'ALPHA_VANTAGE_KEY'),
       getCredential('fred_api_key', 'FRED_API_KEY'),
     ]);
 
-    const [redisCheck, dbCheck, polygonKey, finnhubKey, avKey, fredKey] = checks;
+    const [redisCheck, dbCheck, polygonKey, finnhubKey, twelveDataKey, avKey, fredKey] = checks;
 
     return {
       status: 'ok',
@@ -26,6 +27,7 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
       api_providers: {
         polygon: polygonKey.status === 'fulfilled' && polygonKey.value ? 'configured' : 'missing',
         finnhub: finnhubKey.status === 'fulfilled' && finnhubKey.value ? 'configured' : 'missing',
+        twelve_data: twelveDataKey.status === 'fulfilled' && twelveDataKey.value ? 'configured' : 'missing',
         alpha_vantage: avKey.status === 'fulfilled' && avKey.value ? 'configured' : 'missing',
         fred: fredKey.status === 'fulfilled' && fredKey.value ? 'configured' : 'missing (macro data désactivée)',
         yahoo_finance: 'always_available',

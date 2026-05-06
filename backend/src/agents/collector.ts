@@ -1,4 +1,4 @@
-import { getYahooOHLCV, getYahooCurrentPrice, getYahooFundamentals } from '../data/yahoo';
+import { getEquityOHLCV, getEquityCurrentPrice, getYahooFundamentals } from '../data/yahoo';
 import { getBinanceOHLCV, getBinanceCurrentPrice, getBinanceTicker24h, type CryptoTicker24h } from '../data/binance';
 import { getTradingViewSignal, type TradingViewSignal } from '../data/tradingview';
 import { getFinvizMacro, type FinvizMacro } from '../data/finviz';
@@ -65,6 +65,7 @@ export class CollectorAgent {
     try {
       // Parallel fetch for macro data
       const polygonKey = await getCredential('polygon_key', 'POLYGON_KEY');
+      const twelveDataKey = await getCredential('twelve_data_key', 'TWELVE_DATA_KEY');
 
       const [macro, sectorBiases, financeRSS, cryptoRSS, finvizMacro, cryptoContext, internals, marketContext] = await Promise.all([
         getMacroData(),
@@ -90,10 +91,10 @@ export class CollectorAgent {
               const isCrypto = CRYPTO_TICKERS.has(ticker);
 
               const [ohlcv15m, ohlcv1h, ohlcv4h, price, fundamentals, news, tvSignal, cryptoMetrics] = await Promise.allSettled([
-                isCrypto ? getBinanceOHLCV(ticker, '15m') : getYahooOHLCV(ticker, '15m'),
-                isCrypto ? getBinanceOHLCV(ticker, '1h') : getYahooOHLCV(ticker, '1h'),
-                isCrypto ? getBinanceOHLCV(ticker, '4h') : getYahooOHLCV(ticker, '4h'),
-                isCrypto ? getBinanceCurrentPrice(ticker) : getYahooCurrentPrice(ticker),
+                isCrypto ? getBinanceOHLCV(ticker, '15m') : getEquityOHLCV(ticker, '15m'),
+                isCrypto ? getBinanceOHLCV(ticker, '1h') : getEquityOHLCV(ticker, '1h'),
+                isCrypto ? getBinanceOHLCV(ticker, '4h') : getEquityOHLCV(ticker, '4h'),
+                isCrypto ? getBinanceCurrentPrice(ticker) : getEquityCurrentPrice(ticker),
                 isCrypto ? Promise.resolve({}) : getYahooFundamentals(ticker),
                 getTickerNewsRSS(ticker, 10, isCrypto),
                 getTradingViewSignal(ticker, isCrypto),
@@ -144,6 +145,15 @@ export class CollectorAgent {
                   newsData.length > 0
                     ? `${newsData.length} news récentes trouvées.`
                     : 'Aucune news récente exploitable trouvée.'
+                ),
+                sourceFreshness(
+                  'Twelve Data',
+                  !isCrypto && twelveDataKey ? 'fresh' : 'missing',
+                  isCrypto
+                    ? 'Twelve Data non utilisé pour les cryptos; Binance reste prioritaire.'
+                    : twelveDataKey
+                      ? 'Clé configurée, source API prioritaire pour prix et bougies actions.'
+                      : 'Clé Twelve Data absente, fallback Yahoo utilisé.'
                 ),
                 sourceFreshness(
                   'Polygon.io',
@@ -217,6 +227,7 @@ export class CollectorAgent {
           sector_biases: sectorBiases,
           data_freshness: summarizeFreshness([
             sourceFreshness('Yahoo Finance', marketContext.vix > 0 ? 'delayed' : 'missing', 'VIX et direction Nasdaq via sources gratuites.'),
+            sourceFreshness('Twelve Data', twelveDataKey ? 'fresh' : 'missing', twelveDataKey ? 'Clé configurée pour prix/bougies actions.' : 'Clé absente, fallback Yahoo.'),
             sourceFreshness('FRED', macro.fed_funds_rate !== null || macro.yield_curve !== null ? 'fresh' : 'limited', macro.summary),
             sourceFreshness('RSS News', financeRSS.length + cryptoRSS.length > 0 ? 'fresh' : 'missing', `${financeRSS.length + cryptoRSS.length} news macro/crypto collectées.`),
             sourceFreshness('Polygon.io', polygonKey ? 'limited' : 'missing', polygonKey ? 'Plan FREE configuré, utilisé comme appoint limité.' : 'Clé Polygon absente.'),

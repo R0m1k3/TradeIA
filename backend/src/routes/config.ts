@@ -9,6 +9,7 @@ const KEYS_TO_INVALIDATE = new Set([
   'alpha_vantage_key',
   'polygon_key',
   'finnhub_key',
+  'twelve_data_key',
   'fred_api_key',
   'socialdata_key',
   'ollama_api_key',
@@ -33,7 +34,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const c of configs) {
       if (KEYS_TO_INVALIDATE.has(c.key)) {
-        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key'].includes(c.key)) {
+        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key'].includes(c.key)) {
           secretsConfigured[c.key] = c.value.length > 0;
         } else {
           result[c.key] = c.value;
@@ -44,7 +45,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Ensure all sensitive keys appear in secrets_configured
-    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key']) {
+    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key']) {
       if (!(key in secretsConfigured)) secretsConfigured[key] = false;
     }
 

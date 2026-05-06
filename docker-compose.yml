@@ -38,6 +38,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - POLYGON_KEY=${POLYGON_KEY:-}
       - FINNHUB_KEY=${FINNHUB_KEY:-}
+      - TWELVE_DATA_KEY=${TWELVE_DATA_KEY:-}
       - ALPHAVANTAGE_KEY=${ALPHAVANTAGE_KEY:-}
       - PORT=4000
     depends_on:

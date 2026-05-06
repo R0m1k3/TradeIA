@@ -287,6 +287,13 @@ export function Config() {
             />
 
             <ApiKeyInput
+              label="Twelve Data (actions/forex live)"
+              configured={secretsConfigured.twelve_data_key}
+              placeholder="Clé API Twelve Data"
+              onSave={(val) => saveSecret('twelve_data_key', val)}
+            />
+
+            <ApiKeyInput
               label="FRED (Macro)"
               configured={secretsConfigured.fred_api_key}
               placeholder="Clé gratuite sur fred.stlouisfed.org"
@@ -295,7 +302,7 @@ export function Config() {
 
             <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
               Astuce : Polygon FREE est utile en complément, mais les données peuvent être limitées ou différées.
-              L'application doit donc croiser Polygon avec Yahoo, Binance, TradingView et les flux news.
+              L'application doit donc croiser Twelve Data, Polygon, Yahoo, Binance, TradingView et les flux news.
             </div>
           </div>
         </div>

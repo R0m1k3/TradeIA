@@ -4,7 +4,7 @@ import type { ExecutionResult } from '../broker/mock';
 import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { prisma } from '../lib/prisma';
-import { getYahooCurrentPrice } from '../data/yahoo';
+import { getEquityCurrentPrice } from '../data/yahoo';
 import { getBinanceCurrentPrice } from '../data/binance';
 import { getNasdaqStatus } from '../routes/market';
 import type { DataQualitySummary } from '../data/freshness';
@@ -281,6 +281,6 @@ export class ReporterAgent {
   private async getCurrentPrice(ticker: string): Promise<number | null> {
     return CRYPTO_TICKERS.has(ticker)
       ? getBinanceCurrentPrice(ticker)
-      : getYahooCurrentPrice(ticker);
+      : getEquityCurrentPrice(ticker);
   }
 }
