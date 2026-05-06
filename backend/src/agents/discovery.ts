@@ -1,6 +1,6 @@
+import { prisma } from '../lib/prisma';
 import { getNasdaqStatus } from '../routes/market';
 
-/** NASDAQ 100 fallback tickers (full list) */
 const NASDAQ_100 = [
   'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMGN', 'AMZN', 'ANSS',
   'ARM', 'ASML', 'AVGO', 'AXON', 'AZN', 'BIIB', 'BKNG', 'BKR', 'CDNS', 'CDW',
@@ -14,27 +14,37 @@ const NASDAQ_100 = [
   'WBD', 'WDAY', 'XEL', 'ZS',
 ];
 
-/** Top 20 Crypto (Binance pairs) */
 const CRYPTO_TOP_20 = [
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER'
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
 ];
+
+function enabled(value: string | undefined, fallback = true): boolean {
+  if (!value) return fallback;
+  return !['false', '0', 'off', 'disabled'].includes(value.toLowerCase());
+}
 
 export class DiscoveryAgent {
   async run(): Promise<string[]> {
     const nasdaq = getNasdaqStatus();
+    const cryptoConfig = await prisma.config.findUnique({ where: { key: 'crypto_work_enabled' } });
+    const cryptoRaw = cryptoConfig?.value || process.env.CRYPTO_WORK_ENABLED;
+    const cryptoEnabled = enabled(cryptoRaw, true);
 
     if (!nasdaq.isOpen) {
-      // Market closed — crypto trades 24/7, stocks don't move after hours
+      if (!cryptoEnabled) {
+        console.log('[Discovery] Market closed and crypto work paused - no active scan');
+        return [];
+      }
+
       const shuffled = [...CRYPTO_TOP_20].sort(() => 0.5 - Math.random());
-      console.log(`[Discovery] Market closed — crypto-only mode: ${shuffled.length} tickers`);
+      console.log(`[Discovery] Market closed - crypto-only mode: ${shuffled.length} tickers`);
       return shuffled;
     }
 
-    // Market open — full scan: NASDAQ 100 + crypto
-    const allTickers = [...NASDAQ_100, ...CRYPTO_TOP_20];
+    const allTickers = cryptoEnabled ? [...NASDAQ_100, ...CRYPTO_TOP_20] : NASDAQ_100;
     const shuffled = allTickers.sort(() => 0.5 - Math.random());
-    console.log(`[Discovery] Market open — full scan: ${shuffled.length} tickers (stocks + crypto)`);
+    console.log(`[Discovery] Market open - normal scan: ${shuffled.length} tickers (${cryptoEnabled ? 'stocks + crypto' : 'stocks only'})`);
     return shuffled;
   }
-}
+}

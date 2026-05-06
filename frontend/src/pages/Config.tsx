@@ -448,6 +448,32 @@ export function Config() {
               </button>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Travail crypto 24/7</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                  {config.crypto_work_enabled === 'false'
+                    ? 'Pause crypto active : hors marché US, les cycles 5 min sont sautés et le mode normal revient à l’ouverture.'
+                    : 'Crypto active : analyse crypto 24/7, et scan mixte actions + crypto quand le marché US est ouvert.'}
+                </div>
+              </div>
+              <button
+                onClick={() => saveConfig({ crypto_work_enabled: config.crypto_work_enabled === 'false' ? 'true' : 'false' })}
+                title={config.crypto_work_enabled === 'false' ? 'Réactiver le travail crypto' : 'Stopper le travail crypto'}
+                style={{
+                  width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
+                  background: config.crypto_work_enabled !== 'false' ? 'var(--accent)' : 'var(--bg-elev-2)',
+                  position: 'relative', transition: 'all 0.2s',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2,
+                  left: config.crypto_work_enabled !== 'false' ? 20 : 2,
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s',
+                }} />
+              </button>
+            </div>
+
             {/* Manual Overrides */}
             <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 16, marginTop: 8 }}>
               <div className="card-h-title" style={{ marginBottom: 12 }}>

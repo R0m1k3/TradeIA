@@ -96,8 +96,9 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   let tickers = await discovery.run();
 
   if (tickers.length === 0) {
-    console.log('[Orchestrator] Discovery returned nothing, using fallback watchlist');
-    tickers = WATCHLIST_DEFAULT;
+    console.log('[Orchestrator] Discovery returned no active assets, ending cycle');
+    await reporter.finalize(cycleStart, [], [], portfolioUsd, dailyLossLimitPct);
+    return;
   }
 
   // We no longer limit tickers to 8 to give the AI maximum freedom of choice.

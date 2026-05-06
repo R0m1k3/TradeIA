@@ -22,6 +22,7 @@ const KEYS_TO_INVALIDATE = new Set([
   'model_strong',
   'llm_provider',
   'crypto_max_pct',
+  'crypto_work_enabled',
 ]);
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {
@@ -60,6 +61,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       max_drawdown_pct: result.max_drawdown_pct || '10',
       mock_broker: result.mock_broker || process.env.MOCK_BROKER || '',
       crypto_max_pct: result.crypto_max_pct || process.env.CRYPTO_MAX_PCT || '20',
+      crypto_work_enabled: result.crypto_work_enabled || process.env.CRYPTO_WORK_ENABLED || 'true',
       secrets_configured: secretsConfigured,
     };
   });
