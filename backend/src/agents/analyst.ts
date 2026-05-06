@@ -22,6 +22,8 @@ export interface AnalystOutput {
   candle_pattern: string;
   confidence: number;
   skip_reason: string | null;
+  data_quality?: string;
+  data_freshness_score?: number;
 }
 
 export class AnalystAgent {
@@ -51,6 +53,7 @@ export class AnalystAgent {
               tradingview: data.tradingview,
               crypto_metrics: data.crypto_metrics,
               market_context: collectorOutput.market,
+              data_freshness: data.data_freshness,
               fundamentals: data.fundamentals,
               news: data.news,
               rss_news: data.news, // Map local news to rss format for prompt simplification
@@ -62,6 +65,12 @@ export class AnalystAgent {
             if (parsed.analyses && parsed.analyses.length > 0) {
               // Validate LLM output against deterministic values
               for (const analysis of parsed.analyses) {
+                analysis.data_quality = data.data_quality;
+                analysis.data_freshness_score = data.data_freshness.score;
+                if (data.data_freshness.score < 60) {
+                  analysis.confidence = Math.min(analysis.confidence, 55);
+                  analysis.skip_reason = analysis.skip_reason || 'Qualité des données limitée';
+                }
                 if (analysis.confidence <= 0) {
                   analysis.skip_reason = analysis.skip_reason || 'LLM low confidence';
                 }
@@ -74,7 +83,13 @@ export class AnalystAgent {
           }
 
           // Deterministic fallback
-          results.push(deterministic);
+          results.push({
+            ...deterministic,
+            data_quality: data.data_quality,
+            data_freshness_score: data.data_freshness.score,
+            confidence: data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence,
+            skip_reason: data.data_freshness.score < 40 ? 'Données trop anciennes ou incomplètes' : deterministic.skip_reason,
+          });
           return;
         }
 
@@ -95,6 +110,7 @@ export class AnalystAgent {
             tradingview: data.tradingview,
             crypto_metrics: data.crypto_metrics,
             market_context: collectorOutput.market,
+            data_freshness: data.data_freshness,
             fundamentals: data.fundamentals,
             news: data.news,
             rss_news: data.news,
@@ -104,7 +120,11 @@ export class AnalystAgent {
           const parsed = parseJsonResponse<{ analyses: AnalystOutput[] }>(response.content);
 
           if (parsed.analyses && parsed.analyses.length > 0) {
-            results.push(...parsed.analyses);
+            results.push(...parsed.analyses.map((analysis) => ({
+              ...analysis,
+              data_quality: data.data_quality,
+              data_freshness_score: data.data_freshness.score,
+            })));
           }
         } catch (err) {
           console.error(`[Analyst] Failed for ${ticker}:`, err);
@@ -126,6 +146,8 @@ export class AnalystAgent {
             candle_pattern: 'unknown',
             confidence: 0,
             skip_reason: `No indicators: ${String(err).slice(0, 100)}`,
+            data_quality: data.data_quality,
+            data_freshness_score: data.data_freshness.score,
           });
         }
       })

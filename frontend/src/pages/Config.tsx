@@ -266,6 +266,27 @@ export function Config() {
           </div>
           <div style={{ padding: 20 }}>
             <ApiKeyInput
+              label="Polygon.io (actions US)"
+              configured={secretsConfigured.polygon_key}
+              placeholder="Clé API Polygon"
+              onSave={(val) => saveSecret('polygon_key', val)}
+            />
+
+            <ApiKeyInput
+              label="Alpha Vantage (news, options, compléments)"
+              configured={secretsConfigured.alpha_vantage_key}
+              placeholder="Clé API Alpha Vantage"
+              onSave={(val) => saveSecret('alpha_vantage_key', val)}
+            />
+
+            <ApiKeyInput
+              label="Finnhub (news/actions, fallback)"
+              configured={secretsConfigured.finnhub_key}
+              placeholder="Clé API Finnhub"
+              onSave={(val) => saveSecret('finnhub_key', val)}
+            />
+
+            <ApiKeyInput
               label="FRED (Macro)"
               configured={secretsConfigured.fred_api_key}
               placeholder="Clé gratuite sur fred.stlouisfed.org"
@@ -273,7 +294,8 @@ export function Config() {
             />
 
             <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-              Astuce : L'application utilise des sources 100% gratuites (Yahoo, Binance, TradingView). FRED est optionnel pour affiner l'analyse macro-économique.
+              Astuce : Polygon FREE est utile en complément, mais les données peuvent être limitées ou différées.
+              L'application doit donc croiser Polygon avec Yahoo, Binance, TradingView et les flux news.
             </div>
           </div>
         </div>

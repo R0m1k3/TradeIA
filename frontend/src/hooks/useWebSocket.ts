@@ -35,8 +35,9 @@ export function useWebSocket() {
       }
 
       if (signalsRes.status === 'fulfilled' && signalsRes.value.ok) {
-        const data = await signalsRes.value.json() as { signals: SignalItem[] };
+        const data = await signalsRes.value.json() as { signals: SignalItem[]; market?: MarketContext };
         if (data.signals?.length) setSignals(data.signals);
+        if (data.market) setMarket(data.market);
       }
 
       if (portfolioRes.status === 'fulfilled' && portfolioRes.value.ok) {

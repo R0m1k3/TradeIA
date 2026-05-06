@@ -2,6 +2,23 @@ export type Signal = 'BUY' | 'SELL' | 'HOLD';
 export type RiskRegime = 'NORMAL' | 'ELEVATED' | 'CRISIS' | 'DRAWDOWN' | 'SEVERE_DRAWDOWN';
 export type AgentStatus = 'idle' | 'running' | 'ok' | 'error';
 export type AlertLevel = 'info' | 'warning' | 'critical';
+export type DataFreshnessStatus = 'live' | 'fresh' | 'delayed' | 'limited' | 'stale' | 'missing';
+
+export interface DataSourceFreshness {
+  source: string;
+  status: DataFreshnessStatus;
+  fetched_at: string;
+  observed_at?: string;
+  age_seconds?: number;
+  message: string;
+}
+
+export interface DataQualitySummary {
+  status: DataFreshnessStatus;
+  score: number;
+  sources: DataSourceFreshness[];
+  notes: string[];
+}
 
 export interface Position {
   ticker: string;
@@ -60,6 +77,7 @@ export interface MarketContext {
   macro?: MacroData;
   sector_biases?: Record<string, SectorBias>;
   crypto?: CryptoContext;
+  data_freshness?: DataQualitySummary | null;
 }
 
 export interface AgentTimelineEvent {
@@ -166,6 +184,8 @@ export interface DebateOutput {
     signal_15m: string;
     rsi_15m: number;
     rsi_1h: number;
+    data_quality?: string;
+    data_freshness_score?: number;
   };
 }
 

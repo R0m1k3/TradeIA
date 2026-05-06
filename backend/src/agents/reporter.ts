@@ -5,12 +5,19 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { prisma } from '../lib/prisma';
 import { getYahooCurrentPrice } from '../data/yahoo';
+import { getBinanceCurrentPrice } from '../data/binance';
 import { getNasdaqStatus } from '../routes/market';
+import type { DataQualitySummary } from '../data/freshness';
 
 const REPORTER_SYSTEM = `Tu es le rapporteur du cycle de trading automatisé. Résume le cycle et génère les alertes importantes.
 IMPORTANT: Toutes les alertes et le résumé DOIVENT être rédigés en français naturel, compréhensible par un non-expert.
 Explique les décisions en termes simples : "Le système a acheté NVDA car la tendance est haussière et les analystes IA sont optimistes."
 Output JSON uniquement: { "alerts": [{ "level": "info|warning|critical", "message": "", "ticker": "" }], "summary": "" }`;
+
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
 
 export class ReporterAgent {
   private agentStates: CycleUpdatePayload['agents'] = {
@@ -39,7 +46,7 @@ export class ReporterAgent {
     portfolioUsd: number,
     dailyLossLimitPct: number,
     portfolio?: CycleUpdatePayload['portfolio'],
-    market?: { vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct?: number; macro?: any; sector_biases?: any },
+    market?: { vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct?: number; macro?: any; sector_biases?: any; data_freshness?: DataQualitySummary },
     watchlist?: string[]
   ) {
     const durationMs = Date.now() - cycleStart;
@@ -139,6 +146,7 @@ export class ReporterAgent {
         nasdaq_status: getNasdaqStatus(),
         macro: (market as any)?.macro || null,
         sector_biases: (market as any)?.sector_biases || null,
+        data_freshness: market?.data_freshness || null,
       } as any,
       signals,
       orders_executed,
@@ -168,7 +176,7 @@ export class ReporterAgent {
 
     // Récupérer les prix actuels en parallèle
     const prices = await Promise.allSettled(
-      debates.map((d) => getYahooCurrentPrice(d.ticker))
+      debates.map((d) => this.getCurrentPrice(d.ticker))
     );
 
     for (let i = 0; i < toCreate.length; i++) {
@@ -192,7 +200,7 @@ export class ReporterAgent {
 
     for (const pred of pending) {
       try {
-        const currentPrice = await getYahooCurrentPrice(pred.ticker);
+        const currentPrice = await this.getCurrentPrice(pred.ticker);
         if (!currentPrice || !pred.priceAtPrediction) continue;
 
         const actualReturn = ((currentPrice - pred.priceAtPrediction) / pred.priceAtPrediction) * 100;
@@ -211,5 +219,11 @@ export class ReporterAgent {
     }
 
     console.log(`[Reporter] Resolved ${pending.length} old predictions`);
+  }
+
+  private async getCurrentPrice(ticker: string): Promise<number | null> {
+    return CRYPTO_TICKERS.has(ticker)
+      ? getBinanceCurrentPrice(ticker)
+      : getYahooCurrentPrice(ticker);
   }
 }

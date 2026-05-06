@@ -43,6 +43,15 @@ function macroRegimeLabel(regime: string): { text: string; color: string } {
   return { text: 'Politique monétaire neutre', color: 'var(--info)' };
 }
 
+function freshnessLabel(status?: string): { label: string; text: string; color: string } {
+  if (status === 'live') return { label: 'Live', text: 'Données très fraîches', color: 'var(--accent)' };
+  if (status === 'fresh') return { label: 'Fraîches', text: 'Données récentes', color: 'var(--accent)' };
+  if (status === 'delayed') return { label: 'Différées', text: 'Actions gratuites probablement retardées', color: 'var(--warn)' };
+  if (status === 'limited') return { label: 'Limitées', text: 'Sources gratuites/API FREE, confiance réduite', color: 'var(--warn)' };
+  if (status === 'stale') return { label: 'Anciennes', text: 'Données à confirmer avant décision', color: 'var(--danger)' };
+  return { label: 'Incomplètes', text: 'Certaines sources manquent', color: 'var(--danger)' };
+}
+
 const AGENT_PIPELINE = [
   { id: 'collector', name: 'Collecteur' },
   { id: 'analyst', name: 'Analyste' },
@@ -179,6 +188,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const vixInfo = vixLabel(market.vix || 0);
   const fgInfo = fearGreedLabel(market.fear_greed || 0);
   const macroInfo = macroRegimeLabel((market as any).macro?.macro_regime || 'NEUTRE');
+  const dataInfo = freshnessLabel(market.data_freshness?.status);
 
   // Active alerts (critical + warning only)
   const activeAlerts = alerts.filter((a) => a.level === 'critical' || a.level === 'warning');
@@ -216,6 +226,55 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           ))}
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: 16, borderColor: dataInfo.color }}>
+        <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18, alignItems: 'center' }}>
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>Lecture simple</div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+              {portfolio.risk_regime === 'NORMAL' && market.nasdaq !== 'bearish'
+                ? 'L’IA peut chercher des opportunités, sans forcer.'
+                : portfolio.risk_regime === 'NORMAL'
+                  ? 'L’IA observe un marché mitigé et doit rester sélective.'
+                  : 'L’IA doit protéger le capital avant de chercher du rendement.'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              Les cryptos sont les plus fraîches via Binance. Les actions US gratuites, dont Polygon FREE, peuvent être limitées ou différées.
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 8, display: 'grid', placeItems: 'center',
+              border: `1px solid ${dataInfo.color}`, background: 'var(--bg-elev-2)', color: dataInfo.color,
+              fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 18,
+            }}>
+              {market.data_freshness?.score ?? 0}
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 99, background: dataInfo.color }} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{dataInfo.label}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.45 }}>{dataInfo.text}</div>
+              {market.data_freshness?.sources && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {market.data_freshness.sources.slice(0, 4).map((source) => {
+                    const info = freshnessLabel(source.status);
+                    return (
+                      <span key={source.source} className="mono" title={source.message} style={{
+                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                        border: `1px solid ${info.color}`, color: info.color,
+                      }}>
+                        {source.source}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* KPI strip */}
       <div className="grid" style={{ gridTemplateColumns: '1.4fr repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>

@@ -19,6 +19,7 @@ const signalsRoutes: FastifyPluginAsync = async (fastify) => {
     const payload = recent.payload as {
       debateOutputs?: DebateOutput[];
       finalPortfolio?: unknown;
+      market?: unknown;
     };
 
     const debates = payload.debateOutputs || [];
@@ -34,6 +35,7 @@ const signalsRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       signals,
+      market: payload.market || {},
       updatedAt: recent.createdAt,
     };
   });

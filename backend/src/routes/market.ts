@@ -3,6 +3,7 @@ import { getYahooOHLCV, getMarketContext } from '../data/yahoo';
 import { getBinanceOHLCV } from '../data/binance';
 import { getCryptoContext } from '../data/crypto-context';
 import { getCredential } from '../config/credentials';
+import { sourceFreshness, summarizeFreshness } from '../data/freshness';
 
 const CRYPTO_TICKERS = new Set([
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
@@ -67,12 +68,20 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/context', async () => {
     const context = await getMarketContext();
     const nasdaq = getNasdaqStatus();
+    const polygonKey = await getCredential('polygon_key', 'POLYGON_KEY');
     return {
       vix: context.vix,
       fear_greed: context.fear_greed,
       nasdaq: context.nasdaq_direction,
       nasdaq_change_pct: context.nasdaq_change_pct,
       nasdaq_status: nasdaq,
+      data_freshness: summarizeFreshness([
+        sourceFreshness('Yahoo Finance', context.vix > 0 ? 'delayed' : 'missing', 'Contexte actions gratuit, pas garanti temps réel.'),
+        sourceFreshness('Polygon.io', polygonKey ? 'limited' : 'missing', polygonKey ? 'Clé FREE configurée, source limitée/différée.' : 'Clé absente.'),
+        sourceFreshness('Binance Spot', 'live', 'Crypto disponible 24/7 via Binance.'),
+      ], [
+        'Les actions gratuites peuvent être retardées; les cryptos sont les plus fraîches.',
+      ]),
     };
   });
 

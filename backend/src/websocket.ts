@@ -79,6 +79,7 @@ export interface CycleUpdatePayload {
       nextOpen: string;
       nextClose: string;
     };
+    data_freshness?: unknown;
   };
   signals?: SignalItem[];
   orders_executed?: ExecutedOrder[];

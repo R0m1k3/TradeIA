@@ -8,6 +8,9 @@ import { computeIndicators, type IndicatorValues } from '../data/indicators';
 import { getMacroData, type MacroData } from '../data/fred';
 import { getSectorBiases, getTickerSector, type SectorBias } from '../data/sectors';
 import { getCryptoNews, getFinanceNews, getTickerNewsRSS, type NewsItem } from '../data/news-rss';
+import { getMarketContext } from '../data/yahoo';
+import { getCredential } from '../config/credentials';
+import { latestObservedAt, sourceFreshness, summarizeFreshness, type DataQualitySummary } from '../data/freshness';
 
 export interface TickerData {
   data_quality: 'ok' | 'stale' | 'partial' | 'missing';
@@ -24,6 +27,7 @@ export interface TickerData {
   crypto_metrics?: CryptoTicker24h;
   earnings_blackout?: boolean;
   options?: { iv30?: number | null };
+  data_freshness: DataQualitySummary;
 }
 
 export interface CollectorOutput {
@@ -32,11 +36,13 @@ export interface CollectorOutput {
     vix: number;
     fear_greed: number;
     nasdaq_direction: string;
+    nasdaq_change_pct: number;
     macro: MacroData;
     finviz: FinvizMacro;
     crypto: CryptoContext;
     internals: MarketInternals;
     sector_biases: Record<string, SectorBias>;
+    data_freshness: DataQualitySummary;
   };
   finance_rss_news: NewsItem[];
   crypto_rss_news: NewsItem[];
@@ -58,7 +64,9 @@ export class CollectorAgent {
 
     try {
       // Parallel fetch for macro data
-      const [macro, sectorBiases, financeRSS, cryptoRSS, finvizMacro, cryptoContext, internals] = await Promise.all([
+      const polygonKey = await getCredential('polygon_key', 'POLYGON_KEY');
+
+      const [macro, sectorBiases, financeRSS, cryptoRSS, finvizMacro, cryptoContext, internals, marketContext] = await Promise.all([
         getMacroData(),
         getSectorBiases(),
         getFinanceNews(),
@@ -66,6 +74,7 @@ export class CollectorAgent {
         getFinvizMacro(),
         getCryptoContext(),
         getMarketInternals(),
+        getMarketContext(),
       ]);
 
       console.log(`[Collector] Macro: ${macro.summary}`);
@@ -113,6 +122,44 @@ export class CollectorAgent {
               if (!p || bars_15m.length === 0) quality = 'missing';
               else if (bars_15m.length < 50) quality = 'partial';
 
+              const dataFreshness = summarizeFreshness([
+                sourceFreshness(
+                  isCrypto ? 'Binance Spot' : 'Yahoo Finance',
+                  isCrypto ? 'live' : 'delayed',
+                  isCrypto
+                    ? 'Prix et bougies crypto issus de Binance, source principale 24/7.'
+                    : 'Données actions gratuites susceptibles d’être retardées ou incomplètes.',
+                  latestObservedAt(bars_15m as unknown[])
+                ),
+                sourceFreshness(
+                  'TradingView scanner',
+                  tv.recommendation === 'UNKNOWN' ? 'missing' : 'fresh',
+                  tv.recommendation === 'UNKNOWN'
+                    ? 'Signal TradingView indisponible pour ce ticker.'
+                    : `Signal technique ${tv.recommendation}.`
+                ),
+                sourceFreshness(
+                  isCrypto ? 'Google News Crypto' : 'Google News/RSS',
+                  newsData.length > 0 ? 'fresh' : 'missing',
+                  newsData.length > 0
+                    ? `${newsData.length} news récentes trouvées.`
+                    : 'Aucune news récente exploitable trouvée.'
+                ),
+                sourceFreshness(
+                  'Polygon.io',
+                  !isCrypto && polygonKey ? 'limited' : 'missing',
+                  isCrypto
+                    ? 'Polygon non utilisé pour les cryptos.'
+                    : polygonKey
+                      ? 'Clé configurée, plan FREE traité comme source complémentaire limitée/différée.'
+                      : 'Clé Polygon absente, actions analysées sans cette source.'
+                ),
+              ], [
+                isCrypto
+                  ? 'Crypto: les données Binance sont les plus fraîches du système.'
+                  : 'Actions US: les sources gratuites peuvent être différées, la confiance doit en tenir compte.',
+              ]);
+
               rawData[ticker] = {
                 data_quality: quality,
                 is_crypto: isCrypto,
@@ -128,6 +175,7 @@ export class CollectorAgent {
                 crypto_metrics: crypto24h,
                 earnings_blackout: false,
                 options: {},
+                data_freshness: dataFreshness,
               };
             } catch (err) {
               console.error(`[Collector] Failed to fetch ${ticker}:`, err);
@@ -145,6 +193,9 @@ export class CollectorAgent {
                 crypto_metrics: undefined,
                 earnings_blackout: false,
                 options: {},
+                data_freshness: summarizeFreshness([
+                  sourceFreshness('Collector', 'missing', `Collecte échouée: ${(err as Error).message}`),
+                ]),
               };
             }
           })
@@ -155,14 +206,23 @@ export class CollectorAgent {
       return {
         tickers: rawData as Record<string, TickerData>,
         market: {
-          vix: 20, // default if no yahoo
-          fear_greed: 50,
-          nasdaq_direction: 'neutral',
+          vix: marketContext.vix,
+          fear_greed: marketContext.fear_greed,
+          nasdaq_direction: marketContext.nasdaq_direction,
+          nasdaq_change_pct: marketContext.nasdaq_change_pct,
           macro,
           finviz: finvizMacro,
           crypto: cryptoContext,
           internals,
           sector_biases: sectorBiases,
+          data_freshness: summarizeFreshness([
+            sourceFreshness('Yahoo Finance', marketContext.vix > 0 ? 'delayed' : 'missing', 'VIX et direction Nasdaq via sources gratuites.'),
+            sourceFreshness('FRED', macro.fed_funds_rate !== null || macro.yield_curve !== null ? 'fresh' : 'limited', macro.summary),
+            sourceFreshness('RSS News', financeRSS.length + cryptoRSS.length > 0 ? 'fresh' : 'missing', `${financeRSS.length + cryptoRSS.length} news macro/crypto collectées.`),
+            sourceFreshness('Polygon.io', polygonKey ? 'limited' : 'missing', polygonKey ? 'Plan FREE configuré, utilisé comme appoint limité.' : 'Clé Polygon absente.'),
+          ], [
+            'La qualité marché combine prix, macro, news et disponibilité des sources.',
+          ]),
         },
         finance_rss_news: financeRSS,
         crypto_rss_news: cryptoRSS,

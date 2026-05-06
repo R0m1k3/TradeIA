@@ -95,6 +95,7 @@ export function buildAnalystPrompt(data: {
   tradingview: TradingViewSignal;
   crypto_metrics?: unknown;
   market_context?: unknown;
+  data_freshness?: unknown;
   fundamentals?: unknown;
   news?: unknown[];
   rss_news?: unknown[];
@@ -143,6 +144,9 @@ EXTERNAL SIGNALS:
 
 MARKET CONTEXT:
 ${data.market_context ? JSON.stringify(data.market_context) : 'N/A'}
+
+DATA FRESHNESS / SOURCE LIMITS:
+${data.data_freshness ? JSON.stringify(data.data_freshness) : 'N/A'}
 
 ${data.is_crypto ? `CRYPTO 24H METRICS:
 ${data.crypto_metrics ? JSON.stringify(data.crypto_metrics) : 'N/A'}` : ''}

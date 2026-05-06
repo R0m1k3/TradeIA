@@ -194,7 +194,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
 
   await prisma.cycleLog.create({
     data: {
-      payload: { debateOutputs, execResults, finalPortfolio } as any,
+      payload: { debateOutputs, execResults, finalPortfolio, market: collectorOutput.market } as any,
       ordersCount: execResults.length,
       alertsCount: 0,
       durationMs: duration,

@@ -10,6 +10,15 @@ function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
 }
 
+function freshnessLabel(status?: string): { label: string; color: string; text: string } {
+  if (status === 'live') return { label: 'Live', color: 'var(--accent)', text: 'Flux très frais' };
+  if (status === 'fresh') return { label: 'Frais', color: 'var(--accent)', text: 'Données récentes' };
+  if (status === 'delayed') return { label: 'Différé', color: 'var(--warn)', text: 'Retard probable sur actions gratuites' };
+  if (status === 'limited') return { label: 'Limité', color: 'var(--warn)', text: 'API FREE ou source partielle' };
+  if (status === 'stale') return { label: 'Ancien', color: 'var(--danger)', text: 'À confirmer' };
+  return { label: 'Incomplet', color: 'var(--danger)', text: 'Source manquante' };
+}
+
 const AGENT_ORDER = ['collector', 'analyst', 'bull', 'bear', 'strategist', 'risk', 'reporter'];
 const AGENT_PIPELINE_NAMES: Record<string, { num: string; name: string; role: string; color: string }> = {
   collector: { num: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)' },
@@ -62,6 +71,7 @@ export function Markets() {
   const investedUsd = portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0);
   const exposurePct = portfolio.total_usd > 0 ? ((investedUsd / portfolio.total_usd) * 100).toFixed(0) : '0';
   const cashPct = portfolio.total_usd > 0 ? ((portfolio.cash_usd / portfolio.total_usd) * 100).toFixed(0) : '100';
+  const dataInfo = freshnessLabel(market.data_freshness?.status);
 
   return (
     <div className="page">
@@ -88,6 +98,32 @@ export function Markets() {
           </div>
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-h">
+          <div className="card-h-title">Fraîcheur des données <Help tip="L’IA réduit sa confiance quand une source est limitée, différée ou absente." /></div>
+          <span className="card-h-meta" style={{ color: dataInfo.color }}>{dataInfo.label}</span>
+        </div>
+        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+          <div style={{ padding: 12, borderRadius: 8, background: 'var(--bg-elev-2)' }}>
+            <div className="kpi-label">Score global</div>
+            <div className="mono" style={{ fontSize: 24, fontWeight: 700, color: dataInfo.color }}>{market.data_freshness?.score ?? 0}/100</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{dataInfo.text}</div>
+          </div>
+          {(market.data_freshness?.sources || []).slice(0, 4).map((source) => {
+            const sourceInfo = freshnessLabel(source.status);
+            return (
+              <div key={source.source} style={{ padding: 12, borderRadius: 8, background: 'var(--bg-elev-2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{source.source}</span>
+                  <span className="mono" style={{ fontSize: 10, color: sourceInfo.color }}>{sourceInfo.label}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45 }}>{source.message}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
