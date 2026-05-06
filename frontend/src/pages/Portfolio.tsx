@@ -5,6 +5,8 @@ import { PortfolioChart } from '../components/charts/PortfolioChart';
 import { getTickerName, formatPrice } from '../data/tickerNames';
 import type { Trade } from '../types';
 
+const API = import.meta.env.VITE_API_URL || '/api';
+
 function Help({ tip }: { tip: string }) {
   return <span className="card-h-help" data-tip={tip}>i</span>;
 }
@@ -24,7 +26,7 @@ const CLOSE_REASON_LABELS: Record<string, string> = {
   CIRCUIT_BREAKER: 'Circuit breaker',
 };
 
-function PositionCard({ position, signal }: {
+function PositionCard({ position, signal, onForceClose, closing }: {
   position: {
     ticker: string;
     quantity: number;
@@ -37,6 +39,8 @@ function PositionCard({ position, signal }: {
     takeProfit: number;
   };
   signal?: { debate_score: number; bull_conviction: number; bear_conviction: number; confidence: number; reasoning: string } | null;
+  onForceClose: (ticker: string) => Promise<void>;
+  closing: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const pnlPositive = position.pnlUsd >= 0;
@@ -82,6 +86,18 @@ function PositionCard({ position, signal }: {
             <p className="label" style={{ marginBottom: 2 }}>Prix actuel</p>
             <p className="mono" style={{ fontSize: 14 }}>${formatPrice(position.currentPrice)}</p>
           </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={closing}
+            title="Cloturer cette position au prix courant"
+            onClick={(e) => {
+              e.stopPropagation();
+              void onForceClose(position.ticker);
+            }}
+            style={{ color: 'var(--danger)', fontSize: 11, whiteSpace: 'nowrap' }}
+          >
+            {closing ? 'Vente...' : 'Forcer vente'}
+          </button>
           <span style={{ color: 'var(--ink-4)', fontSize: 14, transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
         </div>
       </div>
@@ -209,15 +225,43 @@ function TradeRow({ trade }: { trade: Trade }) {
 }
 
 export function Portfolio() {
-  const { portfolio, history } = usePortfolioStore();
+  const { portfolio, history, fetchPortfolio, fetchHistory } = usePortfolioStore();
   const { signals } = useSignalsStore();
   const [tab, setTab] = useState<'open' | 'history'>('open');
+  const [closingTicker, setClosingTicker] = useState<string | null>(null);
 
   const startingValue = portfolio.initial_capital || 10000;
   const totalPnl = portfolio.total_usd - startingValue;
   const totalPnlPct = (totalPnl / startingValue) * 100;
   const investedUsd = portfolio.positions.reduce((s, p) => s + p.sizeUsd, 0);
   const unrealizedPnl = portfolio.positions.reduce((s, p) => s + p.pnlUsd, 0);
+
+  async function handleForceClose(ticker: string) {
+    if (closingTicker) return;
+    const confirmed = window.confirm(`Forcer la vente de ${ticker} au prix courant ?`);
+    if (!confirmed) return;
+
+    const password = window.prompt('Mot de passe admin :');
+    if (!password) return;
+
+    setClosingTicker(ticker);
+    try {
+      const res = await fetch(`${API}/override/close/${encodeURIComponent(ticker)}`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${btoa(`:${password}`)}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        window.alert(body.error || `Impossible de fermer ${ticker}`);
+        return;
+      }
+      await Promise.all([fetchPortfolio(), fetchHistory()]);
+    } catch {
+      window.alert(`Impossible de fermer ${ticker}`);
+    } finally {
+      setClosingTicker(null);
+    }
+  }
 
   return (
     <div className="page">
@@ -320,7 +364,15 @@ export function Portfolio() {
           ) : (
             portfolio.positions.map((p) => {
               const signal = signals.find((s) => s.ticker === p.ticker) || null;
-              return <PositionCard key={p.ticker} position={p} signal={signal} />;
+              return (
+                <PositionCard
+                  key={p.ticker}
+                  position={p}
+                  signal={signal}
+                  onForceClose={handleForceClose}
+                  closing={closingTicker === p.ticker}
+                />
+              );
             })
           )}
         </div>

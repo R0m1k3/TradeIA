@@ -2,6 +2,13 @@ import { FastifyPluginAsync } from 'fastify';
 import { broadcastOverrideAck } from '../websocket';
 import { closeTrade } from '../broker/mock';
 import { prisma } from '../lib/prisma';
+import { getYahooCurrentPrice } from '../data/yahoo';
+import { getBinanceCurrentPrice } from '../data/binance';
+
+const CRYPTO_TICKERS = new Set([
+  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
+  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+]);
 
 function verifyAdmin(authHeader: string | undefined): boolean {
   if (!authHeader) return false;
@@ -56,9 +63,20 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: `No open position for ${ticker}` });
     }
 
-    await closeTrade(openTrade.id, openTrade.filledPrice, 'MANUAL');
+    const normalizedTicker = ticker.toUpperCase();
+    const isCrypto = CRYPTO_TICKERS.has(normalizedTicker);
+    const currentPrice = isCrypto
+      ? await getBinanceCurrentPrice(normalizedTicker)
+      : await getYahooCurrentPrice(normalizedTicker);
+
+    await closeTrade(openTrade.id, currentPrice || openTrade.filledPrice, 'MANUAL');
     broadcastOverrideAck('CLOSE', ticker);
-    return { success: true, action: 'POSITION_CLOSED', ticker };
+    return {
+      success: true,
+      action: 'POSITION_CLOSED',
+      ticker,
+      close_price: currentPrice || openTrade.filledPrice,
+    };
   });
 
   // Block — auth required
