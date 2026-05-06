@@ -145,13 +145,13 @@ export interface AgentStates {
 }
 
 export interface CycleUpdate {
-  portfolio: Portfolio;
-  market: MarketContext;
-  signals: SignalItem[];
-  orders_executed: ExecutedOrder[];
-  alerts: Omit<AlertItem, 'id' | 'timestamp'>[];
+  portfolio?: Portfolio;
+  market?: MarketContext;
+  signals?: SignalItem[];
+  orders_executed?: ExecutedOrder[];
+  alerts?: Omit<AlertItem, 'id' | 'timestamp'>[];
   analysis_events?: AnalysisEvent[];
-  agents: AgentStates;
+  agents?: AgentStates;
 }
 
 export interface WsMessage {

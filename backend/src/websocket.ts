@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 let wss: WebSocketServer;
 const clients = new Set<WebSocket>();
+let onClientConnected: (() => void | Promise<void>) | null = null;
 
 export function initWebSocket(server: HttpServer) {
   wss = new WebSocketServer({ server, path: '/ws' });
@@ -21,7 +22,9 @@ export function initWebSocket(server: HttpServer) {
       clients.delete(ws);
     });
 
-    ws.send(JSON.stringify({ type: 'CONNECTED', payload: { timestamp: new Date().toISOString() } }));
+    const timestamp = new Date().toISOString();
+    ws.send(JSON.stringify({ type: 'CONNECTED', payload: { timestamp }, timestamp }));
+    void onClientConnected?.();
   });
 
   wss.on('error', (err) => {
@@ -40,6 +43,14 @@ export function broadcast(type: string, payload: unknown) {
       }
     }
   }
+}
+
+export function getWebSocketClientCount(): number {
+  return clients.size;
+}
+
+export function setOnWebSocketClientConnected(handler: () => void | Promise<void>): void {
+  onClientConnected = handler;
 }
 
 export function broadcastCycleUpdate(payload: CycleUpdatePayload) {
@@ -79,6 +90,9 @@ export interface CycleUpdatePayload {
       nextOpen: string;
       nextClose: string;
     };
+    macro?: unknown;
+    sector_biases?: unknown;
+    crypto?: unknown;
     data_freshness?: unknown;
   };
   signals?: SignalItem[];

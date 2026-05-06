@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { initWebSocket } from './websocket';
+import { startLiveStateStream } from './live-state';
 import { initScheduler } from './scheduler';
 import { initQueue } from './queue';
 import { initCredentials, warmCredentialsCache } from './config/credentials';
@@ -51,6 +52,7 @@ async function main() {
   app.log.info(`Backend listening on ${server}`);
 
   initWebSocket(app.server);
+  startLiveStateStream();
   initQueue();
   initScheduler();
 }

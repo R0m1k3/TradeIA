@@ -92,6 +92,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     fetchCtx();
   }, []);
 
+  useEffect(() => {
+    if (market.crypto) setCryptoCtx(market.crypto);
+  }, [market.crypto]);
+
   // Fetch trade type stats on mount
   useEffect(() => { fetchTypeStats(); }, [fetchTypeStats]);
 
