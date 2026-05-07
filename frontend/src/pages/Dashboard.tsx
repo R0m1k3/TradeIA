@@ -4,7 +4,7 @@ import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import { HeatMap } from '../components/charts/HeatMap';
 import type { Page } from '../App';
-import type { SectorBias, CryptoContext } from '../types';
+import type { SectorBias } from '../types';
 
 const SIGNAL_COLOR: Record<string, string> = {
   BUY: 'var(--accent)',
@@ -73,31 +73,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { signals, market, agents, alerts, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
   const [tab, setTab] = useState<'open' | 'hist'>('open');
-  const [cryptoCtx, setCryptoCtx] = useState<CryptoContext | null>(null);
   const lastStatsFetchRef = useRef(0);
-
-  useEffect(() => {
-    const api = import.meta.env.VITE_API_URL || '/api';
-    let attempts = 0;
-    function fetchCtx() {
-      fetch(`${api}/market/crypto-context`)
-        .then((r) => {
-          if (r.status === 429 && attempts < 3) {
-            attempts++;
-            setTimeout(fetchCtx, 10_000);
-            return null;
-          }
-          return r.ok ? r.json() : null;
-        })
-        .then((d) => d && setCryptoCtx(d))
-        .catch(() => {});
-    }
-    fetchCtx();
-  }, []);
-
-  useEffect(() => {
-    if (market.crypto) setCryptoCtx(market.crypto);
-  }, [market.crypto]);
 
   useEffect(() => {
     const now = Date.now();
@@ -250,7 +226,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   : 'L’IA doit protéger le capital avant de chercher du rendement.'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-              Les cryptos sont les plus fraîches via Binance. Les actions US gratuites, dont Polygon FREE, peuvent être limitées ou différées.
+              Les indices européens sont disponibles via Twelve Data. Les actions US gratuites, dont Polygon FREE, peuvent être limitées ou différées.
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
@@ -377,35 +353,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             </div>
           )}
-          {/* Crypto Sentiment */}
+          {/* CAC 40 */}
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Crypto Sentiment</div>
-            {cryptoCtx?.crypto_fear_greed ? (() => {
-              const v = cryptoCtx.crypto_fear_greed!.value;
-              const color = v <= 25 ? 'var(--danger)' : v <= 45 ? 'var(--warn)' : v <= 55 ? 'var(--ink-3)' : 'var(--accent)';
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>CAC 40</div>
+            {(market as any).eu?.cac40_change_pct != null ? (() => {
+              const v = (market as any).eu.cac40_change_pct as number;
               return (
                 <>
-                  <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>{v}</div>
-                  <div style={{ fontSize: 12, color, marginTop: 2 }}>{cryptoCtx.crypto_fear_greed!.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: v >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                    {v >= 0 ? '+' : ''}{v.toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: 12, color: v >= 0 ? 'var(--accent)' : 'var(--danger)', marginTop: 2 }}>
+                    {v >= 0 ? 'Hausse' : 'Baisse'}
+                  </div>
                 </>
               );
             })() : (
               <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-4)' }}>—</div>
             )}
           </div>
-          {/* BTC 24h */}
+          {/* DAX */}
           <div>
-            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>BTC 24h</div>
-            {cryptoCtx?.btc_change_24h != null ? (
-              <>
-                <div style={{ fontSize: 20, fontWeight: 600, color: cryptoCtx.btc_change_24h >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-                  {cryptoCtx.btc_change_24h >= 0 ? '+' : ''}{cryptoCtx.btc_change_24h.toFixed(2)}%
-                </div>
-                {cryptoCtx.btc_dominance != null && (
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Dom. {cryptoCtx.btc_dominance}%</div>
-                )}
-              </>
-            ) : (
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>DAX</div>
+            {(market as any).eu?.dax_change_pct != null ? (() => {
+              const v = (market as any).eu.dax_change_pct as number;
+              return (
+                <>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: v >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                    {v >= 0 ? '+' : ''}{v.toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: 12, color: v >= 0 ? 'var(--accent)' : 'var(--danger)', marginTop: 2 }}>
+                    {v >= 0 ? 'Hausse' : 'Baisse'}
+                  </div>
+                </>
+              );
+            })() : (
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-4)' }}>—</div>
+            )}
+          </div>
+          {/* FTSE 100 */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>FTSE 100</div>
+            {(market as any).eu?.ftse100_change_pct != null ? (() => {
+              const v = (market as any).eu.ftse100_change_pct as number;
+              return (
+                <>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: v >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                    {v >= 0 ? '+' : ''}{v.toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: 12, color: v >= 0 ? 'var(--accent)' : 'var(--danger)', marginTop: 2 }}>
+                    {v >= 0 ? 'Hausse' : 'Baisse'}
+                  </div>
+                </>
+              );
+            })() : (
               <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-4)' }}>—</div>
             )}
           </div>

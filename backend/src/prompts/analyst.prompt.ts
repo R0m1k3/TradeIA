@@ -68,7 +68,6 @@ Output STRICT JSON only:
 
 export function buildAnalystPrompt(data: {
   ticker: string;
-  is_crypto: boolean;
   current_price: number;
   indicators: {
     rsi_14: number | null;
@@ -93,7 +92,6 @@ export function buildAnalystPrompt(data: {
     rsi_divergence: string | null;
   };
   tradingview: TradingViewSignal;
-  crypto_metrics?: unknown;
   market_context?: unknown;
   data_freshness?: unknown;
   fundamentals?: unknown;
@@ -108,18 +106,7 @@ export function buildAnalystPrompt(data: {
     }).join('\n');
   };
 
-  const cryptoNote = data.is_crypto ? `
-CRYPTO-SPECIFIC RULES (MANDATORY):
-- This asset trades 24/7 — no overnight gap risk, but weekend liquidity can be thinner.
-- Fundamentals (P/E, EPS, revenue) are IRRELEVANT for crypto — ignore them entirely.
-- Crypto volatility is 3-5x higher than equities. Use wider ATR multiples: Stop = 3.5×ATR, Target = 7×ATR.
-- On-chain sentiment and BTC correlation matter more than sector rotation.
-- Higher ADX threshold for trend confirmation: require ADX > 30 (not 25) before calling a trend.
-- Volume spikes on crypto are common — only flag volume_ratio > 2.5x as truly significant.
-` : '';
-
-  return `Analyze ${data.ticker} (${data.is_crypto ? 'CRYPTOCURRENCY' : 'STOCK'}) using the PRE-COMPUTED indicators below.
-${cryptoNote}
+  return `Analyze ${data.ticker} (STOCK) using the PRE-COMPUTED indicators below.
 Current price: $${data.current_price}
 
 TECHNICAL INDICATORS (already computed — interpret, do not recalculate):
@@ -148,10 +135,7 @@ ${data.market_context ? JSON.stringify(data.market_context) : 'N/A'}
 DATA FRESHNESS / SOURCE LIMITS:
 ${data.data_freshness ? JSON.stringify(data.data_freshness) : 'N/A'}
 
-${data.is_crypto ? `CRYPTO 24H METRICS:
-${data.crypto_metrics ? JSON.stringify(data.crypto_metrics) : 'N/A'}` : ''}
-
-${data.is_crypto ? 'FUNDAMENTALS: N/A (cryptocurrency — no earnings, P/E, or revenue data)' : `FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}`}
+FUNDAMENTALS: ${data.fundamentals ? JSON.stringify(data.fundamentals) : 'N/A'}
 
 RECENT NEWS (Yahoo): ${data.news ? JSON.stringify(data.news) : 'N/A'}
 

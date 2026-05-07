@@ -22,8 +22,7 @@ const KEYS_TO_INVALIDATE = new Set([
   'model_mid',
   'model_strong',
   'llm_provider',
-  'crypto_max_pct',
-  'crypto_work_enabled',
+  'eodhd_key',
 ]);
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {
@@ -34,7 +33,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const c of configs) {
       if (KEYS_TO_INVALIDATE.has(c.key)) {
-        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key'].includes(c.key)) {
+        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key', 'eodhd_key'].includes(c.key)) {
           secretsConfigured[c.key] = c.value.length > 0;
         } else {
           result[c.key] = c.value;
@@ -45,7 +44,7 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Ensure all sensitive keys appear in secrets_configured
-    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key']) {
+    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key', 'eodhd_key']) {
       if (!(key in secretsConfigured)) secretsConfigured[key] = false;
     }
 
@@ -61,8 +60,6 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       daily_loss_limit_pct: result.daily_loss_limit_pct || process.env.DAILY_LOSS_LIMIT_PCT || '',
       max_drawdown_pct: result.max_drawdown_pct || '10',
       mock_broker: result.mock_broker || process.env.MOCK_BROKER || '',
-      crypto_max_pct: result.crypto_max_pct || process.env.CRYPTO_MAX_PCT || '20',
-      crypto_work_enabled: result.crypto_work_enabled || process.env.CRYPTO_WORK_ENABLED || 'true',
       secrets_configured: secretsConfigured,
     };
   });

@@ -73,9 +73,6 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const dailyLossLimitPct = parseFloat(lossLimitRaw || '3');
   const maxDrawdownRaw = await getCredential('max_drawdown_pct', 'MAX_DRAWDOWN_PCT');
   const maxDrawdownPct = parseFloat(maxDrawdownRaw || '10');
-  const cryptoMaxRaw = await getCredential('crypto_max_pct', 'CRYPTO_MAX_PCT');
-  const cryptoMaxPct = parseFloat(cryptoMaxRaw || '20');
-
   console.log(`[Orchestrator] === CYCLE START (Capital: $${portfolioUsd}) ===`, new Date().toISOString());
 
   reporter.updateAgent('collector', { status: 'running' });
@@ -152,7 +149,6 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     collectorOutput.market,
     dailyLossLimitPct,
     collectorOutput.tickers,
-    cryptoMaxPct
   );
   reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 

@@ -1,5 +1,5 @@
-import { prisma } from '../lib/prisma';
 import { getNasdaqStatus } from '../routes/market';
+import { isEuropeanMarketOpen } from '../data/european-markets';
 
 const NASDAQ_100 = [
   'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMGN', 'AMZN', 'ANSS',
@@ -14,37 +14,36 @@ const NASDAQ_100 = [
   'WBD', 'WDAY', 'XEL', 'ZS',
 ];
 
-const CRYPTO_TOP_20 = [
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
+const EU_BLUE_CHIPS = [
+  'SAP:XETR', 'SIE:XETR', 'ALV:XETR', 'DTE:XETR', 'BAS:XETR',
+  'SAN:XPAR', 'MC:XPAR', 'TTE:XPAR', 'AIR:XPAR', 'OR:XPAR',
+  'BP:LSE', 'SHEL:LSE', 'AZN:LSE', 'HSBA:LSE', 'ULVR:LSE',
+  'NOVO:XCTR', 'ASML', 'NESN:XSWX', 'ROG:XSWX', 'NOVN:XSWX',
 ];
-
-function enabled(value: string | undefined, fallback = true): boolean {
-  if (!value) return fallback;
-  return !['false', '0', 'off', 'disabled'].includes(value.toLowerCase());
-}
 
 export class DiscoveryAgent {
   async run(): Promise<string[]> {
     const nasdaq = getNasdaqStatus();
-    const cryptoConfig = await prisma.config.findUnique({ where: { key: 'crypto_work_enabled' } });
-    const cryptoRaw = cryptoConfig?.value || process.env.CRYPTO_WORK_ENABLED;
-    const cryptoEnabled = enabled(cryptoRaw, true);
+    const euOpen = isEuropeanMarketOpen(new Date());
 
-    if (!nasdaq.isOpen) {
-      if (!cryptoEnabled) {
-        console.log('[Discovery] Market closed and crypto work paused - no active scan');
-        return [];
-      }
+    const usTickers = [...NASDAQ_100].sort(() => 0.5 - Math.random());
+    const euTickers = [...EU_BLUE_CHIPS].sort(() => 0.5 - Math.random());
 
-      const shuffled = [...CRYPTO_TOP_20].sort(() => 0.5 - Math.random());
-      console.log(`[Discovery] Market closed - crypto-only mode: ${shuffled.length} tickers`);
-      return shuffled;
+    if (!nasdaq.isOpen && !euOpen) {
+      console.log('[Discovery] All markets closed - no active scan');
+      return [];
     }
 
-    const allTickers = cryptoEnabled ? [...NASDAQ_100, ...CRYPTO_TOP_20] : NASDAQ_100;
-    const shuffled = allTickers.sort(() => 0.5 - Math.random());
-    console.log(`[Discovery] Market open - normal scan: ${shuffled.length} tickers (${cryptoEnabled ? 'stocks + crypto' : 'stocks only'})`);
-    return shuffled;
+    // When only EU is open, prioritize EU tickers
+    if (!nasdaq.isOpen && euOpen) {
+      const tickers = [...euTickers, ...usTickers.slice(0, 10)];
+      console.log(`[Discovery] EU market open only - ${tickers.length} tickers`);
+      return tickers;
+    }
+
+    // When both open, scan all
+    const tickers = [...usTickers, ...euTickers];
+    console.log(`[Discovery] Markets open - ${tickers.length} tickers (US + EU)`);
+    return tickers;
   }
 }

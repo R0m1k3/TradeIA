@@ -57,11 +57,10 @@ export class ResearcherAgent {
 
         const inputData = {
           ticker: analysis.ticker,
-          is_crypto: tickerData.is_crypto,
           analyst_output: analysis,
           fundamentals: tickerData.fundamentals,
           news: tickerData.news,
-          sentiment: tickerData.is_crypto ? collector.market.crypto : collector.market,
+          sentiment: collector.market,
           tweets: (tickerData as any).tweets,
           current_price: tickerData.current_price,
         };

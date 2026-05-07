@@ -14,15 +14,15 @@ function parseScore(score: number): TradingViewSignal['recommendation'] {
   return 'NEUTRAL';
 }
 
-export async function getTradingViewSignal(ticker: string, isCrypto = false): Promise<TradingViewSignal> {
+export async function getTradingViewSignal(ticker: string): Promise<TradingViewSignal> {
   const cacheKey = `tv:signal:${ticker}`;
   const cached = await cacheGet<TradingViewSignal>(cacheKey);
   if (cached) return cached;
 
   try {
-    const market = isCrypto ? 'crypto' : 'america';
-    const exchange = isCrypto ? 'BINANCE' : 'NASDAQ'; // Simplification for scan
-    const symbol = isCrypto ? `${ticker}USDT` : ticker;
+    const market = 'america';
+    const exchange = 'NASDAQ';
+    const symbol = ticker;
 
     const response = await axios.post(
       `https://scanner.tradingview.com/${market}/scan`,

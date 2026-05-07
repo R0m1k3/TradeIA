@@ -5,7 +5,6 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { prisma } from '../lib/prisma';
 import { getEquityCurrentPrice } from '../data/yahoo';
-import { getBinanceCurrentPrice } from '../data/binance';
 import { getNasdaqStatus } from '../routes/market';
 import type { DataQualitySummary } from '../data/freshness';
 
@@ -13,11 +12,6 @@ const REPORTER_SYSTEM = `Tu es le rapporteur du cycle de trading automatisé. R�
 IMPORTANT: Toutes les alertes et le résumé DOIVENT être rédigés en français naturel, compréhensible par un non-expert.
 Explique les décisions en termes simples : "Le système a acheté NVDA car la tendance est haussière et les analystes IA sont optimistes."
 Output JSON uniquement: { "alerts": [{ "level": "info|warning|critical", "message": "", "ticker": "" }], "summary": "" }`;
-
-const CRYPTO_TICKERS = new Set([
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
-]);
 
 export class ReporterAgent {
   private agentStates: CycleUpdatePayload['agents'] = {
@@ -279,8 +273,6 @@ export class ReporterAgent {
   }
 
   private async getCurrentPrice(ticker: string): Promise<number | null> {
-    return CRYPTO_TICKERS.has(ticker)
-      ? getBinanceCurrentPrice(ticker)
-      : getEquityCurrentPrice(ticker);
+    return getEquityCurrentPrice(ticker);
   }
 }

@@ -1,5 +1,5 @@
 import type { SignalItem } from '../../types';
-import { getTickerName, isCryptoTicker } from '../../data/tickerNames';
+import { getTickerName } from '../../data/tickerNames';
 
 interface HeatMapProps {
   signals: SignalItem[];
@@ -30,18 +30,16 @@ export function HeatMap({ signals }: HeatMapProps) {
   return (
     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-5">
       {signals.map((s) => {
-        const crypto = isCryptoTicker(s.ticker);
         return (
           <div
             key={s.ticker}
             className="rounded p-2 border flex flex-col items-center gap-1"
             style={{
               background: getBg(s.debate_score),
-              borderColor: crypto ? `#F7931A55` : `${getColor(s.debate_score)}40`,
+              borderColor: `${getColor(s.debate_score)}40`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              {crypto && <span style={{ fontSize: 8, color: '#F7931A' }}>₿</span>}
               <span className="font-mono font-bold text-xs text-text-primary">{s.ticker}</span>
             </div>
             <span className="text-[9px] text-text-secondary truncate max-w-[60px]">{getTickerName(s.ticker)}</span>

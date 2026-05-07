@@ -1,12 +1,3 @@
-export const CRYPTO_TICKERS = new Set([
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
-]);
-
-export function isCryptoTicker(ticker: string): boolean {
-  return CRYPTO_TICKERS.has(ticker.toUpperCase());
-}
-
 export function formatPrice(price: number): string {
   if (price === 0) return '0.00';
   if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -17,27 +8,6 @@ export function formatPrice(price: number): string {
 }
 
 export const TICKER_NAMES: Record<string, string> = {
-  // Crypto
-  BTC: 'Bitcoin',
-  ETH: 'Ethereum',
-  BNB: 'BNB',
-  SOL: 'Solana',
-  XRP: 'XRP',
-  DOGE: 'Dogecoin',
-  ADA: 'Cardano',
-  AVAX: 'Avalanche',
-  SHIB: 'Shiba Inu',
-  DOT: 'Polkadot',
-  LINK: 'Chainlink',
-  TRX: 'TRON',
-  MATIC: 'Polygon',
-  BCH: 'Bitcoin Cash',
-  LTC: 'Litecoin',
-  NEAR: 'NEAR Protocol',
-  UNI: 'Uniswap',
-  APT: 'Aptos',
-  INJ: 'Injective',
-  RENDER: 'Render',
   // NASDAQ 100
   AAPL: 'Apple',
   ABNB: 'Airbnb',
@@ -133,6 +103,26 @@ export const TICKER_NAMES: Record<string, string> = {
   WDAY: 'Workday',
   XEL: 'Xcel Energy',
   ZS: 'Zscaler',
+  // European Blue Chips
+  'SAP:XETR': 'SAP',
+  'SIE:XETR': 'Siemens',
+  'ALV:XETR': 'Allianz',
+  'DTE:XETR': 'Deutsche Telekom',
+  'BAS:XETR': 'BASF',
+  'SAN:XPAR': 'Sanofi',
+  'MC:XPAR': 'LVMH',
+  'TTE:XPAR': 'TotalEnergies',
+  'AIR:XPAR': 'Airbus',
+  'OR:XPAR': "L'Oréal",
+  'BP:LSE': 'BP',
+  'SHEL:LSE': 'Shell',
+  'AZN:LSE': 'AstraZeneca',
+  'HSBA:LSE': 'HSBC',
+  'ULVR:LSE': 'Unilever',
+  'NOVO:XCTR': 'Novo Nordisk',
+  NESN: 'Nestlé',
+  ROG: 'Roche',
+  NOVN: 'Novartis',
 };
 
 export function getTickerName(ticker: string): string {

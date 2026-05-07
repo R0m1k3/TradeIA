@@ -58,11 +58,6 @@ export interface SectorBias {
   change_pct: number;
 }
 
-export interface CryptoContext {
-  crypto_fear_greed: { value: number; label: string } | null;
-  btc_dominance: number | null;
-  btc_change_24h: number | null;
-}
 
 export interface MarketContext {
   vix: number;
@@ -76,7 +71,12 @@ export interface MarketContext {
   };
   macro?: MacroData;
   sector_biases?: Record<string, SectorBias>;
-  crypto?: CryptoContext;
+  eu?: {
+    cac40_change_pct: number;
+    dax_change_pct: number;
+    ftse100_change_pct: number;
+    eu_market_open: boolean;
+  };
   data_freshness?: DataQualitySummary | null;
 }
 

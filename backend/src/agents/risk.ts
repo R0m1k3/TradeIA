@@ -8,19 +8,13 @@ import { getTickerSector, countPositionsBySector } from '../data/sectors';
 import { prisma } from '../lib/prisma';
 
 const MAX_POSITIONS_PER_SECTOR = 3;
-const MAX_SECTOR_NAV_PCT = 0.40; // max 40% of NAV in a single sector
-
-const CRYPTO_TICKERS = new Set([
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
-]);
+const MAX_SECTOR_NAV_PCT = 0.40;
 
 interface RiskOutput {
   approved: ApprovedOrder[];
   rejected: Array<{ ticker: string; action: string; rejection_reason: string }>;
 }
 
-/** Calcule l'Expected Move sur holdDays jours depuis l'IV30 */
 function calcExpectedMove(price: number, iv30: number | null, holdDays: number): number | null {
   if (!iv30 || iv30 <= 0) return null;
   return price * (iv30 / 100) * Math.sqrt(holdDays / 365);
@@ -34,13 +28,11 @@ export class RiskAgent {
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
-    cryptoMaxPct: number = 20
   ): Promise<ApprovedOrder[]> {
     console.log(`[Risk] Validating ${proposals.length} proposals`);
 
     if (proposals.length === 0) return [];
 
-    // Pre-filter déterministe — always runs first
     const preFiltered = this.deterministicPreFilter(
       proposals,
       portfolioUsd,
@@ -48,12 +40,10 @@ export class RiskAgent {
       market,
       dailyLossLimitPct,
       tickerData,
-      cryptoMaxPct
     );
 
     if (preFiltered.length === 0) return [];
 
-    // Deterministic validation is the primary path — fast, cheap, consistent
     const deterministicApproved = this.deterministicValidation(
       preFiltered,
       portfolioUsd,
@@ -65,8 +55,6 @@ export class RiskAgent {
 
     if (deterministicApproved.length === 0) return [];
 
-    // LLM validation only if models available and we have ambiguous cases
-    // (low conviction, conflicting signals, or VIX regime edge cases)
     const ambiguousOrders = deterministicApproved.filter(
       (o) => o.confidence < 70 || market.vix > 25
     );
@@ -76,7 +64,6 @@ export class RiskAgent {
       return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio);
     }
 
-    // Try LLM for ambiguous orders only
     try {
       const MODELS = await getModels();
       const prompt = buildRiskPrompt({
@@ -112,7 +99,6 @@ export class RiskAgent {
       }
 
       const llmApproved = parsed.approved || [];
-      // Combine: non-ambiguous from deterministic + LLM-filtered ambiguous
       const nonAmbiguous = deterministicApproved.filter((o) => o.confidence >= 70 && market.vix <= 25);
       console.log(`[Risk] Final: ${nonAmbiguous.length} deterministic + ${llmApproved.length} LLM-validated`);
       return this.enforceCashBudget([...nonAmbiguous, ...llmApproved], portfolioUsd, portfolio);
@@ -129,31 +115,21 @@ export class RiskAgent {
     market: { vix: number },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
-    cryptoMaxPct: number = 20
   ): OrderProposal[] {
-    // Count positions correctly identifying Crypto
     const sectorCounts: Record<string, number> = {};
     for (const pos of portfolio.positions) {
-      const sector = CRYPTO_TICKERS.has(pos.ticker) ? 'Crypto' : getTickerSector(pos.ticker);
+      const sector = getTickerSector(pos.ticker);
       sectorCounts[sector] = (sectorCounts[sector] || 0) + 1;
     }
 
-    // Current crypto exposure in USD
-    const currentCryptoUsd = portfolio.positions
-      .filter((p) => CRYPTO_TICKERS.has(p.ticker))
-      .reduce((s, p) => s + (p.sizeUsd ?? 0), 0);
-    const cryptoCapUsd = portfolioUsd * (cryptoMaxPct / 100);
-    let pendingCryptoUsd = 0;
     const filtered: OrderProposal[] = [];
 
     for (const p of proposals) {
-      // Blocage perte journalière (unrealized inclus)
       if (portfolio.daily_pnl_pct <= -dailyLossLimitPct && p.action === 'BUY') {
         console.log(`[Risk] Pre-filter ${p.ticker}: daily loss limit reached (${portfolio.daily_pnl_pct.toFixed(2)}%)`);
         continue;
       }
 
-      // Drawdown regime — reduce or block based on severity
       if (portfolio.risk_regime === 'SEVERE_DRAWDOWN' && p.action === 'BUY') {
         console.log(`[Risk] Pre-filter ${p.ticker}: severe drawdown regime, no new buys`);
         continue;
@@ -163,13 +139,11 @@ export class RiskAgent {
         continue;
       }
 
-      // VIX trop élevé
       if (market.vix > 30 && p.action === 'BUY') {
         console.log(`[Risk] Pre-filter ${p.ticker}: VIX ${market.vix} > 30`);
         continue;
       }
 
-      // R/R minimum
       const rr = p.action === 'BUY'
         ? (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss)
         : (p.limit_price - p.take_profit) / (p.stop_loss - p.limit_price);
@@ -178,34 +152,19 @@ export class RiskAgent {
         continue;
       }
 
-      // Earnings blackout
       if (tickerData?.[p.ticker]?.earnings_blackout) {
         console.log(`[Risk] Pre-filter ${p.ticker}: earnings blackout`);
         continue;
       }
 
-      // Crypto capital cap
-      if (p.action === 'BUY' && CRYPTO_TICKERS.has(p.ticker)) {
-        const proposedUsd = portfolioUsd * (p.size_pct / 100);
-        if (currentCryptoUsd + pendingCryptoUsd + proposedUsd > cryptoCapUsd) {
-          console.log(`[Risk] Pre-filter ${p.ticker}: crypto cap ${cryptoMaxPct}% reached (current $${(currentCryptoUsd + pendingCryptoUsd).toFixed(0)} / cap $${cryptoCapUsd.toFixed(0)})`);
+      if (p.action === 'BUY') {
+        const sector = getTickerSector(p.ticker);
+        const currentCount = sectorCounts[sector] || 0;
+        if (currentCount >= MAX_POSITIONS_PER_SECTOR) {
+          console.log(`[Risk] Pre-filter ${p.ticker}: sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
           continue;
         }
-        pendingCryptoUsd += proposedUsd;
-      }
-
-      // Concentration sectorielle max (exempt Crypto as it has its own cap)
-      if (p.action === 'BUY') {
-        const sector = CRYPTO_TICKERS.has(p.ticker) ? 'Crypto' : getTickerSector(p.ticker);
-        if (sector !== 'Crypto') {
-          const currentCount = sectorCounts[sector] || 0;
-          if (currentCount >= MAX_POSITIONS_PER_SECTOR) {
-            console.log(`[Risk] Pre-filter ${p.ticker}: sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
-            continue;
-          }
-          // Incrémenter provisoirement pour éviter plusieurs approbations sur le même secteur
-          sectorCounts[sector] = currentCount + 1;
-        }
+        sectorCounts[sector] = currentCount + 1;
       }
 
       filtered.push(p);
@@ -224,30 +183,24 @@ export class RiskAgent {
   ): ApprovedOrder[] {
     const approved: ApprovedOrder[] = [];
 
-    // Drawdown regime sizing reduction (progressive)
     let sizingMultiplier = 1.0;
     if (portfolio.risk_regime === 'ELEVATED') sizingMultiplier = 0.75;
     if (portfolio.risk_regime === 'CRISIS') sizingMultiplier = 0.5;
     if (portfolio.risk_regime === 'DRAWDOWN') sizingMultiplier = 0.5;
     if (portfolio.risk_regime === 'SEVERE_DRAWDOWN') sizingMultiplier = 0.25;
 
-    // VIX regime sizing reduction
     if (vix > 25) sizingMultiplier *= 0.75;
     if (vix > 30) sizingMultiplier *= 0.5;
 
-    // Calculate sector exposure for concentration check
     const sectorExposure: Record<string, number> = {};
     for (const pos of portfolio.positions) {
-      const sector = CRYPTO_TICKERS.has(pos.ticker) ? 'Crypto' : getTickerSector(pos.ticker);
+      const sector = getTickerSector(pos.ticker);
       sectorExposure[sector] = (sectorExposure[sector] || 0) + (pos.sizeUsd || 0);
     }
 
     for (const p of proposals) {
-      // AI Autonomous Sizing: Use the size_pct defined by the Strategist AI
-      // The AI is instructed to maximize profit and choose its own sizing based on conviction.
       let sizeUsd = portfolioUsd * (p.size_pct / 100) * sizingMultiplier;
 
-      // Réduction si IV30 Expected Move dépasse l'objectif
       const td = tickerData?.[p.ticker];
       const opts = td?.options as { iv30?: number | null } | undefined;
       const iv30 = opts?.iv30 ?? null;
@@ -261,27 +214,23 @@ export class RiskAgent {
         sizeUsd *= reductionFactor;
       }
 
-      // Max 50% of portfolio per position (Autonomous AI allowance)
       sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.50);
 
-      // Sector concentration check: max 40% of NAV in one sector (exempt Crypto)
       if (p.action === 'BUY') {
-        const sector = CRYPTO_TICKERS.has(p.ticker) ? 'Crypto' : getTickerSector(p.ticker);
-        if (sector !== 'Crypto') {
-          const currentExposure = sectorExposure[sector] || 0;
-          const maxSectorUsd = portfolioUsd * MAX_SECTOR_NAV_PCT;
-          if (currentExposure + sizeUsd > maxSectorUsd) {
-            const adjustedSize = maxSectorUsd - currentExposure;
-            if (adjustedSize > 0) {
-              console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV, reducing from $${sizeUsd.toFixed(0)} to $${adjustedSize.toFixed(0)}`);
-              sizeUsd = adjustedSize;
-            } else {
-              console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap, skipping`);
-              continue;
-            }
+        const sector = getTickerSector(p.ticker);
+        const currentExposure = sectorExposure[sector] || 0;
+        const maxSectorUsd = portfolioUsd * MAX_SECTOR_NAV_PCT;
+        if (currentExposure + sizeUsd > maxSectorUsd) {
+          const adjustedSize = maxSectorUsd - currentExposure;
+          if (adjustedSize > 0) {
+            console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV, reducing from $${sizeUsd.toFixed(0)} to $${adjustedSize.toFixed(0)}`);
+            sizeUsd = adjustedSize;
+          } else {
+            console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap, skipping`);
+            continue;
           }
-          sectorExposure[sector] = (sectorExposure[sector] || 0) + sizeUsd;
         }
+        sectorExposure[sector] = (sectorExposure[sector] || 0) + sizeUsd;
       }
 
       approved.push({
@@ -341,7 +290,6 @@ export class RiskAgent {
     return budgeted;
   }
 
-  /** Get Kelly fraction based on historical win rate by trade type */
   private async getKellyFractionSync(tradeType: string): Promise<number> {
     try {
       const closedTrades = await prisma.trade.findMany({
@@ -349,12 +297,11 @@ export class RiskAgent {
         select: { pnlUsd: true },
       });
 
-      if (closedTrades.length < 10) return 0.4; // default half-Kelly equivalent
+      if (closedTrades.length < 10) return 0.4;
 
       const wins = closedTrades.filter((t) => (t.pnlUsd ?? 0) > 0);
       const winRate = wins.length / closedTrades.length;
 
-      // Average win / average loss for profit factor
       const avgWin = wins.reduce((s, t) => s + (t.pnlUsd ?? 0), 0) / Math.max(wins.length, 1);
       const losses = closedTrades.filter((t) => (t.pnlUsd ?? 0) <= 0);
       const avgLoss = Math.abs(losses.reduce((s, t) => s + (t.pnlUsd ?? 0), 0)) / Math.max(losses.length, 1);
@@ -362,9 +309,7 @@ export class RiskAgent {
       if (avgLoss === 0) return 0.4;
 
       const profitLossRatio = avgWin / avgLoss;
-      // Kelly formula: f = (bp - q) / b where b=profit/loss ratio, p=win rate, q=1-p
       const kelly = (profitLossRatio * winRate - (1 - winRate)) / profitLossRatio;
-      // Use half-Kelly for safety
       const halfKelly = Math.max(0.1, Math.min(kelly * 0.5, 0.4));
 
       console.log(`[Risk] Kelly fraction for type ${tradeType}: winRate=${winRate.toFixed(2)}, P/L ratio=${profitLossRatio.toFixed(2)}, halfKelly=${halfKelly.toFixed(3)}`);
@@ -374,10 +319,7 @@ export class RiskAgent {
     }
   }
 
-  /** Synchronous Kelly fraction fallback using cached stats */
   private getKellyFraction(tradeType: string): number {
-    // Will be overridden by async version when available
-    // This is a conservative default
     const defaults: Record<string, number> = { A: 0.35, B: 0.25, C: 0.2 };
     return defaults[tradeType] || 0.3;
   }

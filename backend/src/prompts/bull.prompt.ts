@@ -34,22 +34,13 @@ Output STRICT JSON only:
 
 export function buildBullPrompt(data: {
   ticker: string;
-  is_crypto?: boolean;
   analyst_output: unknown;
   fundamentals: unknown;
   news: unknown[];
   sentiment: unknown;
   current_price: number;
 }): string {
-  const cryptoNote = data.is_crypto ? `
-Crypto-specific instructions:
-- Treat this as a cryptocurrency, not an equity.
-- Ignore P/E, EPS, earnings, analyst upgrades, insider buying and sector rotation.
-- Focus on BTC trend, crypto fear/greed, liquidity, momentum, regulatory risk and 24/7 volatility.
-` : '';
-
-  return `Build the strongest bullish case for ${data.ticker} (${data.is_crypto ? 'CRYPTO' : 'STOCK'}).
-${cryptoNote}
+  return `Build the strongest bullish case for ${data.ticker} (STOCK).
 
 Current price: $${data.current_price}
 

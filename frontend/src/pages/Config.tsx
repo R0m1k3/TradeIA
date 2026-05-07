@@ -287,10 +287,17 @@ export function Config() {
             />
 
             <ApiKeyInput
-              label="Twelve Data (actions/forex live)"
+              label="Twelve Data (actions/indices US + EU live)"
               configured={secretsConfigured.twelve_data_key}
               placeholder="Clé API Twelve Data"
               onSave={(val) => saveSecret('twelve_data_key', val)}
+            />
+
+            <ApiKeyInput
+              label="EODHD (données historiques EU, fondamentales)"
+              configured={secretsConfigured.eodhd_key}
+              placeholder="Clé API EODHD"
+              onSave={(val) => saveSecret('eodhd_key', val)}
             />
 
             <ApiKeyInput
@@ -301,8 +308,8 @@ export function Config() {
             />
 
             <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-              Astuce : Polygon FREE est utile en complément, mais les données peuvent être limitées ou différées.
-              L'application doit donc croiser Twelve Data, Polygon, Yahoo, Binance, TradingView et les flux news.
+              Astuce : Twelve Data couvre les actions US et européennes. EODHD est un bon complément pour les données historiques et fondamentales européennes.
+              L'application croise Twelve Data, Polygon, Yahoo, EODHD, TradingView et les flux news.
             </div>
           </div>
         </div>
@@ -371,34 +378,6 @@ export function Config() {
               </p>
             </div>
 
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span className="label" style={{ marginBottom: 0 }}>
-                  Allocation max Crypto <Help tip="Pourcentage maximum du portefeuille pouvant être investi en cryptomonnaies simultanément. 0% = aucun trade crypto. 50% = équilibre stocks / crypto." />
-                </span>
-                <span className="mono" style={{ fontSize: 13, color: 'var(--info)' }}>{config.crypto_max_pct}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={50}
-                step={5}
-                value={parseFloat(config.crypto_max_pct || '20')}
-                onChange={(e) => setConfig({ crypto_max_pct: e.target.value })}
-                onPointerUp={(e) => saveConfig({ crypto_max_pct: (e.target as HTMLInputElement).value })}
-                style={{ width: '100%', accentColor: 'var(--info)', marginBottom: 4 }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
-                <span>0% — actions uniquement</span>
-                <span>50% — équilibre</span>
-              </div>
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
-                {parseFloat(config.crypto_max_pct || '20') === 0
-                  ? 'Les cryptomonnaies sont surveillées mais aucun capital ne leur est alloué.'
-                  : `Maximum $${((parseFloat(config.portfolio_usd || '10000') * parseFloat(config.crypto_max_pct || '20')) / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })} en crypto sur $${parseFloat(config.portfolio_usd || '10000').toLocaleString()}.`}
-              </div>
-            </div>
-
             <div style={{ padding: 12, background: 'var(--warn-soft)', borderRadius: 6, fontSize: 12, color: 'var(--warn)', borderLeft: '3px solid var(--warn)' }}>
               Au-delà de 3% par trade, le drawdown peut dépasser votre seuil cible.
             </div>
@@ -450,32 +429,6 @@ export function Config() {
                 <span style={{
                   position: 'absolute', top: 2,
                   left: config.mock_broker === 'true' ? 20 : 2,
-                  width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s',
-                }} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>Travail crypto 24/7</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                  {config.crypto_work_enabled === 'false'
-                    ? 'Pause crypto active : hors marché US, les cycles 5 min sont sautés et le mode normal revient à l’ouverture.'
-                    : 'Crypto active : analyse crypto 24/7, et scan mixte actions + crypto quand le marché US est ouvert.'}
-                </div>
-              </div>
-              <button
-                onClick={() => saveConfig({ crypto_work_enabled: config.crypto_work_enabled === 'false' ? 'true' : 'false' })}
-                title={config.crypto_work_enabled === 'false' ? 'Réactiver le travail crypto' : 'Stopper le travail crypto'}
-                style={{
-                  width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer',
-                  background: config.crypto_work_enabled !== 'false' ? 'var(--accent)' : 'var(--bg-elev-2)',
-                  position: 'relative', transition: 'all 0.2s',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2,
-                  left: config.crypto_work_enabled !== 'false' ? 20 : 2,
                   width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'all 0.2s',
                 }} />
               </button>

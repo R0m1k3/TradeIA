@@ -92,7 +92,8 @@ export interface CycleUpdatePayload {
     };
     macro?: unknown;
     sector_biases?: unknown;
-    crypto?: unknown;
+    eu?: unknown;
+    eu_status?: unknown;
     data_freshness?: unknown;
   };
   signals?: SignalItem[];

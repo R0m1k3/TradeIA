@@ -2,13 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { broadcastOverrideAck } from '../websocket';
 import { closeTrade } from '../broker/mock';
 import { prisma } from '../lib/prisma';
-import { getYahooCurrentPrice } from '../data/yahoo';
-import { getBinanceCurrentPrice } from '../data/binance';
-
-const CRYPTO_TICKERS = new Set([
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
-]);
+import { getEquityCurrentPrice } from '../data/yahoo';
 
 function verifyAdmin(authHeader: string | undefined): boolean {
   if (!authHeader) return false;
@@ -64,10 +58,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const normalizedTicker = ticker.toUpperCase();
-    const isCrypto = CRYPTO_TICKERS.has(normalizedTicker);
-    const currentPrice = isCrypto
-      ? await getBinanceCurrentPrice(normalizedTicker)
-      : await getYahooCurrentPrice(normalizedTicker);
+    const currentPrice = await getEquityCurrentPrice(normalizedTicker);
 
     await closeTrade(openTrade.id, currentPrice || openTrade.filledPrice, 'MANUAL');
     broadcastOverrideAck('CLOSE', ticker);

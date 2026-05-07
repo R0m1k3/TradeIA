@@ -22,6 +22,7 @@ interface ConfigSecrets {
   twelve_data_key: boolean;
   fred_api_key: boolean;
   ollama_api_key: boolean;
+  eodhd_key: boolean;
 }
 
 interface ConfigStore {
@@ -47,8 +48,6 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     portfolio_usd: '10000',
     daily_loss_limit_pct: '3',
     max_drawdown_pct: '10',
-    crypto_max_pct: '20',
-    crypto_work_enabled: 'true',
     mock_broker: 'true',
     ollama_base_url: '',
   },
@@ -60,6 +59,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     twelve_data_key: false,
     fred_api_key: false,
     ollama_api_key: false,
+    eodhd_key: false,
   },
   paused: false,
 

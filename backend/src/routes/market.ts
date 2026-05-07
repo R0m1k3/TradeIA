@@ -1,18 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getEquityOHLCV, getMarketContext } from '../data/yahoo';
-import { getBinanceOHLCV } from '../data/binance';
-import { getCryptoContext } from '../data/crypto-context';
 import { getCredential } from '../config/credentials';
 import { sourceFreshness, summarizeFreshness } from '../data/freshness';
-
-const CRYPTO_TICKERS = new Set([
-  'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 'DOT',
-  'LINK', 'TRX', 'MATIC', 'BCH', 'LTC', 'NEAR', 'UNI', 'APT', 'INJ', 'RENDER',
-]);
+import { getEUIndexDirection, getEUMarketStatus } from '../data/european-markets';
 
 export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
   const now = new Date();
-  // Convert UTC to ET using offset (no Intl dependency — works in Alpine Docker)
   const utcMs = now.getTime();
   const etOffsetMs = getETOffsetMs(now);
   const etMs = utcMs + etOffsetMs;
@@ -24,7 +17,7 @@ export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClos
   const time = h * 60 + m;
 
   const isWeekday = day >= 1 && day <= 5;
-  const isMarketHours = isWeekday && time >= 570 && time < 960; // 9:30-16:00 ET
+  const isMarketHours = isWeekday && time >= 570 && time < 960;
 
   let nextOpen: string;
   let nextClose: string;
@@ -35,12 +28,11 @@ export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClos
   } else {
     const minutesToOpen = (() => {
       if (!isWeekday) {
-        // Weekend: days until Monday
         const daysToMonday = day === 0 ? 1 : day === 6 ? 2 : 0;
         return daysToMonday * 24 * 60 + (570 - time);
       }
-      if (time < 570) return 570 - time; // Before open today
-      return (24 * 60 - time) + 570 + (day === 5 ? 2 * 24 * 60 : 0); // After close, or Friday
+      if (time < 570) return 570 - time;
+      return (24 * 60 - time) + 570 + (day === 5 ? 2 * 24 * 60 : 0);
     })();
     const hours = Math.floor(minutesToOpen / 60);
     const mins = minutesToOpen % 60;
@@ -51,15 +43,12 @@ export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClos
   return { isOpen: isMarketHours, nextOpen, nextClose };
 }
 
-/** Calculate ET offset in ms, accounting for DST (US rules: 2nd Sunday March - 1st Sunday November) */
 function getETOffsetMs(date: Date): number {
   const year = date.getUTCFullYear();
-  // 2nd Sunday of March
   const marchDow = new Date(Date.UTC(year, 2, 1)).getUTCDay();
-  const dstStart = Date.UTC(year, 2, 8 + ((7 - marchDow) % 7), 2); // 2am ET = 7am UTC spring forward
-  // 1st Sunday of November
+  const dstStart = Date.UTC(year, 2, 8 + ((7 - marchDow) % 7), 2);
   const novDow = new Date(Date.UTC(year, 10, 1)).getUTCDay();
-  const dstEnd = Date.UTC(year, 10, 1 + ((7 - novDow) % 7), 2); // 2am ET = 6am UTC fall back
+  const dstEnd = Date.UTC(year, 10, 1 + ((7 - novDow) % 7), 2);
   const isDST = date.getTime() >= dstStart && date.getTime() < dstEnd;
   return isDST ? -4 * 3600000 : -5 * 3600000;
 }
@@ -68,19 +57,25 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/context', async () => {
     const context = await getMarketContext();
     const nasdaq = getNasdaqStatus();
+    const eu = await getEUIndexDirection();
+    const euStatus = getEUMarketStatus();
     const polygonKey = await getCredential('polygon_key', 'POLYGON_KEY');
+    const eodhdKey = await getCredential('eodhd_key', 'EODHD_KEY');
     return {
       vix: context.vix,
       fear_greed: context.fear_greed,
       nasdaq: context.nasdaq_direction,
       nasdaq_change_pct: context.nasdaq_change_pct,
       nasdaq_status: nasdaq,
+      eu,
+      eu_status: euStatus,
       data_freshness: summarizeFreshness([
         sourceFreshness('Yahoo Finance', context.vix > 0 ? 'delayed' : 'missing', 'Contexte actions gratuit, pas garanti temps réel.'),
         sourceFreshness('Polygon.io', polygonKey ? 'limited' : 'missing', polygonKey ? 'Clé FREE configurée, source limitée/différée.' : 'Clé absente.'),
-        sourceFreshness('Binance Spot', 'live', 'Crypto disponible 24/7 via Binance.'),
+        sourceFreshness('Indices EU', eu.cac40_change_pct !== 0 || eu.dax_change_pct !== 0 ? 'fresh' : 'limited', 'CAC 40, DAX, FTSE 100 via Twelve Data / Yahoo.'),
+        sourceFreshness('EODHD', eodhdKey ? 'fresh' : 'missing', eodhdKey ? 'Clé configurée pour données européennes.' : 'Clé absente.'),
       ], [
-        'Les actions gratuites peuvent être retardées; les cryptos sont les plus fraîches.',
+        'Les actions gratuites peuvent être retardées; les indices EU sont mis à jour via Twelve Data.',
       ]),
     };
   });
@@ -90,17 +85,8 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
     const query = req.query as { interval?: string };
     const interval = (query.interval || '1d') as '15m' | '1h' | '4h' | '1d';
 
-    if (CRYPTO_TICKERS.has(ticker.toUpperCase())) {
-      const bars = await getBinanceOHLCV(ticker.toUpperCase(), interval === '4h' ? '4h' : interval === '1h' ? '1h' : interval === '15m' ? '15m' : '1d');
-      return bars.length > 0 ? bars : [];
-    }
-
     const equityBars = await getEquityOHLCV(ticker, interval);
     return equityBars.length > 0 ? equityBars : [];
-  });
-
-  fastify.get('/crypto-context', async () => {
-    return getCryptoContext();
   });
 };
 

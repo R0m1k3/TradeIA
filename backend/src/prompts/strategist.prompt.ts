@@ -17,8 +17,7 @@ DECISION LOGIC (apply in order):
 
 MARKET CONTEXT USAGE:
 - Use market.internals.risk_regime and sector_momentum to avoid fighting broad equity flows.
-- For crypto, use market.crypto and each debate's crypto metrics/news context; do not apply equity-only earnings or sector rules.
-- Prefer smaller size_pct when market internals are RISK_OFF or BTC momentum is weak.
+- Prefer smaller size_pct when market internals are RISK_OFF.
 
 IMPORTANT: The "reasoning" field MUST be written in French.
 
