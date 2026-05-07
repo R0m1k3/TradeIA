@@ -42,11 +42,11 @@ async function checkCircuitBreaker(
       await closeTrade(trade.id, trade.filledPrice, 'CIRCUIT_BREAKER');
     }
 
-    // Pause forcée de 72h via config
+    // Pause forcée via config — doit utiliser 'system_paused' pour que la queue le respecte
     await prisma.config.upsert({
-      where: { key: 'paused' },
+      where: { key: 'system_paused' },
       update: { value: 'true' },
-      create: { key: 'paused', value: 'true' },
+      create: { key: 'system_paused', value: 'true' },
     });
     await prisma.config.upsert({
       where: { key: 'circuit_breaker_triggered_at' },

@@ -25,6 +25,9 @@ const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
         update: { value: initialCapital.toString() },
         create: { key: 'equity_peak', value: initialCapital.toString() },
       }),
+      prisma.config.deleteMany({
+        where: { key: { in: ['paused', 'system_paused', 'circuit_breaker_triggered_at'] } },
+      }),
     ]);
 
     return {
