@@ -388,79 +388,86 @@ export function toYahooSymbol(ticker: string): string {
 }
 
 const TTL_SNAPSHOT = 15 * 60; // 15 minutes
+const SNAPSHOT_BATCH = 20;   // parallel requests per round
 
-const YAHOO_QUOTE_BASE = 'https://query1.finance.yahoo.com/v7/finance/quote';
-
-interface YahooQuoteItem {
-  symbol: string;
-  regularMarketPrice?: number;
-  regularMarketChangePercent?: number;
-  regularMarketVolume?: number;
+export interface TickerSnapshotResult {
+  ticker: string;
+  name: string | null;
+  price: number | null;
+  change_1d_pct: number | null;
+  volume: number | null;
 }
 
-/** Batch fetch snapshot (price + 1d change %) for a list of tickers */
-export async function getTickerSnapshots(
-  tickers: string[]
-): Promise<Array<{ ticker: string; price: number | null; change_1d_pct: number | null; volume: number | null }>> {
-  if (tickers.length === 0) return [];
-
-  const sortedTickers = [...tickers].sort();
-  const cacheKey = `snapshot:batch:${sortedTickers.join(',')}`;
-  const cached = await cacheGet<Array<{ ticker: string; price: number | null; change_1d_pct: number | null; volume: number | null }>>(cacheKey);
-  if (cached) return cached;
-
-  // Build Yahoo symbol map: yahooSymbol → original ticker
-  const yahooToOriginal: Record<string, string> = {};
-  const yahooSymbols: string[] = [];
-  for (const t of tickers) {
-    const y = toYahooSymbol(t);
-    yahooToOriginal[y] = t;
-    yahooSymbols.push(y);
-  }
-
+async function fetchOneTicker(ticker: string, crumb: string | null): Promise<TickerSnapshotResult> {
+  const yahooSym = toYahooSymbol(ticker);
   try {
-    const crumb = await getYahooCrumb();
-    const params: Record<string, string> = {
-      symbols: yahooSymbols.join(','),
-      fields: 'regularMarketPrice,regularMarketChangePercent,regularMarketVolume',
-    };
+    const params: Record<string, string> = { interval: '1d', range: '5d' };
     if (crumb) params.crumb = crumb;
 
-    const response = await axios.get(YAHOO_QUOTE_BASE, {
+    const response = await axios.get(`${BASE}/${encodeURIComponent(yahooSym)}`, {
       params,
       headers: YAHOO_HEADERS,
-      timeout: 20_000,
+      timeout: 12_000,
       validateStatus: () => true,
     });
 
     if (response.status !== 200) {
-      console.warn(`[Yahoo] getTickerSnapshots: HTTP ${response.status}`);
-      return tickers.map((t) => ({ ticker: t, price: null, change_1d_pct: null, volume: null }));
+      return { ticker, name: null, price: null, change_1d_pct: null, volume: null };
     }
 
-    const quoteItems: YahooQuoteItem[] = response.data?.quoteResponse?.result ?? [];
-    const resultMap: Record<string, { price: number | null; change_1d_pct: number | null; volume: number | null }> = {};
+    const result = response.data?.chart?.result?.[0];
+    if (!result) return { ticker, name: null, price: null, change_1d_pct: null, volume: null };
 
-    for (const item of quoteItems) {
-      const originalTicker = yahooToOriginal[item.symbol] ?? item.symbol;
-      resultMap[originalTicker] = {
-        price: item.regularMarketPrice ?? null,
-        change_1d_pct: item.regularMarketChangePercent ?? null,
-        volume: item.regularMarketVolume ?? null,
-      };
-    }
+    const meta = result.meta ?? {};
+    const price: number | null = meta.regularMarketPrice ?? null;
+    const prevClose: number | null = meta.chartPreviousClose ?? meta.previousClose ?? null;
+    const change_1d_pct =
+      price !== null && prevClose !== null && prevClose !== 0
+        ? ((price - prevClose) / prevClose) * 100
+        : null;
 
-    const results = tickers.map((t) => ({
-      ticker: t,
-      price: resultMap[t]?.price ?? null,
-      change_1d_pct: resultMap[t]?.change_1d_pct ?? null,
-      volume: resultMap[t]?.volume ?? null,
-    }));
+    const volumes: (number | null)[] = result.indicators?.quote?.[0]?.volume ?? [];
+    const lastVol = [...volumes].reverse().find((v): v is number => v !== null) ?? null;
 
-    await cacheSet(cacheKey, results, TTL_SNAPSHOT);
-    return results;
-  } catch (err) {
-    console.warn(`[Yahoo] getTickerSnapshots failed: ${(err as Error).message}`);
-    return tickers.map((t) => ({ ticker: t, price: null, change_1d_pct: null, volume: null }));
+    return {
+      ticker,
+      name: meta.shortName ?? meta.longName ?? null,
+      price,
+      change_1d_pct,
+      volume: lastVol,
+    };
+  } catch {
+    return { ticker, name: null, price: null, change_1d_pct: null, volume: null };
   }
+}
+
+/** Batch fetch snapshot (price + 1d change % + company name) for a list of tickers */
+export async function getTickerSnapshots(tickers: string[]): Promise<TickerSnapshotResult[]> {
+  if (tickers.length === 0) return [];
+
+  const { createHash } = await import('crypto');
+  const hash = createHash('md5').update([...tickers].sort().join(',')).digest('hex');
+  const cacheKey = `snapshot4:${hash}`;
+
+  const cached = await cacheGet<TickerSnapshotResult[]>(cacheKey);
+  if (cached) {
+    console.log(`[Yahoo] getTickerSnapshots: cache hit (${tickers.length} tickers)`);
+    return cached;
+  }
+
+  console.log(`[Yahoo] getTickerSnapshots: fetching ${tickers.length} tickers in batches of ${SNAPSHOT_BATCH}`);
+  const crumb = await getYahooCrumb();
+  const results: TickerSnapshotResult[] = [];
+
+  for (let i = 0; i < tickers.length; i += SNAPSHOT_BATCH) {
+    const batch = tickers.slice(i, i + SNAPSHOT_BATCH);
+    const batchResults = await Promise.all(batch.map((t) => fetchOneTicker(t, crumb)));
+    results.push(...batchResults);
+  }
+
+  const fetched = results.filter((r) => r.price !== null).length;
+  console.log(`[Yahoo] getTickerSnapshots: ${fetched}/${tickers.length} tickers with prices`);
+
+  await cacheSet(cacheKey, results, TTL_SNAPSHOT);
+  return results;
 }
