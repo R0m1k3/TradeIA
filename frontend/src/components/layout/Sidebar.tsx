@@ -7,7 +7,6 @@ import type { WsStatus } from '../../hooks/useWebSocket';
 const NAV = [
   { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
-  { id: 'watchlist' as Page, label: 'Watchlist', sub: 'NASDAQ · CAC · DAX · FTSE', icon: IcWatchlist },
   { id: 'research' as Page, label: 'Recherche', sub: 'Historique & notes', icon: IcResearch },
   { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
   { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },

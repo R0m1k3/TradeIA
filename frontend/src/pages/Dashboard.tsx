@@ -312,7 +312,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
           <div className="card-h-title">Contexte Marché <Help tip="Indicateurs globaux qui influencent les décisions de l'IA. En vert = favorable, en rouge = défavorable." /></div>
-          <span className="card-h-meta">{market.nasdaq_status?.isOpen ? 'Ouvert' : market.nasdaq_status?.nextOpen || 'Fermé'}</span>
+          <span className="card-h-meta">
+            {market.global_market_status?.isOpen
+              ? `Ouvert (${market.global_market_status.region === 'US' ? 'US' : 'EU'})`
+              : market.global_market_status?.nextOpen || market.nasdaq_status?.nextOpen || 'Fermé'}
+          </span>
         </div>
         <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
           {/* VIX */}
@@ -414,8 +418,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {!(market as any).macro && (
             <div>
               <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Statut</div>
-              <div style={{ fontSize: 12, color: market.nasdaq_status?.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
-                {market.nasdaq_status?.isOpen ? 'Marché ouvert' : market.nasdaq_status?.nextOpen || 'Marché fermé'}
+              <div style={{ fontSize: 12, color: market.global_market_status?.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
+                {market.global_market_status?.isOpen
+                  ? `Marché ouvert (${market.global_market_status.region === 'US' ? 'US' : 'EU'})`
+                  : market.global_market_status?.nextOpen || market.nasdaq_status?.nextOpen || 'Marché fermé'}
               </div>
             </div>
           )}
