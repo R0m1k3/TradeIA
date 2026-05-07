@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { getEquityOHLCV, getMarketContext, getTickerSnapshots, getYahooVIX } from '../data/yahoo';
 import { getCredential } from '../config/credentials';
 import { sourceFreshness, summarizeFreshness } from '../data/freshness';
-import { getEUIndexDirection, getEUMarketStatus } from '../data/european-markets';
+import { getEUIndexDirection, getEUMarketStatus, getCETOffsetMs } from '../data/european-markets';
 import { NASDAQ_100, DAX_40, CAC_40, FTSE_100, EU_OTHER } from '../agents/discovery';
 import { classifyRegime } from '../agents/regime';
 import { isMacroBlackout, nextMacroEvent } from '../data/macro-events';
@@ -89,6 +89,7 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
       nasdaq_status: nasdaq,
       eu,
       eu_status: euStatus,
+      global_market_status: getGlobalMarketStatus(),
       data_freshness: summarizeFreshness([
         sourceFreshness('Yahoo Finance', context.vix > 0 ? 'delayed' : 'missing', 'Contexte actions gratuit, pas garanti temps réel.'),
         sourceFreshness('Polygon.io', polygonKey ? 'limited' : 'missing', polygonKey ? 'Clé FREE configurée, source limitée/différée.' : 'Clé absente.'),
@@ -136,5 +137,69 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 };
+
+export interface GlobalMarketStatus {
+  isOpen: boolean;
+  nextOpen: string;
+  nextClose: string;
+  region: 'US' | 'EU' | 'closed';
+}
+
+export function getGlobalMarketStatus(): GlobalMarketStatus {
+  const nasdaq = getNasdaqStatus();
+  const eu = getEUMarketStatus();
+
+  if (nasdaq.isOpen) {
+    return { isOpen: true, nextOpen: '', nextClose: nasdaq.nextClose, region: 'US' };
+  }
+  if (eu.anyOpen) {
+    return { isOpen: true, nextOpen: '', nextClose: 'Clôture à 17h30 CET', region: 'EU' };
+  }
+
+  // Both closed — return whichever opens next
+  const now = new Date();
+  const etOffsetMs = getETOffsetMs(now);
+  const etMs = now.getTime() + etOffsetMs;
+  const etDate = new Date(etMs);
+  const etDay = etDate.getUTCDay();
+  const etTime = etDate.getUTCHours() * 60 + etDate.getUTCMinutes();
+
+  const cetOffset = getCETOffsetMs(now);
+  const cetMs = now.getTime() + cetOffset;
+  const cetDate = new Date(cetMs);
+  const cetDay = cetDate.getUTCDay();
+  const cetTime = cetDate.getUTCHours() * 60 + cetDate.getUTCMinutes();
+
+  const isEtWeekday = etDay >= 1 && etDay <= 5;
+  const isCetWeekday = cetDay >= 1 && cetDay <= 5;
+
+  const minutesToNasdaqOpen = (() => {
+    if (!isEtWeekday) {
+      const daysToMonday = etDay === 0 ? 1 : etDay === 6 ? 2 : 0;
+      return daysToMonday * 24 * 60 + (570 - etTime);
+    }
+    if (etTime < 570) return 570 - etTime;
+    return (24 * 60 - etTime) + 570 + (etDay === 5 ? 2 * 24 * 60 : 0);
+  })();
+
+  const minutesToEUOpen = (() => {
+    if (!isCetWeekday) {
+      const daysToMonday = cetDay === 0 ? 1 : cetDay === 6 ? 2 : 0;
+      return daysToMonday * 24 * 60 + (540 - cetTime);
+    }
+    if (cetTime < 540) return 540 - cetTime;
+    return (24 * 60 - cetTime) + 540 + (cetDay === 5 ? 2 * 24 * 60 : 0);
+  })();
+
+  const useNasdaq = minutesToNasdaqOpen <= minutesToEUOpen;
+  const mins = useNasdaq ? minutesToNasdaqOpen : minutesToEUOpen;
+  const hours = Math.floor(mins / 60);
+  const minsRem = mins % 60;
+  const nextOpen = hours > 0
+    ? `Ouvre dans ${hours}h${minsRem > 0 ? ` ${minsRem}min` : ''}`
+    : `Ouvre dans ${minsRem}min`;
+
+  return { isOpen: false, nextOpen, nextClose: '', region: 'closed' };
+}
 
 export default marketRoutes;

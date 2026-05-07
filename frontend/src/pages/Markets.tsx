@@ -209,13 +209,16 @@ export function Markets() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {market.nasdaq_status ? (
+              {market.global_market_status ? (
+                <span style={{ fontSize: 11, color: market.global_market_status.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
+                  {market.global_market_status.isOpen
+                    ? `Ouvert (${market.global_market_status.region === 'US' ? 'US' : 'EU'})`
+                    : market.global_market_status.nextOpen || 'Fermé'}
+                </span>
+              ) : market.nasdaq_status ? (
                 <span style={{ fontSize: 11, color: market.nasdaq_status.isOpen ? 'var(--accent)' : 'var(--ink-3)' }}>
                   US: {market.nasdaq_status.isOpen ? 'Ouvert' : market.nasdaq_status.nextOpen || 'Fermé'}
                 </span>
-              ) : null}
-              {(market as any).eu_status?.anyOpen ? (
-                <span style={{ fontSize: 11, color: 'var(--accent)' }}>EU: Ouvert</span>
               ) : null}
             </div>
           </div>

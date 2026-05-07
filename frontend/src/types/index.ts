@@ -77,6 +77,12 @@ export interface MarketContext {
     ftse100_change_pct: number;
     eu_market_open: boolean;
   };
+  global_market_status?: {
+    isOpen: boolean;
+    nextOpen: string;
+    nextClose: string;
+    region: 'US' | 'EU' | 'closed';
+  };
   data_freshness?: DataQualitySummary | null;
 }
 

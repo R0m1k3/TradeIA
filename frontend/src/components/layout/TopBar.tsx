@@ -41,15 +41,17 @@ export function TopBar({ paused, onToggleRun }: { paused: boolean; onToggleRun: 
       </div>
       <div className="tb-spacer" />
       <span className="tb-pill">
-        {market.nasdaq_status?.isOpen ? (
+        {market.global_market_status?.isOpen ? (
           <>
             <span className="dot" style={{ background: 'var(--accent)' }} />
-            Marché ouvert · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
+            Marché ouvert ({market.global_market_status.region === 'US' ? 'US' : 'EU'})
+            · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
           </>
         ) : (
           <>
             <span className="dot" style={{ background: 'var(--ink-4)' }} />
-            {market.nasdaq_status?.nextOpen || 'Marché fermé'} · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
+            {market.global_market_status?.nextOpen || market.nasdaq_status?.nextOpen || 'Marché fermé'}
+            · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} UTC
           </>
         )}
       </span>

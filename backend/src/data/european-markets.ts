@@ -184,7 +184,7 @@ export function getEUMarketStatus(now: Date = new Date()): EUMarketStatus {
   };
 }
 
-function getCETOffsetMs(date: Date): number {
+export function getCETOffsetMs(date: Date): number {
   const year = date.getUTCFullYear();
   const marchDow = new Date(Date.UTC(year, 2, 1)).getUTCDay();
   const dstStart = Date.UTC(year, 2, 8 + ((7 - marchDow) % 7), 1); // Last Sunday of March 1am UTC
