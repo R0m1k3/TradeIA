@@ -6,15 +6,23 @@ import { getEUIndexDirection, getEUMarketStatus } from '../data/european-markets
 import { NASDAQ_100, DAX_40, CAC_40, FTSE_100, EU_OTHER } from '../agents/discovery';
 import { classifyRegime } from '../agents/regime';
 import { isMacroBlackout, nextMacroEvent } from '../data/macro-events';
-import type { MarketSegment } from '../agents/discovery';
 
-const SEGMENT_TICKERS: Record<MarketSegment, string[]> = {
-  nasdaq: NASDAQ_100,
-  dax40: DAX_40,
-  cac40: CAC_40,
-  ftse100: FTSE_100,
-  eu_other: EU_OTHER,
-};
+/**
+ * Segment → ticker list resolver.
+ * Defined as a function (not module-level const) to avoid circular-import races
+ * between routes/market.ts ↔ agents/discovery.ts where the imported lists could
+ * be `undefined` at module-init time.
+ */
+function getSegmentTickers(segment: string): string[] | null {
+  switch (segment) {
+    case 'nasdaq': return NASDAQ_100;
+    case 'dax40': return DAX_40;
+    case 'cac40': return CAC_40;
+    case 'ftse100': return FTSE_100;
+    case 'eu_other': return EU_OTHER;
+    default: return null;
+  }
+}
 
 export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
   const now = new Date();
@@ -103,7 +111,7 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/snapshot/:segment', async (req) => {
     const { segment } = req.params as { segment: string };
-    const tickers = SEGMENT_TICKERS[segment as MarketSegment];
+    const tickers = getSegmentTickers(segment);
     if (!tickers) {
       return { error: `Unknown segment: ${segment}` };
     }

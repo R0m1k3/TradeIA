@@ -30,8 +30,8 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 export const TTL = {
-  PRICE: 60,
-  OHLCV: 300,
+  PRICE: 240,        // 4 min — couvre cycles lite 5 min sans cache miss systématique
+  OHLCV: 900,        // 15 min — match la période 15m, suffit pour cycle full 30 min
   FUNDAMENTALS: 86400,
   NEWS: 1800,
   OPTIONS: 3600,

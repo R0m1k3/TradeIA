@@ -5,6 +5,40 @@ import type { OHLCVBar } from './indicators';
 
 const BASE_URL = 'https://api.twelvedata.com';
 
+/**
+ * Daily credit-exhaustion circuit breaker.
+ * Once we see "ran out of API credits" or similar, we set a Redis flag with TTL until
+ * next UTC midnight. All subsequent calls short-circuit and return null/[] without HTTP.
+ * Saves credits and prevents log spam.
+ */
+const EXHAUSTED_KEY = 'twelvedata:exhausted';
+
+function secondsUntilUTCMidnight(): number {
+  const now = new Date();
+  const tomorrow = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0, 0, 0, 0
+  ));
+  return Math.max(60, Math.ceil((tomorrow.getTime() - now.getTime()) / 1000));
+}
+
+async function isExhausted(): Promise<boolean> {
+  return (await cacheGet<number>(EXHAUSTED_KEY)) === 1;
+}
+
+async function markExhausted(reason: string): Promise<void> {
+  const ttl = secondsUntilUTCMidnight();
+  await cacheSet(EXHAUSTED_KEY, 1, ttl);
+  console.warn(`[TwelveData] CIRCUIT BREAKER tripped (${reason}) — skipping all calls for ${Math.round(ttl / 60)} min`);
+}
+
+function isCreditError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes('api credits') || m.includes('ran out') || m.includes('rate limit');
+}
+
 function mapInterval(interval: '15m' | '1h' | '4h' | '1d'): string {
   if (interval === '15m') return '15min';
   if (interval === '1d') return '1day';
@@ -25,6 +59,8 @@ export async function getTwelveDataCurrentPrice(ticker: string): Promise<number 
   const cached = await cacheGet<number>(cacheKey);
   if (cached) return cached;
 
+  if (await isExhausted()) return null;
+
   const apikey = await getApiKey();
   if (!apikey) return null;
 
@@ -42,6 +78,10 @@ export async function getTwelveDataCurrentPrice(ticker: string): Promise<number 
     }
 
     const message = response.data?.message || response.data?.status || `HTTP ${response.status}`;
+    if (isCreditError(message)) {
+      await markExhausted(`price ${symbol}: ${message.slice(0, 80)}`);
+      return null;
+    }
     console.warn(`[TwelveData] price ${symbol}: ${message}`);
     return null;
   } catch (err) {
@@ -58,6 +98,8 @@ export async function getTwelveDataOHLCV(
   const cacheKey = `twelvedata:ohlcv:${symbol}:${interval}`;
   const cached = await cacheGet<OHLCVBar[]>(cacheKey);
   if (cached) return cached;
+
+  if (await isExhausted()) return [];
 
   const apikey = await getApiKey();
   if (!apikey) return [];
@@ -78,6 +120,10 @@ export async function getTwelveDataOHLCV(
     const values = response.data?.values;
     if (response.status !== 200 || !Array.isArray(values)) {
       const message = response.data?.message || response.data?.status || `HTTP ${response.status}`;
+      if (isCreditError(message)) {
+        await markExhausted(`ohlcv ${symbol} ${interval}: ${message.slice(0, 80)}`);
+        return [];
+      }
       console.warn(`[TwelveData] ohlcv ${symbol} ${interval}: ${message}`);
       return [];
     }

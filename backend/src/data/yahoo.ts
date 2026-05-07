@@ -372,13 +372,27 @@ export async function getMarketContext(): Promise<{ vix: number; fear_greed: num
   }
 }
 
+/**
+ * Equity data routing: Yahoo first (free, no rate limit), Twelve Data only as fallback.
+ *
+ * Twelve Data has a strict daily credit limit (800 on free tier). Calling it as primary
+ * exhausts credits within hours. Yahoo's v8 chart endpoint is unmetered for our usage
+ * and works for both US and EU listings (via .DE/.PA/.L suffix conversion).
+ *
+ * Twelve Data is reserved for tickers Yahoo can't resolve.
+ */
 export async function getEquityOHLCV(ticker: string, interval: '15m' | '1h' | '4h' | '1d'): Promise<OHLCVBar[]> {
-  const twelveBars = await getTwelveDataOHLCV(ticker, interval);
-  return twelveBars.length > 0 ? twelveBars : getYahooOHLCV(ticker, interval);
+  const yahooSym = toYahooSymbol(ticker);
+  const yahooBars = await getYahooOHLCV(yahooSym, interval);
+  if (yahooBars.length > 0) return yahooBars;
+  return getTwelveDataOHLCV(ticker, interval);
 }
 
 export async function getEquityCurrentPrice(ticker: string): Promise<number | null> {
-  return (await getTwelveDataCurrentPrice(ticker)) || getYahooCurrentPrice(ticker);
+  const yahooSym = toYahooSymbol(ticker);
+  const yahooPrice = await getYahooCurrentPrice(yahooSym);
+  if (yahooPrice !== null) return yahooPrice;
+  return getTwelveDataCurrentPrice(ticker);
 }
 
 /** Convert Twelve Data exchange symbol to Yahoo Finance symbol */
