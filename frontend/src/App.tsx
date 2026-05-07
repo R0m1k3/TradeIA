@@ -6,12 +6,13 @@ import { Portfolio } from './pages/Portfolio';
 import { Agents } from './pages/Agents';
 import { Markets } from './pages/Markets';
 import { Config } from './pages/Config';
+import { Watchlist } from './pages/Watchlist';
 import { AlertToast } from './components/cards/AlertToast';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePortfolioStore } from './store/portfolio.store';
 import { useConfigStore } from './store/config.store';
 
-export type Page = 'dashboard' | 'portfolio' | 'agents' | 'markets' | 'config';
+export type Page = 'dashboard' | 'portfolio' | 'agents' | 'markets' | 'config' | 'watchlist';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -41,6 +42,7 @@ export default function App() {
           {page === 'agents' && <Agents />}
           {page === 'markets' && <Markets />}
           {page === 'config' && <Config />}
+          {page === 'watchlist' && <Watchlist />}
         </div>
       </div>
 

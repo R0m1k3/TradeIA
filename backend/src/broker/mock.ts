@@ -178,6 +178,20 @@ export async function closeTrade(
   broadcastPositionClosed(trade.ticker, pnlUsd, reason);
 }
 
+export interface Position {
+  ticker: string;
+  quantity: number;
+  entryPrice: number;
+  currentPrice: number;
+  sizeUsd: number;
+  pnlUsd: number;
+  pnlPct: number;
+  stopLoss: number;
+  takeProfit: number;
+  days_held?: number;
+  entry_conviction?: number;
+}
+
 export async function getPortfolioState(portfolioUsd: number): Promise<{
   total_usd: number;
   cash_usd: number;
@@ -186,17 +200,7 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   initial_capital: number;
   equity_peak: number;
   drawdown_from_peak_pct: number;
-  positions: Array<{
-    ticker: string;
-    quantity: number;
-    entryPrice: number;
-    currentPrice: number;
-    sizeUsd: number;
-    pnlUsd: number;
-    pnlPct: number;
-    stopLoss: number;
-    takeProfit: number;
-  }>;
+  positions: Position[];
 }> {
   const openTrades = await prisma.trade.findMany({ where: { closedAt: null, action: 'BUY' } });
   const today = new Date();
@@ -216,11 +220,13 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
   const investedUsd = openTrades.reduce((sum, t) => sum + t.sizeUsd, 0);
   const cashUsd = actualCapital - investedUsd;
 
-  const positions = await Promise.all(
+  const nowMs = Date.now();
+  const positions: Position[] = await Promise.all(
     openTrades.map(async (t) => {
       const fetchedPrice = await getEquityCurrentPrice(t.ticker);
       const cp = fetchedPrice || t.filledPrice;
       const pnlUsd = (cp - t.filledPrice) * t.quantity;
+      const daysHeld = (nowMs - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24);
       return {
         ticker: t.ticker,
         quantity: t.quantity,
@@ -231,6 +237,8 @@ export async function getPortfolioState(portfolioUsd: number): Promise<{
         pnlPct: (pnlUsd / t.sizeUsd) * 100,
         stopLoss: t.stopLoss,
         takeProfit: t.takeProfit,
+        days_held: Math.floor(daysHeld * 10) / 10,
+        entry_conviction: t.confidence,
       };
     })
   );

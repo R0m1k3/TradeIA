@@ -7,6 +7,7 @@ import type { WsStatus } from '../../hooks/useWebSocket';
 const NAV = [
   { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
+  { id: 'watchlist' as Page, label: 'Watchlist', sub: 'NASDAQ · CAC · DAX · FTSE', icon: IcWatchlist },
   { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
   { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },
   { id: 'config' as Page, label: 'Configuration', sub: 'Stratégie & système', icon: IcConfig },
@@ -44,6 +45,15 @@ function IcMarket() {
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M2 14 L6 9 L9 11 L14 4 L16 6" />
       <circle cx="14" cy="4" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+function IcWatchlist() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="14" height="3" rx="1" />
+      <rect x="2" y="7.5" width="14" height="3" rx="1" />
+      <rect x="2" y="13" width="14" height="3" rx="1" />
     </svg>
   );
 }

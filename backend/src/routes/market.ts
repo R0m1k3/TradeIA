@@ -1,8 +1,18 @@
 import { FastifyPluginAsync } from 'fastify';
-import { getEquityOHLCV, getMarketContext } from '../data/yahoo';
+import { getEquityOHLCV, getMarketContext, getTickerSnapshots } from '../data/yahoo';
 import { getCredential } from '../config/credentials';
 import { sourceFreshness, summarizeFreshness } from '../data/freshness';
 import { getEUIndexDirection, getEUMarketStatus } from '../data/european-markets';
+import { NASDAQ_100, DAX_40, CAC_40, FTSE_100, EU_OTHER } from '../agents/discovery';
+import type { MarketSegment } from '../agents/discovery';
+
+const SEGMENT_TICKERS: Record<MarketSegment, string[]> = {
+  nasdaq: NASDAQ_100,
+  dax40: DAX_40,
+  cac40: CAC_40,
+  ftse100: FTSE_100,
+  eu_other: EU_OTHER,
+};
 
 export function getNasdaqStatus(): { isOpen: boolean; nextOpen: string; nextClose: string } {
   const now = new Date();
@@ -87,6 +97,16 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
 
     const equityBars = await getEquityOHLCV(ticker, interval);
     return equityBars.length > 0 ? equityBars : [];
+  });
+
+  fastify.get('/snapshot/:segment', async (req) => {
+    const { segment } = req.params as { segment: string };
+    const tickers = SEGMENT_TICKERS[segment as MarketSegment];
+    if (!tickers) {
+      return { error: `Unknown segment: ${segment}` };
+    }
+    const snapshots = await getTickerSnapshots(tickers);
+    return snapshots;
   });
 };
 

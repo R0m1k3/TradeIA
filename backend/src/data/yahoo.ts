@@ -375,3 +375,92 @@ export async function getEquityOHLCV(ticker: string, interval: '15m' | '1h' | '4
 export async function getEquityCurrentPrice(ticker: string): Promise<number | null> {
   return (await getTwelveDataCurrentPrice(ticker)) || getYahooCurrentPrice(ticker);
 }
+
+/** Convert Twelve Data exchange symbol to Yahoo Finance symbol */
+export function toYahooSymbol(ticker: string): string {
+  if (!ticker.includes(':')) return ticker; // US ticker, no change
+  const [sym, exchange] = ticker.split(':');
+  const suffix: Record<string, string> = {
+    XETR: '.DE', XPAR: '.PA', LSE: '.L', XSWX: '.SW',
+    XAMS: '.AS', XCSE: '.CO', XMAD: '.MC', XMIL: '.MI', XHEL: '.HE',
+  };
+  return sym + (suffix[exchange] ?? `.${exchange}`);
+}
+
+const TTL_SNAPSHOT = 15 * 60; // 15 minutes
+
+const YAHOO_QUOTE_BASE = 'https://query1.finance.yahoo.com/v7/finance/quote';
+
+interface YahooQuoteItem {
+  symbol: string;
+  regularMarketPrice?: number;
+  regularMarketChangePercent?: number;
+  regularMarketVolume?: number;
+}
+
+/** Batch fetch snapshot (price + 1d change %) for a list of tickers */
+export async function getTickerSnapshots(
+  tickers: string[]
+): Promise<Array<{ ticker: string; price: number | null; change_1d_pct: number | null; volume: number | null }>> {
+  if (tickers.length === 0) return [];
+
+  const sortedTickers = [...tickers].sort();
+  const cacheKey = `snapshot:batch:${sortedTickers.join(',')}`;
+  const cached = await cacheGet<Array<{ ticker: string; price: number | null; change_1d_pct: number | null; volume: number | null }>>(cacheKey);
+  if (cached) return cached;
+
+  // Build Yahoo symbol map: yahooSymbol → original ticker
+  const yahooToOriginal: Record<string, string> = {};
+  const yahooSymbols: string[] = [];
+  for (const t of tickers) {
+    const y = toYahooSymbol(t);
+    yahooToOriginal[y] = t;
+    yahooSymbols.push(y);
+  }
+
+  try {
+    const crumb = await getYahooCrumb();
+    const params: Record<string, string> = {
+      symbols: yahooSymbols.join(','),
+      fields: 'regularMarketPrice,regularMarketChangePercent,regularMarketVolume',
+    };
+    if (crumb) params.crumb = crumb;
+
+    const response = await axios.get(YAHOO_QUOTE_BASE, {
+      params,
+      headers: YAHOO_HEADERS,
+      timeout: 20_000,
+      validateStatus: () => true,
+    });
+
+    if (response.status !== 200) {
+      console.warn(`[Yahoo] getTickerSnapshots: HTTP ${response.status}`);
+      return tickers.map((t) => ({ ticker: t, price: null, change_1d_pct: null, volume: null }));
+    }
+
+    const quoteItems: YahooQuoteItem[] = response.data?.quoteResponse?.result ?? [];
+    const resultMap: Record<string, { price: number | null; change_1d_pct: number | null; volume: number | null }> = {};
+
+    for (const item of quoteItems) {
+      const originalTicker = yahooToOriginal[item.symbol] ?? item.symbol;
+      resultMap[originalTicker] = {
+        price: item.regularMarketPrice ?? null,
+        change_1d_pct: item.regularMarketChangePercent ?? null,
+        volume: item.regularMarketVolume ?? null,
+      };
+    }
+
+    const results = tickers.map((t) => ({
+      ticker: t,
+      price: resultMap[t]?.price ?? null,
+      change_1d_pct: resultMap[t]?.change_1d_pct ?? null,
+      volume: resultMap[t]?.volume ?? null,
+    }));
+
+    await cacheSet(cacheKey, results, TTL_SNAPSHOT);
+    return results;
+  } catch (err) {
+    console.warn(`[Yahoo] getTickerSnapshots failed: ${(err as Error).message}`);
+    return tickers.map((t) => ({ ticker: t, price: null, change_1d_pct: null, volume: null }));
+  }
+}

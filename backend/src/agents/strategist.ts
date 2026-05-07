@@ -2,10 +2,22 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { buildStrategistPrompt, STRATEGIST_SYSTEM } from '../prompts/strategist.prompt';
 import type { DebateOutput } from './researcher';
+import type { MarketSegment } from './discovery';
+import type { AllocationBudget } from './balance-controller';
+
+export interface SwapCandidate {
+  ticker: string;
+  segment: MarketSegment;
+  days_held: number;
+  entry_conviction: number;
+  current_pnl_pct: number;
+  current_signal: string;
+}
 
 export interface OrderProposal {
   ticker: string;
-  action: 'BUY' | 'SELL';
+  action: 'BUY' | 'SELL' | 'SWAP';
+  swap_sell_ticker?: string;
   trade_type: 'A' | 'B' | 'C';
   limit_price: number;
   stop_loss: number;
@@ -22,9 +34,11 @@ export interface OrderProposal {
 export class StrategistAgent {
   async run(
     debates: DebateOutput[],
-    portfolio: { daily_pnl_pct: number; positions: { ticker: string }[] },
+    portfolio: { daily_pnl_pct: number; positions: Array<{ ticker: string; days_held?: number; entry_conviction?: number; pnlPct?: number }> },
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
-    heldTickers: string[]
+    heldTickers: string[],
+    budget?: AllocationBudget,
+    swapCandidates?: SwapCandidate[]
   ): Promise<OrderProposal[]> {
     console.log(`[Strategist] Processing ${debates.length} debate outcomes`);
     const MODELS = await getModels();
@@ -40,6 +54,8 @@ export class StrategistAgent {
         portfolio,
         market,
         held_tickers: heldTickers,
+        budget,
+        swapCandidates,
       });
 
       const response = await callLLM('strategist', MODELS.STRONG, STRATEGIST_SYSTEM, prompt);

@@ -4,6 +4,7 @@ import { buildRiskPrompt, RISK_SYSTEM } from '../prompts/risk.prompt';
 import type { OrderProposal } from './strategist';
 import type { ApprovedOrder } from '../broker/mock';
 import type { TickerData } from './collector';
+import type { Position } from '../broker/mock';
 import { getTickerSector, countPositionsBySector } from '../data/sectors';
 import { prisma } from '../lib/prisma';
 
@@ -20,11 +21,89 @@ function calcExpectedMove(price: number, iv30: number | null, holdDays: number):
   return price * (iv30 / 100) * Math.sqrt(holdDays / 365);
 }
 
+/** Expand SWAP proposals into a SELL + BUY pair */
+function expandSwaps(
+  proposals: OrderProposal[],
+  positions: Position[]
+): OrderProposal[] {
+  const expanded: OrderProposal[] = [];
+
+  for (const p of proposals) {
+    if (p.action !== 'SWAP') {
+      expanded.push(p);
+      continue;
+    }
+
+    // Validate swap_sell_ticker exists
+    if (!p.swap_sell_ticker) {
+      console.log(`[Risk] SWAP ${p.ticker}: missing swap_sell_ticker, converting to BUY`);
+      expanded.push({ ...p, action: 'BUY' });
+      continue;
+    }
+
+    const existing = positions.find((pos) => pos.ticker === p.swap_sell_ticker);
+    if (!existing) {
+      console.log(`[Risk] SWAP ${p.ticker}: swap_sell_ticker ${p.swap_sell_ticker} not in positions, skipping`);
+      continue;
+    }
+
+    // Conviction delta check
+    const entryConviction = existing.entry_conviction ?? 0;
+    const convictionDelta = p.confidence - entryConviction;
+    if (convictionDelta < 20) {
+      console.log(`[Risk] SWAP ${p.ticker}: conviction delta ${convictionDelta} < 20, skipping`);
+      continue;
+    }
+
+    // days_held check
+    const daysHeld = existing.days_held ?? 0;
+    if (daysHeld < 2) {
+      console.log(`[Risk] SWAP ${p.ticker}: ${p.swap_sell_ticker} only held ${daysHeld} days < 2, skipping`);
+      continue;
+    }
+
+    // pnlPct check: not > +8%
+    const pnlPct = existing.pnlPct ?? 0;
+    if (pnlPct > 8) {
+      console.log(`[Risk] SWAP ${p.ticker}: ${p.swap_sell_ticker} pnl ${pnlPct.toFixed(1)}% > 8%, skipping`);
+      continue;
+    }
+
+    // Emit SELL then BUY
+    const sellOrder: OrderProposal = {
+      ticker: p.swap_sell_ticker,
+      action: 'SELL',
+      trade_type: p.trade_type,
+      limit_price: existing.currentPrice,
+      stop_loss: 0,
+      take_profit: 0,
+      invalidation_condition: `SWAP: replaced by ${p.ticker}`,
+      size_pct: 100, // SELL full position; size_usd computed at execution from pos.sizeUsd
+      confidence: p.confidence,
+      debate_score: p.debate_score,
+      bull_conviction: p.bull_conviction,
+      bear_conviction: p.bear_conviction,
+      reasoning: `SWAP: vente de ${p.swap_sell_ticker} pour financer ${p.ticker}`,
+    };
+
+    const buyOrder: OrderProposal = {
+      ...p,
+      action: 'BUY',
+      swap_sell_ticker: undefined,
+    };
+
+    expanded.push(sellOrder, buyOrder);
+    console.log(`[Risk] SWAP approved: SELL ${p.swap_sell_ticker} + BUY ${p.ticker}`);
+  }
+
+  return expanded;
+}
+
 export class RiskAgent {
   async run(
     proposals: OrderProposal[],
     portfolioUsd: number,
-    portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
+    portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: Position[] },
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
@@ -33,8 +112,11 @@ export class RiskAgent {
 
     if (proposals.length === 0) return [];
 
+    // Expand SWAP proposals into SELL + BUY pairs first
+    const expandedProposals = expandSwaps(proposals, portfolio.positions);
+
     const preFiltered = this.deterministicPreFilter(
-      proposals,
+      expandedProposals,
       portfolioUsd,
       portfolio,
       market,
@@ -144,12 +226,13 @@ export class RiskAgent {
         continue;
       }
 
-      const rr = p.action === 'BUY'
-        ? (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss)
-        : (p.limit_price - p.take_profit) / (p.stop_loss - p.limit_price);
-      if (rr < 2.0) {
-        console.log(`[Risk] Pre-filter ${p.ticker}: R/R ${rr.toFixed(2)} < 2.0`);
-        continue;
+      // Skip R/R check for SELL orders
+      if (p.action === 'BUY') {
+        const rr = (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss);
+        if (rr < 2.0) {
+          console.log(`[Risk] Pre-filter ${p.ticker}: R/R ${rr.toFixed(2)} < 2.0`);
+          continue;
+        }
       }
 
       if (tickerData?.[p.ticker]?.earnings_blackout) {
@@ -199,6 +282,26 @@ export class RiskAgent {
     }
 
     for (const p of proposals) {
+      // SELL orders pass through directly
+      if (p.action === 'SELL') {
+        approved.push({
+          ticker: p.ticker,
+          action: p.action,
+          trade_type: p.trade_type,
+          limit_price: p.limit_price,
+          stop_loss: p.stop_loss,
+          take_profit: p.take_profit,
+          invalidation_condition: p.invalidation_condition,
+          size_usd: 0, // computed at execution time for SELL
+          confidence: p.confidence,
+          debate_score: p.debate_score,
+          bull_conviction: p.bull_conviction,
+          bear_conviction: p.bear_conviction,
+          reasoning: p.reasoning,
+        });
+        continue;
+      }
+
       let sizeUsd = portfolioUsd * (p.size_pct / 100) * sizingMultiplier;
 
       const td = tickerData?.[p.ticker];
@@ -233,9 +336,11 @@ export class RiskAgent {
         sectorExposure[sector] = (sectorExposure[sector] || 0) + sizeUsd;
       }
 
+      // After expandSwaps, action can only be BUY or SELL at this point
+      const approvedAction = p.action as 'BUY' | 'SELL';
       approved.push({
         ticker: p.ticker,
-        action: p.action,
+        action: approvedAction,
         trade_type: p.trade_type,
         limit_price: p.limit_price,
         stop_loss: p.stop_loss,
@@ -269,6 +374,11 @@ export class RiskAgent {
 
     for (const order of orders) {
       if (order.action !== 'BUY') {
+        // SELL orders: add freed cash back to pool
+        const pos = portfolio.positions.find((p) => (p as any).ticker === order.ticker);
+        if (pos?.sizeUsd) {
+          remainingCash += pos.sizeUsd;
+        }
         budgeted.push(order);
         continue;
       }

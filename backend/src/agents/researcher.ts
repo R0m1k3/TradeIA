@@ -4,6 +4,8 @@ import { buildBullPrompt, BULL_SYSTEM } from '../prompts/bull.prompt';
 import { buildBearPrompt, BEAR_SYSTEM } from '../prompts/bear.prompt';
 import type { AnalystOutput } from './analyst';
 import type { CollectorOutput } from './collector';
+import type { MarketSegment } from './discovery';
+import type { AllocationBudget } from './balance-controller';
 
 export interface BullOutput {
   ticker: string;
@@ -40,18 +42,47 @@ export interface DebateOutput {
 }
 
 export class ResearcherAgent {
-  async run(analystOutputs: AnalystOutput[], collector: CollectorOutput): Promise<DebateOutput[]> {
-    // Top 10 by confidence — keeps cycle time bounded (~60-90s total in parallel)
+  async run(
+    analystOutputs: AnalystOutput[],
+    collector: CollectorOutput,
+    ticker_segments?: Record<string, MarketSegment>,
+    budget?: AllocationBudget
+  ): Promise<DebateOutput[]> {
     const validAnalyses = analystOutputs
-      .filter((a) => a.confidence > 0 && !a.skip_reason)
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 10);
+      .filter((a) => a.confidence > 0 && !a.skip_reason);
 
-    console.log(`[Researcher] Starting bull/bear debates for ${validAnalyses.length} tickers (parallel)`);
+    let selectedAnalyses: AnalystOutput[];
 
-    // Run all debates in parallel — bull+bear per ticker also in parallel
+    if (budget && ticker_segments && Object.keys(budget.segments).length > 0) {
+      // Segment-aware selection: top (slots + 1) per segment, cap at 15 total
+      const selectedTickers = new Set<string>();
+
+      for (const [seg, alloc] of Object.entries(budget.segments) as Array<[MarketSegment, { slots: number; candidates_to_analyze: number }]>) {
+        const segAnalyses = validAnalyses
+          .filter((a) => ticker_segments[a.ticker] === seg)
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, alloc.slots + 1);
+
+        for (const a of segAnalyses) {
+          selectedTickers.add(a.ticker);
+        }
+      }
+
+      selectedAnalyses = validAnalyses
+        .filter((a) => selectedTickers.has(a.ticker))
+        .slice(0, 15);
+    } else {
+      // Backward compat: top 10 globally
+      selectedAnalyses = validAnalyses
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 10);
+    }
+
+    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (parallel)`);
+
+    // Run all debates in parallel
     const results = await Promise.allSettled(
-      validAnalyses.map(async (analysis) => {
+      selectedAnalyses.map(async (analysis) => {
         const tickerData = collector.tickers[analysis.ticker];
         if (!tickerData) return null;
 

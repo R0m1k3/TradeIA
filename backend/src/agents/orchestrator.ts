@@ -5,12 +5,16 @@ import { ResearcherAgent } from './researcher';
 import { StrategistAgent } from './strategist';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
+import { BalanceController } from './balance-controller';
 import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquityPeak } from '../broker/mock';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 import { broadcastAlert } from '../websocket';
-
-const WATCHLIST_DEFAULT = (process.env.WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,AVGO,ORCL,ADBE,CRM,INTC,AMD,QCOM,TXN,SBUX,PYPL,BKNG,ISRG,MDLZ,ADP,GILD,VRTX,REGN,MNST,CHTR,LRCX,KLAC,MRVL,PANW,SNPS,CDNS,MRNA,ILMN,BIIB,FTNT,ZS,DDOG,NET,CRWD,ABNB,COIN,PLTR,ARM,GE,COST,CMCSA,NFLX,PEP').split(',').map((t) => t.trim());
+import { getNasdaqStatus } from '../routes/market';
+import { isEuropeanMarketOpen } from '../data/european-markets';
+import { getYahooVIX, getFearAndGreed } from '../data/yahoo';
+import type { SwapCandidate } from './strategist';
+import type { MarketSegment } from './discovery';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
 
@@ -42,7 +46,7 @@ async function checkCircuitBreaker(
       await closeTrade(trade.id, trade.filledPrice, 'CIRCUIT_BREAKER');
     }
 
-    // Pause forcée via config — doit utiliser 'system_paused' pour que la queue le respecte
+    // Pause forcée via config
     await prisma.config.upsert({
       where: { key: 'system_paused' },
       update: { value: 'true' },
@@ -87,24 +91,58 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     return;
   }
 
-  // Step 3: Discovery
+  // Step 3: Get portfolio state early (needed for balance controller)
+  const portfolioForBudget = await getPortfolioState(portfolioUsd);
+
+  // Step 3a: Get market context for balance controller
+  const nasdaq = getNasdaqStatus();
+  const euOpen = isEuropeanMarketOpen(new Date());
+  const vix = await getYahooVIX() ?? 20;
+  const fearGreed = await getFearAndGreed() ?? 50;
+
+  // Step 3b: Compute allocation budget
+  const balanceController = new BalanceController();
+  const budget = balanceController.compute({
+    nasdaq_open: nasdaq.isOpen,
+    eu_open: euOpen,
+    vix,
+    fear_greed: fearGreed,
+    existing_positions: portfolioForBudget.positions.map((p) => ({
+      ticker: p.ticker,
+      segment: undefined as MarketSegment | undefined,
+    })),
+    segments_map: {},
+  });
+
+  // Step 4: Discovery (budget-aware)
   reporter.updateAgent('collector', { status: 'running' });
   const discovery = new DiscoveryAgent();
-  let tickers = await discovery.run();
+  const discoveryResult = await discovery.run(budget);
 
-  if (tickers.length === 0) {
+  // Fix existing positions segment mapping now that we have segments
+  const budgetWithSegments = balanceController.compute({
+    nasdaq_open: nasdaq.isOpen,
+    eu_open: euOpen,
+    vix,
+    fear_greed: fearGreed,
+    existing_positions: portfolioForBudget.positions.map((p) => ({
+      ticker: p.ticker,
+      segment: discoveryResult.segments[p.ticker],
+    })),
+    segments_map: discoveryResult.segments,
+  });
+
+  if (discoveryResult.tickers.length === 0) {
     console.log('[Orchestrator] Discovery returned no active assets, ending cycle');
     await reporter.finalize(cycleStart, [], [], portfolioUsd, dailyLossLimitPct);
     return;
   }
 
-  // We no longer limit tickers to 8 to give the AI maximum freedom of choice.
-  // The Orchestrator timeout is now 30 minutes, accommodating up to 15-20 tickers easily.
-  console.log(`[Orchestrator] Processing ${tickers.length} tickers: ${tickers.join(', ')}`);
+  console.log(`[Orchestrator] Processing ${discoveryResult.tickers.length} tickers`);
 
-  // Step 4: Collect data
+  // Step 5: Collect data
   const collector = new CollectorAgent();
-  const collectorOutput = await collector.run(tickers);
+  const collectorOutput = await collector.run(discoveryResult.tickers);
   reporter.updateAgent('collector', {
     status: collectorOutput ? 'ok' : 'error',
     lastRun: new Date().toISOString(),
@@ -116,30 +154,54 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     return;
   }
 
-  // Step 5: Technical analysis
+  // Step 6: Technical analysis
   reporter.updateAgent('analyst', { status: 'running' });
   const analyst = new AnalystAgent();
   const analystOutputs = await analyst.run(collectorOutput);
   reporter.updateAgent('analyst', { status: 'ok', lastRun: new Date().toISOString() });
 
-  // Step 6: Bull/Bear debate
+  // Step 7: Bull/Bear debate (segment-aware)
   reporter.updateAgent('bull', { status: 'running' });
   reporter.updateAgent('bear', { status: 'running' });
   const researcher = new ResearcherAgent();
-  const debateOutputs = await researcher.run(analystOutputs, collectorOutput);
+  const debateOutputs = await researcher.run(
+    analystOutputs,
+    collectorOutput,
+    discoveryResult.segments,
+    budgetWithSegments
+  );
   reporter.updateAgent('bull', { status: 'ok', lastRun: new Date().toISOString() });
   reporter.updateAgent('bear', { status: 'ok', lastRun: new Date().toISOString() });
 
-  // Step 7: Strategic decision
+  // Step 8: Strategic decision
   reporter.updateAgent('strategist', { status: 'running' });
   const portfolio = await getPortfolioState(portfolioUsd);
   const heldTickers = portfolio.positions.map((p) => p.ticker);
 
+  // Build swap candidates: positions held >= 2 days with pnl < +8%
+  const swapCandidates: SwapCandidate[] = portfolio.positions
+    .filter((p) => (p.days_held ?? 0) >= 2 && (p.pnlPct ?? 0) < 8)
+    .map((p) => ({
+      ticker: p.ticker,
+      segment: discoveryResult.segments[p.ticker] ?? 'nasdaq',
+      days_held: p.days_held ?? 0,
+      entry_conviction: p.entry_conviction ?? 50,
+      current_pnl_pct: p.pnlPct ?? 0,
+      current_signal: 'HOLD',
+    }));
+
   const strategist = new StrategistAgent();
-  const orderProposals = await strategist.run(debateOutputs, portfolio, collectorOutput.market, heldTickers);
+  const orderProposals = await strategist.run(
+    debateOutputs,
+    portfolio,
+    collectorOutput.market,
+    heldTickers,
+    budgetWithSegments,
+    swapCandidates.length > 0 ? swapCandidates : undefined
+  );
   reporter.updateAgent('strategist', { status: 'ok', lastRun: new Date().toISOString() });
 
-  // Step 8: Risk validation
+  // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });
   const risk = new RiskAgent();
   const approvedOrders = await risk.run(
@@ -152,7 +214,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   );
   reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 
-  // Step 9: Execute orders
+  // Step 10: Execute orders
   const execResults = [];
   if (process.env.MOCK_BROKER !== 'false') {
     for (const order of approvedOrders) {
@@ -165,7 +227,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     }
   }
 
-  // Step 10: Report + AgentPrediction logging
+  // Step 11: Report + AgentPrediction logging
   reporter.updateAgent('reporter', { status: 'running' });
   const finalPortfolio = await getPortfolioState(portfolioUsd);
 
@@ -182,7 +244,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     dailyLossLimitPct,
     finalPortfolio,
     collectorOutput.market,
-    tickers
+    discoveryResult.tickers
   );
   reporter.updateAgent('reporter', { status: 'ok', lastRun: new Date().toISOString() });
 
