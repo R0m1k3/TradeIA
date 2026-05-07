@@ -1,12 +1,11 @@
-import { useMemo } from 'react';
 import { useSignalsStore } from '../../store/signals.store';
-import { useConfigStore } from '../../store/config.store';
 import type { Page } from '../../App';
 import type { WsStatus } from '../../hooks/useWebSocket';
 
 const NAV = [
   { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
+  { id: 'watchlist' as Page, label: 'Watchlist', sub: 'NASDAQ · CAC · DAX · FTSE', icon: IcWatchlist },
   { id: 'research' as Page, label: 'Recherche', sub: 'Historique & notes', icon: IcResearch },
   { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
   { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },
@@ -109,21 +108,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ page, setPage, wsStatus }: SidebarProps) {
-  const { agents, signals } = useSignalsStore();
-  const { config } = useConfigStore();
-
-  // Real watchlist from config, with signal data for daily change
-  const watchlistItems = useMemo(() => {
-    const tickers = (config.watchlist || '').split(',').map((t: string) => t.trim()).filter(Boolean);
-    if (tickers.length === 0) return [];
-    return tickers.map((ticker: string) => {
-      const sig = signals.find((s) => s.ticker === ticker);
-      const debateScore = sig?.debate_score ?? 0;
-      // Use debate score direction as proxy for daily sentiment
-      const pct = sig ? (sig.signal === 'BUY' ? Math.abs(debateScore) * 0.5 : sig.signal === 'SELL' ? -Math.abs(debateScore) * 0.5 : 0) : 0;
-      return [ticker, pct] as [string, number];
-    });
-  }, [config.watchlist, signals]);
+  const { agents } = useSignalsStore();
 
   return (
     <aside className="sidebar">
@@ -160,22 +145,6 @@ export function Sidebar({ page, setPage, wsStatus }: SidebarProps) {
       </ul>
 
       <div className="sb-foot">
-        <div className="sb-watchlist-title">
-          <span>Watchlist</span>
-          <span>Signal</span>
-        </div>
-        {watchlistItems.length === 0 ? (
-          <div style={{ padding: '6px 0', color: 'var(--ink-4)', fontSize: 11 }}>Ajoutez des tickers dans la config</div>
-        ) : watchlistItems.map(([s, p]) => (
-          <div key={s} className="sb-wl-row">
-            <span className="sb-wl-sym">{s}</span>
-            <span className={`sb-wl-pct ${p >= 0 ? 'up' : 'down'}`}>
-              {p >= 0 ? '+' : ''}
-              {p.toFixed(2)}%
-            </span>
-          </div>
-        ))}
-
         {/* Agents mini status */}
         <div style={{ padding: '10px 8px 0', borderTop: '1px solid var(--rule)', marginTop: 8 }}>
           <div className="sb-watchlist-title" style={{ padding: '4px 0 6px' }}>
