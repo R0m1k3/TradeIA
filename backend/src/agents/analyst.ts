@@ -200,6 +200,15 @@ export class AnalystAgent {
     // RSI divergence boost
     if (indicators.rsi_divergence === 'bullish' && signal_15m === 'BUY') confidence += 15;
     if (indicators.rsi_divergence === 'bearish' && signal_15m === 'SELL') confidence += 15;
+
+    // Penalties — même logique que le prompt LLM
+    if (indicators.rsi_14 !== null && indicators.rsi_14 > 75) confidence -= 15; // surachat
+    if (indicators.rsi_14 !== null && indicators.rsi_14 < 25 && signal_15m === 'BUY') confidence += 10; // survente rebond
+    if (indicators.volume_ratio !== null && indicators.volume_ratio < 0.7) confidence -= 10; // volume faible
+    if (indicators.adx !== null && indicators.adx < 15) confidence -= 10; // pas de tendance
+    // Neutral setup cap
+    if (bias_4h === 'NEUTRAL' && signal_15m === 'NEUTRAL') confidence = Math.min(confidence, 45);
+
     confidence = Math.min(confidence, 95);
     confidence = Math.max(confidence, 0);
 
@@ -227,7 +236,9 @@ export class AnalystAgent {
       key_levels: { support: indicators.support_levels, resistance: indicators.resistance_levels },
       candle_pattern,
       confidence,
-      skip_reason: null,
+      skip_reason: (bias_4h === 'NEUTRAL' && signal_15m === 'NEUTRAL')
+        ? 'Setup trop neutre, pas de conviction directionnelle'
+        : null,
     };
   }
 }

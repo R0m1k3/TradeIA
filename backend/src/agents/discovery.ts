@@ -1,5 +1,6 @@
 import { getNasdaqStatus } from '../routes/market';
 import { isEuropeanMarketOpen } from '../data/european-markets';
+import { getTickerSnapshots } from '../data/yahoo';
 import type { AllocationBudget } from './balance-controller';
 
 export type MarketSegment = 'nasdaq' | 'cac40' | 'dax40' | 'ftse100' | 'eu_other';
@@ -80,17 +81,40 @@ function buildSegmentsMap(tickers: string[], ...segmentPairs: Array<[string[], M
 }
 
 export class DiscoveryAgent {
-  /** Simple slice-based pre-score: returns first N from the segment list */
-  scoreAndSelect(
+  /**
+   * Momentum-aware selection: fetches 1d snapshot, scores by change_pct,
+   * deprioritizes earnings spikes (>15%), returns top N.
+   */
+  async scoreAndSelect(
     tickers: string[],
     segment: MarketSegment,
     n: number,
-    _segments_map: Record<string, MarketSegment>
-  ): string[] {
-    // Filter tickers belonging to this segment, then slice to n
+  ): Promise<string[]> {
     const segmentList = SEGMENT_LISTS[segment];
     const filtered = tickers.filter((t) => segmentList.includes(t));
-    return filtered.slice(0, n);
+    if (filtered.length <= n) return filtered;
+
+    try {
+      const snapshots = await getTickerSnapshots(filtered);
+      const snapMap = new Map(snapshots.map((s) => [s.ticker, s]));
+
+      const scored = filtered.map((ticker) => {
+        const snap = snapMap.get(ticker);
+        if (!snap || snap.price === null) return { ticker, score: -999 }; // no data → deprioritize
+        const pct = snap.change_1d_pct ?? 0;
+        if (Math.abs(pct) > 15) return { ticker, score: -10 }; // earnings spike → too risky
+        const volBonus = snap.volume !== null && snap.volume > 500_000 ? 1.5 : 0;
+        return { ticker, score: pct + volBonus };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+      const selected = scored.slice(0, n).map((s) => s.ticker);
+      console.log(`[Discovery] Segment ${segment}: top ${selected.length}/${filtered.length} by momentum`);
+      return selected;
+    } catch (err) {
+      console.warn(`[Discovery] scoreAndSelect fallback (${segment}):`, (err as Error).message);
+      return filtered.slice(0, n);
+    }
   }
 
   async run(budget?: AllocationBudget): Promise<DiscoveryResult> {
@@ -131,15 +155,15 @@ export class DiscoveryAgent {
     // Build segments map
     const segmentsMap = buildSegmentsMap(selectedTickers, ...allPairs);
 
-    // If budget provided, select candidates_to_analyze per segment
+    // If budget provided, select candidates_to_analyze per segment (momentum-sorted)
     if (budget) {
       const budgetedTickers: string[] = [];
       for (const [seg, alloc] of Object.entries(budget.segments) as Array<[MarketSegment, { slots: number; candidates_to_analyze: number }]>) {
-        const candidates = this.scoreAndSelect(selectedTickers, seg, alloc.candidates_to_analyze, segmentsMap);
+        const candidates = await this.scoreAndSelect(selectedTickers, seg, alloc.candidates_to_analyze);
         budgetedTickers.push(...candidates);
       }
       const finalTickers = [...new Set(budgetedTickers)];
-      console.log(`[Discovery] Budget-filtered to ${finalTickers.length} candidates`);
+      console.log(`[Discovery] Budget-filtered to ${finalTickers.length} candidates (momentum-sorted)`);
       return { tickers: finalTickers, segments: segmentsMap };
     }
 

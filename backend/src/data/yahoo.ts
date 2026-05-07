@@ -9,6 +9,7 @@ export interface Fundamentals {
   revenue_growth: number | null;
   debt_equity: number | null;
   earnings_date: string | null;
+  next_earnings_date: string | null; // prochaine publication de résultats (ISO)
   market_cap: number | null;
 }
 
@@ -158,14 +159,14 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
   if (cached) return cached;
 
   const empty: Fundamentals = {
-    pe: null, eps: null, revenue_growth: null, debt_equity: null, earnings_date: null, market_cap: null,
+    pe: null, eps: null, revenue_growth: null, debt_equity: null, earnings_date: null, next_earnings_date: null, market_cap: null,
   };
 
   // Try quoteSummary with crumb first
   const crumb = await getYahooCrumb();
   if (crumb) {
     try {
-      const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings', crumb };
+      const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings,calendarEvents', crumb };
       const response = await axios.get(`${SUMMARY}/${ticker}`, {
         params,
         headers: YAHOO_HEADERS,
@@ -176,12 +177,15 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
       if (response.status === 200) {
         const stats = response.data?.quoteSummary?.result?.[0];
         if (stats) {
+          const earningsTs: number | undefined = stats.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+          const nextEarningsDate = earningsTs ? new Date(earningsTs * 1000).toISOString() : null;
           const result: Fundamentals = {
             pe: stats.defaultKeyStatistics?.forwardPE?.raw ?? null,
             eps: stats.defaultKeyStatistics?.trailingEps?.raw ?? null,
             revenue_growth: stats.financialData?.revenueGrowth?.raw ?? null,
             debt_equity: stats.financialData?.debtToEquity ?? null,
             earnings_date: stats.earnings?.financialsChart?.quarterly?.[0]?.date ?? null,
+            next_earnings_date: nextEarningsDate,
             market_cap: stats.defaultKeyStatistics?.enterpriseValue?.raw ?? null,
           };
           await cacheSet(cacheKey, result, TTL.FUNDAMENTALS);
@@ -217,6 +221,7 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
       revenue_growth: null,
       debt_equity: null,
       earnings_date: null,
+      next_earnings_date: null,
       market_cap: meta?.marketCap ?? null,
     };
 

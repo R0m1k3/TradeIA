@@ -13,10 +13,51 @@ import { broadcastAlert } from '../websocket';
 import { getNasdaqStatus } from '../routes/market';
 import { isEuropeanMarketOpen } from '../data/european-markets';
 import { getYahooVIX, getFearAndGreed } from '../data/yahoo';
-import type { SwapCandidate } from './strategist';
+import { getTickerSector } from '../data/sectors';
+import type { SwapCandidate, OrderProposal } from './strategist';
 import type { MarketSegment } from './discovery';
+import type { SectorBias } from '../data/sectors';
+import type { Position } from '../broker/mock';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
+
+/**
+ * Relative weakness exit: si le secteur monte fortement (+1.5%) mais la position est dans le rouge,
+ * c'est un signal de fuite de capitaux → vendre défensivement.
+ */
+function generateWeaknessExits(
+  positions: Position[],
+  sectorBiases: Record<string, SectorBias>
+): OrderProposal[] {
+  const sells: OrderProposal[] = [];
+  for (const pos of positions) {
+    const daysHeld = pos.days_held ?? 0;
+    const pnlPct = pos.pnlPct ?? 0;
+    if (daysHeld < 1) continue;   // Pas de sortie le jour même
+    if (pnlPct >= 0) continue;    // Position en profit → garder
+    const sector = getTickerSector(pos.ticker);
+    const bias = sectorBiases[sector];
+    if (!bias || bias.direction !== 'bullish' || bias.change_pct < 1.5) continue;
+    // Secteur +1.5% mais position rouge = vraie faiblesse relative
+    console.log(`[Orchestrator] Faiblesse relative: ${pos.ticker} ${pnlPct.toFixed(1)}% vs secteur ${sector} +${bias.change_pct.toFixed(1)}%`);
+    sells.push({
+      ticker: pos.ticker,
+      action: 'SELL',
+      trade_type: 'C',
+      limit_price: pos.currentPrice,
+      stop_loss: 0,
+      take_profit: 0,
+      invalidation_condition: `Faiblesse relative vs secteur ${sector}`,
+      size_pct: 100,
+      confidence: 75,
+      debate_score: 0,
+      bull_conviction: 1,
+      bear_conviction: 8,
+      reasoning: `Faiblesse relative: secteur ${sector} +${bias.change_pct.toFixed(1)}% (${bias.etf}) mais ${pos.ticker} à ${pnlPct.toFixed(1)}% après ${daysHeld.toFixed(0)}j. Vente défensive.`,
+    });
+  }
+  return sells;
+}
 
 let isRunning = false;
 
@@ -201,11 +242,18 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   );
   reporter.updateAgent('strategist', { status: 'ok', lastRun: new Date().toISOString() });
 
+  // Step 8b: Inject relative weakness exits (deterministic, bypass LLM)
+  const weakSells = generateWeaknessExits(portfolio.positions, collectorOutput.market.sector_biases);
+  if (weakSells.length > 0) {
+    console.log(`[Orchestrator] ${weakSells.length} vente(s) faiblesse relative injectée(s)`);
+  }
+  const allProposals = [...orderProposals, ...weakSells];
+
   // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });
   const risk = new RiskAgent();
   const approvedOrders = await risk.run(
-    orderProposals,
+    allProposals,
     portfolioUsd,
     portfolio,
     collectorOutput.market,

@@ -38,6 +38,14 @@ CONVICTION THRESHOLDS:
 - Provide your honest confidence score from 0 to 100 based on the technical setup.
 - DO NOT set skip_reason unless the data is literally corrupted or missing. We want to forward the analysis to the Researcher for a full debate, even for mediocre setups.
 
+CONVICTION PENALTIES (apply before finalizing confidence):
+- RSI(14) 15m > 75 (action en surachat): -15 pts
+- RSI(14) 15m < 25 (action en survente) et signal BUY: +10 pts (opportunité de rebond)
+- Volume ratio < 0.7 (volume faible, pas de conviction): -10 pts
+- bias_4h = NEUTRAL ET signal_15m = NEUTRAL simultanément: confidence max = 45, set skip_reason = "Setup trop neutre, pas de conviction directionnelle"
+- TradingView = SELL ou STRONG_SELL avec signal_15m = BUY: -20 pts (divergence externe, méfiance)
+- ADX < 15 (marché sans tendance): -10 pts (les swings échouent en range)
+
 IMPORTANT: All text fields (candle_pattern, skip_reason, etc.) MUST be written in French.
 
 Output STRICT JSON only:

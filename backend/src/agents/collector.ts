@@ -1,4 +1,4 @@
-import { getEquityOHLCV, getEquityCurrentPrice, getYahooFundamentals } from '../data/yahoo';
+import { getEquityOHLCV, getEquityCurrentPrice, getYahooFundamentals, type Fundamentals } from '../data/yahoo';
 import { getTradingViewSignal, type TradingViewSignal } from '../data/tradingview';
 import { getFinvizMacro, type FinvizMacro } from '../data/finviz';
 import { getMarketInternals, type MarketInternals } from '../data/market-internals';
@@ -153,6 +153,14 @@ export class CollectorAgent {
                 'Actions: les sources gratuites peuvent être différées, la confiance doit en tenir compte.',
               ]);
 
+              const fundsTyped = funds as Fundamentals | null;
+              const nextEarnings = fundsTyped?.next_earnings_date ? new Date(fundsTyped.next_earnings_date) : null;
+              const daysToEarnings = nextEarnings ? (nextEarnings.getTime() - Date.now()) / (1000 * 60 * 60 * 24) : null;
+              const earnings_blackout = daysToEarnings !== null && daysToEarnings >= 0 && daysToEarnings <= 7;
+              if (earnings_blackout) {
+                console.log(`[Collector] ${ticker}: EARNINGS BLACKOUT dans ${daysToEarnings?.toFixed(1)}j`);
+              }
+
               rawData[ticker] = {
                 data_quality: quality,
                 sector,
@@ -164,7 +172,7 @@ export class CollectorAgent {
                 news: newsData,
                 indicators,
                 tradingview: tv,
-                earnings_blackout: false,
+                earnings_blackout,
                 options: {},
                 data_freshness: dataFreshness,
               };
