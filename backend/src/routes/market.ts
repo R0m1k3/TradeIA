@@ -1,9 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
-import { getEquityOHLCV, getMarketContext, getTickerSnapshots } from '../data/yahoo';
+import { getEquityOHLCV, getMarketContext, getTickerSnapshots, getYahooVIX } from '../data/yahoo';
 import { getCredential } from '../config/credentials';
 import { sourceFreshness, summarizeFreshness } from '../data/freshness';
 import { getEUIndexDirection, getEUMarketStatus } from '../data/european-markets';
 import { NASDAQ_100, DAX_40, CAC_40, FTSE_100, EU_OTHER } from '../agents/discovery';
+import { classifyRegime } from '../agents/regime';
+import { isMacroBlackout, nextMacroEvent } from '../data/macro-events';
 import type { MarketSegment } from '../agents/discovery';
 
 const SEGMENT_TICKERS: Record<MarketSegment, string[]> = {
@@ -107,6 +109,23 @@ const marketRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const snapshots = await getTickerSnapshots(tickers);
     return snapshots;
+  });
+
+  fastify.get('/regime', async () => {
+    const vix = await getYahooVIX() ?? 20;
+    const regime = await classifyRegime(vix);
+    const blackout = isMacroBlackout();
+    const next = nextMacroEvent();
+    return {
+      regime: regime.regime,
+      confidence: regime.confidence,
+      reason: regime.reason,
+      sizing_multiplier: regime.sizing_multiplier,
+      prefer_momentum: regime.prefer_momentum,
+      inputs: regime.inputs,
+      macro_blackout: blackout,
+      next_macro_event: next,
+    };
   });
 };
 

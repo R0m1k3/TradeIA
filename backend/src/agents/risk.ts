@@ -6,10 +6,33 @@ import type { ApprovedOrder } from '../broker/mock';
 import type { TickerData } from './collector';
 import type { Position } from '../broker/mock';
 import { getTickerSector, countPositionsBySector } from '../data/sectors';
+import { isMacroBlackout } from '../data/macro-events';
 import { prisma } from '../lib/prisma';
 
 const MAX_POSITIONS_PER_SECTOR = 3;
 const MAX_SECTOR_NAV_PCT = 0.40;
+
+/** Volatility targeting: contribute at most 1.5% annualized vol per slot. */
+const VOL_TARGET_PER_SLOT = 0.015;
+
+/**
+ * Compute volatility-based size cap.
+ * Asset annualized vol approximation: (ATR / price) * √252.
+ * Optimal size fraction = target_vol / asset_vol.
+ * High-vol names get smaller positions; low-vol names get larger.
+ */
+function volatilityBasedSizeCap(
+  portfolioUsd: number,
+  price: number,
+  atr14: number | null
+): number {
+  if (!atr14 || atr14 <= 0 || price <= 0) return portfolioUsd * 0.5; // fallback to existing 50% cap
+  const dailyVolPct = atr14 / price;
+  const annualVolPct = dailyVolPct * Math.sqrt(252);
+  if (annualVolPct <= 0) return portfolioUsd * 0.5;
+  const fraction = Math.min(0.5, VOL_TARGET_PER_SLOT / annualVolPct);
+  return portfolioUsd * fraction;
+}
 
 interface RiskOutput {
   approved: ApprovedOrder[];
@@ -206,7 +229,18 @@ export class RiskAgent {
 
     const filtered: OrderProposal[] = [];
 
+    // Macro blackout: skip new BUYs around FOMC / CPI / NFP days (vol noise)
+    const macroEvent = isMacroBlackout();
+    if (macroEvent) {
+      console.log(`[Risk] Macro blackout active: ${macroEvent.kind} on ${macroEvent.date} — blocking new BUYs`);
+    }
+
     for (const p of proposals) {
+      if (macroEvent && p.action === 'BUY') {
+        console.log(`[Risk] Pre-filter ${p.ticker}: macro blackout (${macroEvent.kind} ${macroEvent.date})`);
+        continue;
+      }
+
       if (portfolio.daily_pnl_pct <= -dailyLossLimitPct && p.action === 'BUY') {
         console.log(`[Risk] Pre-filter ${p.ticker}: daily loss limit reached (${portfolio.daily_pnl_pct.toFixed(2)}%)`);
         continue;
@@ -317,6 +351,14 @@ export class RiskAgent {
         sizeUsd *= reductionFactor;
       }
 
+      // Volatility targeting: cap size based on asset's annualized vol.
+      // High-vol names get capped harder than low-vol names → equalizes risk per slot.
+      const indicatorAtr = (td?.indicators as any)?.atr_14 ?? null;
+      const volCap = volatilityBasedSizeCap(portfolioUsd, p.limit_price, indicatorAtr);
+      if (volCap < sizeUsd) {
+        console.log(`[Risk] ${p.ticker}: vol cap reducing size $${sizeUsd.toFixed(0)} → $${volCap.toFixed(0)} (ATR=${indicatorAtr ?? 'N/A'})`);
+        sizeUsd = volCap;
+      }
       sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.50);
 
       if (p.action === 'BUY') {

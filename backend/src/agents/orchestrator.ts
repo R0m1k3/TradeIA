@@ -6,7 +6,9 @@ import { StrategistAgent } from './strategist';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
 import { BalanceController } from './balance-controller';
+import { classifyRegime } from './regime';
 import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquityPeak } from '../broker/mock';
+import { detectStrategyDecay } from '../broker/backtest';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
 import { broadcastAlert } from '../websocket';
@@ -20,6 +22,36 @@ import type { SectorBias } from '../data/sectors';
 import type { Position } from '../broker/mock';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
+
+/**
+ * Strategy decay monitor — runs at most once per day.
+ * If recent 30 trades win-rate < 50% of historical 60 trades, flag and broadcast critical alert.
+ * Does NOT auto-pause (operator decision) but logs prominently.
+ */
+async function maybeRunDecayCheck(reporter: ReporterAgent): Promise<void> {
+  try {
+    const last = await prisma.config.findUnique({ where: { key: 'last_decay_check' } });
+    const lastMs = last ? new Date(last.value).getTime() : 0;
+    if (Date.now() - lastMs < 24 * 3600 * 1000) return;
+
+    const decay = await detectStrategyDecay();
+    await prisma.config.upsert({
+      where: { key: 'last_decay_check' },
+      update: { value: new Date().toISOString() },
+      create: { key: 'last_decay_check', value: new Date().toISOString() },
+    });
+
+    if (decay.decay_detected) {
+      console.error(`[Orchestrator] ${decay.message}`);
+      broadcastAlert('critical', `⚠️ STRATEGY DECAY — ${decay.message}`);
+      reporter.updateAgent('reporter', { status: 'error', error: decay.message });
+    } else {
+      console.log(`[Orchestrator] Decay check OK: ${decay.message}`);
+    }
+  } catch (err) {
+    console.warn('[Orchestrator] Decay check failed:', (err as Error).message);
+  }
+}
 
 /**
  * Relative weakness exit: si le secteur monte fortement (+1.5%) mais la position est dans le rouge,
@@ -141,7 +173,14 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const vix = await getYahooVIX() ?? 20;
   const fearGreed = await getFearAndGreed() ?? 50;
 
-  // Step 3b: Compute allocation budget
+  // Step 3a.1: Classify market regime — drives sizing + strategy preference
+  const regime = await classifyRegime(vix);
+  console.log(`[Orchestrator] Regime: ${regime.regime} (conf ${regime.confidence}) — ${regime.reason}`);
+
+  // Step 3a.2: Strategy decay check (1× per day)
+  await maybeRunDecayCheck(reporter);
+
+  // Step 3b: Compute allocation budget — regime affects total slot count
   const balanceController = new BalanceController();
   const budget = balanceController.compute({
     nasdaq_open: nasdaq.isOpen,
@@ -153,6 +192,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
       segment: undefined as MarketSegment | undefined,
     })),
     segments_map: {},
+    regime,
   });
 
   // Step 4: Discovery (budget-aware)
@@ -171,6 +211,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
       segment: discoveryResult.segments[p.ticker],
     })),
     segments_map: discoveryResult.segments,
+    regime,
   });
 
   if (discoveryResult.tickers.length === 0) {

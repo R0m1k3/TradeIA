@@ -1,7 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
-import { getEquityCurrentPrice } from '../data/yahoo';
+import { getEquityCurrentPrice, getEquityOHLCV } from '../data/yahoo';
 import { getCredential } from '../config/credentials';
+import { NASDAQ_100 } from '../agents/discovery';
 
 export interface ApprovedOrder {
   ticker: string;
@@ -32,9 +33,21 @@ export interface ExecutionResult {
 
 const MIN_ORDER_USD = 1;
 
-function applySlippage(price: number, action: 'BUY' | 'SELL'): number {
-  // Realistic slippage: 0.10-0.30% random, simulates market impact + spread
-  const slippagePct = 0.001 + Math.random() * 0.002;
+/** Market-cap-aware slippage: large cap (NASDAQ 100) tight, EU mid wider, others mid. */
+function getSlippageRange(ticker: string): [number, number] {
+  if (ticker.includes(':')) {
+    // EU listing — wider spread, less liquidity than US large caps
+    return [0.0025, 0.0060]; // 0.25% – 0.60%
+  }
+  if (NASDAQ_100.includes(ticker)) {
+    return [0.0005, 0.0015]; // 0.05% – 0.15%
+  }
+  return [0.0015, 0.0035]; // 0.15% – 0.35% (US mid / other)
+}
+
+function applySlippage(price: number, action: 'BUY' | 'SELL', ticker: string): number {
+  const [low, high] = getSlippageRange(ticker);
+  const slippagePct = low + Math.random() * (high - low);
   return action === 'BUY' ? price * (1 + slippagePct) : price * (1 - slippagePct);
 }
 
@@ -61,7 +74,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
     console.warn(`[Broker] ${order.ticker}: reducing order from $${order.size_usd.toFixed(2)} to available cash $${executableSizeUsd.toFixed(2)}`);
   }
 
-  const filledPrice = applySlippage(order.limit_price, order.action);
+  const filledPrice = applySlippage(order.limit_price, order.action, order.ticker);
   const filledQty = executableSizeUsd / filledPrice;
   const commission = executableSizeUsd * 0.001;
   const orderId = `MOCK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -111,6 +124,42 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
   };
 }
 
+/**
+ * Chandelier exit + extended stop ladder.
+ *
+ * Stop ladder (R = filledPrice - originalStop):
+ *   gain ≥ +1R → stop = breakeven
+ *   gain ≥ +2R → stop = +1R
+ *   gain ≥ +3R → stop = +2R
+ *   gain ≥ +4R → stop = +3R (continues laddering)
+ *
+ * Chandelier exit (replaces fixed take-profit once gain ≥ +2R):
+ *   trailingTP = max(close since entry) - 3 × ATR(14, 4h)
+ *   When current price falls below trailingTP, close — captures extended trends.
+ *
+ * Original take-profit still triggers if hit before +2R is reached.
+ */
+async function getChandelierExit(ticker: string, entryTime: Date): Promise<{ maxClose: number; atr: number } | null> {
+  try {
+    const bars = await getEquityOHLCV(ticker, '4h');
+    if (bars.length < 14) return null;
+    const sinceEntry = bars.filter((b) => new Date(b.time).getTime() >= entryTime.getTime());
+    if (sinceEntry.length < 2) return null;
+    const maxClose = Math.max(...sinceEntry.map((b) => b.close));
+    // ATR(14) approximation: average of true ranges over last 14 bars
+    const last14 = bars.slice(-14);
+    const atrSum = last14.slice(1).reduce((sum, b, i) => {
+      const prev = last14[i].close;
+      const tr = Math.max(b.high - b.low, Math.abs(b.high - prev), Math.abs(b.low - prev));
+      return sum + tr;
+    }, 0);
+    const atr = atrSum / Math.max(1, last14.length - 1);
+    return { maxClose, atr };
+  } catch {
+    return null;
+  }
+}
+
 export async function markToMarket(): Promise<void> {
   const openTrades = await prisma.trade.findMany({
     where: { closedAt: null, action: 'BUY' },
@@ -120,37 +169,45 @@ export async function markToMarket(): Promise<void> {
     const currentPrice = await getEquityCurrentPrice(trade.ticker);
     if (!currentPrice) continue;
 
-    // Trailing stop logic — déplacer le stop selon progression
     const riskDistance = trade.filledPrice - trade.stopLoss;
     const gain = currentPrice - trade.filledPrice;
     let newStop = trade.stopLoss;
 
-    if (riskDistance > 0) {
-      if (gain >= 2 * riskDistance) {
-        // +2R atteint → stop à +1R (lock profit)
-        newStop = Math.max(trade.stopLoss, trade.filledPrice + riskDistance);
-      } else if (gain >= riskDistance) {
-        // +1R atteint → stop au break-even
-        newStop = Math.max(trade.stopLoss, trade.filledPrice);
-      }
-
-      if (newStop > trade.stopLoss) {
-        await prisma.trade.update({
-          where: { id: trade.id },
-          data: { stopLoss: newStop },
-        });
-        console.log(`[Broker] Trailing stop ${trade.ticker}: ${trade.stopLoss.toFixed(2)} → ${newStop.toFixed(2)}`);
+    // Extended stop ladder: BE → +1R → +2R → +3R → +4R...
+    if (riskDistance > 0 && gain > 0) {
+      const rMultiple = Math.floor(gain / riskDistance);
+      if (rMultiple >= 1) {
+        const stopRMultiple = rMultiple - 1; // gain at +NR → stop at +(N-1)R
+        const candidateStop = trade.filledPrice + stopRMultiple * riskDistance;
+        if (candidateStop > newStop) newStop = candidateStop;
       }
     }
 
-    // Check stop loss (against updated stop)
+    // Chandelier exit: once we have +2R, trail by max(close) - 3×ATR
+    if (riskDistance > 0 && gain >= 2 * riskDistance) {
+      const ce = await getChandelierExit(trade.ticker, trade.createdAt);
+      if (ce) {
+        const chandelierStop = ce.maxClose - 3 * ce.atr;
+        // Only ratchet up — never lower the chandelier stop
+        if (chandelierStop > newStop) newStop = chandelierStop;
+      }
+    }
+
+    if (newStop > trade.stopLoss) {
+      await prisma.trade.update({
+        where: { id: trade.id },
+        data: { stopLoss: newStop },
+      });
+      console.log(`[Broker] Stop ladder ${trade.ticker}: ${trade.stopLoss.toFixed(2)} → ${newStop.toFixed(2)} (gain ${(gain / riskDistance).toFixed(1)}R)`);
+    }
+
     if (currentPrice <= newStop) {
-      await closeTrade(trade.id, currentPrice, 'SL');
+      await closeTrade(trade.id, currentPrice, gain > 0 ? 'TRAIL' : 'SL');
       continue;
     }
 
-    // Check take profit
-    if (currentPrice >= trade.takeProfit) {
+    // Original fixed TP only triggers if gain still < 2R (chandelier takes over after that)
+    if (gain < 2 * riskDistance && currentPrice >= trade.takeProfit) {
       await closeTrade(trade.id, currentPrice, 'TP');
     }
   }

@@ -1,4 +1,5 @@
 import type { MarketSegment } from './discovery';
+import type { RegimeAssessment } from './regime';
 
 export type { MarketSegment };
 
@@ -7,6 +8,7 @@ export interface AllocationBudget {
   total_new_slots: number;
   swap_allowed: boolean;
   risk_per_slot_pct: number;
+  regime?: RegimeAssessment;
 }
 
 /** Base slots per segment when both markets are open */
@@ -26,8 +28,9 @@ export class BalanceController {
     fear_greed: number;
     existing_positions: Array<{ ticker: string; segment?: MarketSegment }>;
     segments_map: Record<string, MarketSegment>;
+    regime?: RegimeAssessment;
   }): AllocationBudget {
-    const { nasdaq_open, eu_open, vix, fear_greed, existing_positions, segments_map } = params;
+    const { nasdaq_open, eu_open, vix, fear_greed, existing_positions, segments_map, regime } = params;
 
     // Step 1: Determine base slots per segment based on market open state
     let rawSlots: Record<MarketSegment, number> = { ...BASE_SLOTS };
@@ -66,7 +69,9 @@ export class BalanceController {
       fgFactor = 0.8; // reduce by 20%
     }
 
-    const combinedFactor = vixFactor * fgFactor;
+    // Regime multiplier: bull_trend boosts, bear_trend / transition reduce.
+    const regimeFactor = regime?.sizing_multiplier ?? 1.0;
+    const combinedFactor = vixFactor * fgFactor * regimeFactor;
 
     // Step 4: Count existing positions per segment
     const positionsBySegment: Partial<Record<MarketSegment, number>> = {};
@@ -116,6 +121,7 @@ export class BalanceController {
       total_new_slots,
       swap_allowed,
       risk_per_slot_pct,
+      regime,
     };
   }
 }

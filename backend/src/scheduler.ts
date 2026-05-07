@@ -3,26 +3,42 @@ import { addCycleJob } from './queue';
 import { getNasdaqStatus } from './routes/market';
 
 export function initScheduler() {
+  // LITE cycle every 5 min during market hours: mark-to-market only (trailing stops + SL/TP).
+  // No LLM cost.
   cron.schedule('*/5 * * * *', async () => {
     const nasdaq = getNasdaqStatus();
     const now = new Date();
-
     const usOrEuOpen = nasdaq.isOpen || isEuropeanMarketOpen(now);
+    if (!usOrEuOpen) return;
+    try {
+      await addCycleJob('lite');
+    } catch (err) {
+      console.error('[Scheduler] Lite cycle enqueue failed:', err);
+    }
+  });
+
+  // FULL pipeline every 30 min during market hours: discovery → analyst → research → strategist → risk.
+  // Suitable cadence for swing trading (5–20 day holds). Reduces LLM cost by ~83%.
+  cron.schedule('*/30 * * * *', async () => {
+    const nasdaq = getNasdaqStatus();
+    const now = new Date();
+    const usOrEuOpen = nasdaq.isOpen || isEuropeanMarketOpen(now);
+
     if (!usOrEuOpen && now.getMinutes() !== 0) {
-      console.log('[Scheduler] All markets closed - skipping 5min cycle');
+      // Outside market hours, only run hourly health check
       return;
     }
 
     const mode = nasdaq.isOpen
-      ? 'normal (US market open)'
+      ? 'US market open'
       : isEuropeanMarketOpen(now)
-        ? 'normal (EU market open)'
+        ? 'EU market open'
         : 'closed-market hourly check';
-    console.log(`[Scheduler] Triggering trading cycle - mode: ${mode}`);
+    console.log(`[Scheduler] Triggering FULL trading cycle - ${mode}`);
     try {
-      await addCycleJob();
+      await addCycleJob('full');
     } catch (err) {
-      console.error('[Scheduler] Failed to enqueue cycle job:', err);
+      console.error('[Scheduler] Full cycle enqueue failed:', err);
     }
   });
 
@@ -30,21 +46,19 @@ export function initScheduler() {
     console.log('[Scheduler] Heartbeat', new Date().toISOString());
   });
 
-  console.log('[Scheduler] Initialized - 5min market cycles; EU + US market hours supported');
+  console.log('[Scheduler] Initialized — lite=5min, full=30min cadence');
 
   setTimeout(async () => {
     const nasdaq = getNasdaqStatus();
     const now = new Date();
     const usOrEuOpen = nasdaq.isOpen || isEuropeanMarketOpen(now);
-
     if (!usOrEuOpen) {
       console.log('[Scheduler] Initial cycle skipped - all markets closed');
       return;
     }
-
-    console.log(`[Scheduler] Running initial cycle on startup`);
+    console.log('[Scheduler] Running initial FULL cycle on startup');
     try {
-      await addCycleJob();
+      await addCycleJob('full');
     } catch (err) {
       console.error('[Scheduler] Initial cycle failed:', err);
     }

@@ -1,7 +1,10 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 import { runPipeline } from './agents/orchestrator';
+import { markToMarket } from './broker/mock';
 import { prisma } from './lib/prisma';
+
+export type CycleMode = 'lite' | 'full';
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://redis:6379', {
   maxRetriesPerRequest: null,
@@ -26,11 +29,19 @@ export function initQueue() {
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
-      console.log(`[Queue] Processing job ${job.id} — ${job.name}`);
+      const mode: CycleMode = job.data?.mode ?? 'full';
+      console.log(`[Queue] Processing job ${job.id} — ${job.name} (${mode})`);
 
       if (await isSystemPaused()) {
         console.log('[Queue] System is PAUSED — skipping cycle');
         return { skipped: true, reason: 'system_paused' };
+      }
+
+      if (mode === 'lite') {
+        // Lite mode: only mark-to-market open positions for trailing stops + SL/TP triggers.
+        // No LLM agents = no cost. Runs every 5 min.
+        await markToMarket();
+        return;
       }
 
       await runPipeline();
@@ -38,7 +49,7 @@ export function initQueue() {
     {
       connection,
       concurrency: 1,
-      limiter: { max: 1, duration: 60_000 },
+      limiter: { max: 2, duration: 60_000 },
     }
   );
 
@@ -58,7 +69,7 @@ export function initQueue() {
   console.log('[Queue] BullMQ worker initialized');
 }
 
-export async function addCycleJob() {
+export async function addCycleJob(mode: CycleMode = 'full') {
   if (!tradingQueue) {
     console.warn('[Queue] Queue not initialized yet');
     return;
@@ -70,8 +81,8 @@ export async function addCycleJob() {
   }
 
   await tradingQueue.add(
-    'trading-cycle',
-    {},
+    `trading-cycle-${mode}`,
+    { mode },
     {
       removeOnComplete: 50,
       removeOnFail: 20,
