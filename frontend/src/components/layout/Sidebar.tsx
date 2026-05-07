@@ -8,6 +8,7 @@ const NAV = [
   { id: 'dashboard' as Page, label: 'Tableau de bord', sub: 'Portefeuille & P&L', icon: IcDash },
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
   { id: 'watchlist' as Page, label: 'Watchlist', sub: 'NASDAQ · CAC · DAX · FTSE', icon: IcWatchlist },
+  { id: 'research' as Page, label: 'Recherche', sub: 'Historique & notes', icon: IcResearch },
   { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
   { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },
   { id: 'config' as Page, label: 'Configuration', sub: 'Stratégie & système', icon: IcConfig },
@@ -77,6 +78,15 @@ function IcChart() {
     </svg>
   );
 }
+function IcResearch() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="5" />
+      <path d="M12 12 L16 16" />
+    </svg>
+  );
+}
+
 function IcConfig() {
   return (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -46,7 +46,22 @@ export function initScheduler() {
     console.log('[Scheduler] Heartbeat', new Date().toISOString());
   });
 
-  console.log('[Scheduler] Initialized — lite=5min, full=30min cadence');
+
+  // Pre-market prep: 8:30 CET weekdays — only when markets closed
+  cron.schedule('30 8 * * 1-5', async () => {
+    const nasdaq = getNasdaqStatus();
+    const now = new Date();
+    if (nasdaq.isOpen || isEuropeanMarketOpen(now)) {
+      console.log('[Scheduler] Pre-market skipped — markets already open');
+      return;
+    }
+    console.log('[Scheduler] Triggering PRE-MARKET prep');
+    try {
+      await addCycleJob('pre_market');
+    } catch (err) {
+      console.error('[Scheduler] Pre-market enqueue failed:', err);
+    }
+  });
 
   setTimeout(async () => {
     const nasdaq = getNasdaqStatus();
@@ -63,6 +78,8 @@ export function initScheduler() {
       console.error('[Scheduler] Initial cycle failed:', err);
     }
   }, 5000);
+
+  console.log('[Scheduler] Initialized — lite=5min, full=30min, pre_market=8h30 CET');
 }
 
 function isEuropeanMarketOpen(now: Date): boolean {

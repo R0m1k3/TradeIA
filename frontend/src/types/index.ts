@@ -209,6 +209,40 @@ export interface DebateOutput {
   };
 }
 
+export interface TickerSnapshot {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number | null;
+}
+
+export interface TickerNote {
+  id: string;
+  ticker: string;
+  noteType: string;
+  content: string;
+  confidence?: number;
+  cycleId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface PreMarketPrep {
+  id: string;
+  date: string;
+  ticker: string;
+  closePrev: number;
+  vixPrev?: number | null;
+  macroSummary?: string | null;
+  setupSignal: 'BUY' | 'SELL' | 'HOLD';
+  confidence: number;
+  reasoning: string;
+  executedAtOpen: boolean;
+  createdAt: string;
+}
+
 export interface Trade {
   id: string;
   ticker: string;

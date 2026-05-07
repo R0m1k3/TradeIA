@@ -73,3 +73,51 @@ model AgentPrediction {
   @@index([createdAt])
   @@index([resolvedAt])
 }
+
+model TickerSnapshot {
+  id        String   @id @default(uuid())
+  ticker    String
+  interval  String
+  time      DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float?
+  source    String
+  createdAt DateTime @default(now())
+
+  @@index([ticker, time])
+  @@index([ticker, interval, time])
+}
+
+model TickerNote {
+  id         String   @id @default(uuid())
+  ticker     String
+  noteType   String
+  content    String
+  confidence Int?
+  cycleId    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([ticker, noteType, createdAt])
+  @@index([createdAt])
+}
+
+model PreMarketPrep {
+  id              String   @id @default(uuid())
+  date            String
+  ticker          String
+  closePrev       Float
+  vixPrev         Float?
+  macroSummary    String?
+  setupSignal     String
+  confidence      Int
+  reasoning       String
+  executedAtOpen  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([date, ticker])
+  @@index([date, setupSignal])
+}

@@ -1,10 +1,11 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 import { runPipeline } from './agents/orchestrator';
+import { runPreMarketAgent } from './agents/pre-market';
 import { markToMarket } from './broker/mock';
 import { prisma } from './lib/prisma';
 
-export type CycleMode = 'lite' | 'full';
+export type CycleMode = 'lite' | 'full' | 'pre_market';
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://redis:6379', {
   maxRetriesPerRequest: null,
@@ -41,6 +42,11 @@ export function initQueue() {
         // Lite mode: only mark-to-market open positions for trailing stops + SL/TP triggers.
         // No LLM agents = no cost. Runs every 5 min.
         await markToMarket();
+        return;
+      }
+
+      if (mode === 'pre_market') {
+        await runPreMarketAgent();
         return;
       }
 

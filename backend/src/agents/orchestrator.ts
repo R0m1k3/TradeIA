@@ -20,6 +20,8 @@ import type { SwapCandidate, OrderProposal } from './strategist';
 import type { MarketSegment } from './discovery';
 import type { SectorBias } from '../data/sectors';
 import type { Position } from '../broker/mock';
+import { saveSnapshots } from '../models/ticker-snapshot';
+import { saveNotes } from '../models/ticker-note';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
 
@@ -236,11 +238,37 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     return;
   }
 
+  // Persist latest OHLCV bars for history tracking
+  for (const [ticker, data] of Object.entries(collectorOutput.tickers)) {
+    if ((data.ohlcv_1h as any[])?.length > 0) {
+      await saveSnapshots(ticker, '1h', data.ohlcv_1h as any);
+    }
+  }
+
   // Step 6: Technical analysis
   reporter.updateAgent('analyst', { status: 'running' });
   const analyst = new AnalystAgent();
   const analystOutputs = await analyst.run(collectorOutput);
   reporter.updateAgent('analyst', { status: 'ok', lastRun: new Date().toISOString() });
+
+  // Persist technical analysis notes
+  if (analystOutputs.length > 0) {
+    const techNotes = analystOutputs.map((a) => ({
+      ticker: a.ticker,
+      noteType: 'technique',
+      content: `Signal ${a.signal_15m}, biais 4H/1H ${a.bias_4h}/${a.bias_1h}, RSI ${a.rsi_15m}, MACD ${a.macd_signal}, pattern ${a.candle_pattern}.`,
+      confidence: a.confidence,
+      metadata: {
+        rsi_15m: a.rsi_15m,
+        rsi_1h: a.rsi_1h,
+        macd_signal: a.macd_signal,
+        volume_ratio: a.volume_ratio,
+        trade_type: a.trade_type,
+        atr: a.atr,
+      },
+    }));
+    await saveNotes(techNotes).catch((err) => console.warn('[Orchestrator] Failed to save tech notes:', err));
+  }
 
   // Step 7: Bull/Bear debate (segment-aware)
   reporter.updateAgent('bull', { status: 'running' });
@@ -254,6 +282,35 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   );
   reporter.updateAgent('bull', { status: 'ok', lastRun: new Date().toISOString() });
   reporter.updateAgent('bear', { status: 'ok', lastRun: new Date().toISOString() });
+
+  // Persist bull/bear debate notes
+  if (debateOutputs.length > 0) {
+    const debateNotes = debateOutputs.flatMap((d) => [
+      {
+        ticker: d.ticker,
+        noteType: 'bull',
+        content: d.bull.technical_case,
+        confidence: d.bull.conviction * 10,
+        metadata: {
+          upside_pct: d.bull.upside_pct,
+          catalyst: d.bull.fundamental_catalyst,
+          invalidation: d.bull.invalidation_condition,
+        },
+      },
+      {
+        ticker: d.ticker,
+        noteType: 'bear',
+        content: d.bear.technical_case,
+        confidence: d.bear.conviction * 10,
+        metadata: {
+          downside_pct: d.bear.downside_pct,
+          weakness: d.bear.structural_weakness,
+          invalidation: d.bear.invalidation_condition,
+        },
+      },
+    ]);
+    await saveNotes(debateNotes).catch((err) => console.warn('[Orchestrator] Failed to save debate notes:', err));
+  }
 
   // Step 8: Strategic decision
   reporter.updateAgent('strategist', { status: 'running' });
