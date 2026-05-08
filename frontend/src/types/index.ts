@@ -158,6 +158,7 @@ export interface CycleUpdate {
   alerts?: Omit<AlertItem, 'id' | 'timestamp'>[];
   analysis_events?: AnalysisEvent[];
   agents?: AgentStates;
+  debates?: DebateOutput[];
 }
 
 export interface WsMessage {

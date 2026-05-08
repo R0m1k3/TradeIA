@@ -11,7 +11,7 @@ import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquity
 import { detectStrategyDecay } from '../broker/backtest';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
-import { broadcastAlert } from '../websocket';
+import { broadcastAlert, broadcastAnalysisEvent } from '../websocket';
 import { getNasdaqStatus } from '../routes/market';
 import { isEuropeanMarketOpen } from '../data/european-markets';
 import { getYahooVIX, getFearAndGreed } from '../data/yahoo';
@@ -232,6 +232,20 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     lastRun: new Date().toISOString(),
   });
 
+  if (collectorOutput) {
+    const tickerCount = Object.keys(collectorOutput.tickers).length;
+    broadcastAnalysisEvent({
+      id: `collect-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      agent: 'collector',
+      stage: 'collect',
+      title: `Données collectées — ${tickerCount} tickers`,
+      summary_simple: `Le collecteur a récupéré les données OHLCV, fondamentaux et macro pour ${tickerCount} actifs.`,
+      summary_expert: `VIX ${collectorOutput.market.vix?.toFixed(1)}, Fear&Greed ${collectorOutput.market.fear_greed}, Taux Fed ${(collectorOutput.market.macro as any)?.fed_funds_rate ?? '—'}%, Courbe ${(collectorOutput.market.macro as any)?.yield_curve ?? '—'}%.`,
+      freshness_score: collectorOutput.market.data_freshness?.score,
+    });
+  }
+
   if (!collectorOutput) {
     console.error('[Orchestrator] Collector failed, aborting cycle');
     await reporter.finalize(cycleStart, [], [], portfolioUsd, dailyLossLimitPct);
@@ -250,6 +264,20 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const analyst = new AnalystAgent();
   const analystOutputs = await analyst.run(collectorOutput);
   reporter.updateAgent('analyst', { status: 'ok', lastRun: new Date().toISOString() });
+
+  if (analystOutputs.length > 0) {
+    const topBuy = analystOutputs.filter((a) => a.signal_15m === 'BUY').slice(0, 3).map((a) => a.ticker).join(', ');
+    const topSell = analystOutputs.filter((a) => a.signal_15m === 'SELL').slice(0, 3).map((a) => a.ticker).join(', ');
+    broadcastAnalysisEvent({
+      id: `analyst-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      agent: 'analyst',
+      stage: 'analyze',
+      title: `Analyse technique — ${analystOutputs.length} tickers`,
+      summary_simple: `Analyste technique: ${analystOutputs.filter((a) => a.signal_15m === 'BUY').length} signaux haussiers, ${analystOutputs.filter((a) => a.signal_15m === 'SELL').length} baissiers sur ${analystOutputs.length} tickers.`,
+      summary_expert: `BUY: ${topBuy || 'aucun'} | SELL: ${topSell || 'aucun'} | Confiance moy. ${Math.round(analystOutputs.reduce((s, a) => s + a.confidence, 0) / analystOutputs.length)}%`,
+    });
+  }
 
   // Persist technical analysis notes
   if (analystOutputs.length > 0) {

@@ -18,7 +18,7 @@ export function useWebSocket() {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { setPortfolio } = usePortfolioStore();
-  const { setSignals, setMarket, setOrdersExecuted, setAgents, addAlert, setLastUpdate, setAnalysisEvents } = useSignalsStore();
+  const { setSignals, setMarket, setOrdersExecuted, setAgents, addAlert, setLastUpdate, setAnalysisEvents, setDebates } = useSignalsStore();
 
   /** Fetch initial data from REST endpoints before first WS cycle */
   async function fetchInitialData() {
@@ -61,6 +61,7 @@ export function useWebSocket() {
       if (payload.orders_executed) setOrdersExecuted(payload.orders_executed);
       if (payload.analysis_events) setAnalysisEvents(payload.analysis_events);
       if (payload.agents) setAgents(payload.agents);
+      if (payload.debates) setDebates(payload.debates);
       if (payload.alerts) {
         for (const alert of payload.alerts) addAlert(alert);
       }

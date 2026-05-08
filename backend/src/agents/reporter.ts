@@ -186,8 +186,37 @@ export class ReporterAgent {
       positions: [],
     };
 
+    const debateItems = debates.map((d) => ({
+      ticker: d.ticker,
+      debate_score: d.debate_score,
+      bull: {
+        conviction: d.bull.conviction,
+        technical_case: d.bull.technical_case,
+        upside_pct: d.bull.upside_pct,
+        invalidation_condition: d.bull.invalidation_condition,
+        fundamental_catalyst: d.bull.fundamental_catalyst,
+      },
+      bear: {
+        conviction: d.bear.conviction,
+        technical_case: d.bear.technical_case,
+        downside_pct: d.bear.downside_pct,
+        invalidation_condition: d.bear.invalidation_condition,
+        structural_weakness: d.bear.structural_weakness,
+      },
+      analyst_output: {
+        confidence: d.analyst_output.confidence,
+        bias_4h: d.analyst_output.bias_4h,
+        bias_1h: d.analyst_output.bias_1h,
+        signal_15m: d.analyst_output.signal_15m,
+        rsi_15m: d.analyst_output.rsi_15m,
+        rsi_1h: d.analyst_output.rsi_1h,
+        data_freshness_score: d.analyst_output.data_freshness_score,
+      },
+    }));
+
     broadcastCycleUpdate({
       portfolio: finalPortfolio,
+      debates: debateItems,
       market: {
         vix: market?.vix || 0,
         fear_greed: market?.fear_greed || 0,

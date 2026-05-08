@@ -2,6 +2,7 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { buildBullPrompt, BULL_SYSTEM } from '../prompts/bull.prompt';
 import { buildBearPrompt, BEAR_SYSTEM } from '../prompts/bear.prompt';
+import { broadcastAnalysisEvent } from '../websocket';
 import type { AnalystOutput } from './analyst';
 import type { CollectorOutput } from './collector';
 import type { MarketSegment } from './discovery';
@@ -114,13 +115,32 @@ export class ResearcherAgent {
             ? bearResult.value
             : this.buildFallbackBear(analysis);
 
-        return {
+        const debate: DebateOutput = {
           ticker: analysis.ticker,
           bull,
           bear,
           debate_score: bull.conviction - bear.conviction,
           analyst_output: analysis,
-        } as DebateOutput;
+        };
+
+        // Broadcast debate in real-time so UI updates as each ticker completes
+        broadcastAnalysisEvent({
+          id: `debate-${analysis.ticker}-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          agent: debate.debate_score > 0 ? 'bull' : 'bear',
+          stage: 'debate',
+          title: `${analysis.ticker} — débat bull vs bear`,
+          summary_simple: debate.debate_score > 0
+            ? `Avantage haussier sur ${analysis.ticker}. Bull ${bull.conviction}/10 vs Bear ${bear.conviction}/10.`
+            : debate.debate_score < 0
+              ? `Avantage baissier sur ${analysis.ticker}. Bear ${bear.conviction}/10 vs Bull ${bull.conviction}/10.`
+              : `Avis partagés sur ${analysis.ticker}. Conviction égale ${bull.conviction}/10.`,
+          summary_expert: `BULL: ${bull.technical_case}\n\nBEAR: ${bear.technical_case}`,
+          confidence: analysis.confidence,
+          ticker: analysis.ticker,
+        });
+
+        return debate;
       }));
       results.push(...batchResults);
     }

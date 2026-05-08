@@ -57,6 +57,10 @@ export function broadcastCycleUpdate(payload: CycleUpdatePayload) {
   broadcast('CYCLE_UPDATE', payload);
 }
 
+export function broadcastAnalysisEvent(event: AnalysisEvent) {
+  broadcast('CYCLE_UPDATE', { analysis_events: [event] });
+}
+
 export function broadcastAlert(level: 'info' | 'warning' | 'critical', message: string, ticker?: string) {
   broadcast('ALERT', { level, message, ticker });
 }
@@ -100,6 +104,7 @@ export interface CycleUpdatePayload {
   orders_executed?: ExecutedOrder[];
   alerts?: AlertItem[];
   analysis_events?: AnalysisEvent[];
+  debates?: DebateItem[];
   agents?: AgentStatus;
 }
 
@@ -137,6 +142,14 @@ export interface AlertItem {
   level: 'info' | 'warning' | 'critical';
   message: string;
   ticker?: string;
+}
+
+export interface DebateItem {
+  ticker: string;
+  debate_score: number;
+  bull: { conviction: number; technical_case: string; upside_pct: number; invalidation_condition: string; fundamental_catalyst: string };
+  bear: { conviction: number; technical_case: string; downside_pct: number; invalidation_condition: string; structural_weakness: string };
+  analyst_output: { confidence: number; bias_4h: string; bias_1h: string; signal_15m: string; rsi_15m: number; rsi_1h: number; data_freshness_score?: number };
 }
 
 export interface AnalysisEvent {
