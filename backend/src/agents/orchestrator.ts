@@ -22,6 +22,7 @@ import type { SectorBias } from '../data/sectors';
 import type { Position } from '../broker/mock';
 import { saveSnapshots } from '../models/ticker-snapshot';
 import { saveNotes } from '../models/ticker-note';
+import { AILogCollector } from '../utils/ai-logger';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
 
@@ -154,6 +155,8 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const maxDrawdownPct = parseFloat(maxDrawdownRaw || '10');
   console.log(`[Orchestrator] === CYCLE START (Capital: $${portfolioUsd}) ===`, new Date().toISOString());
 
+  const aiLog = new AILogCollector(cycleStart);
+
   reporter.updateAgent('collector', { status: 'running' });
 
   // Step 1: Mark to market positions existantes
@@ -214,6 +217,25 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     })),
     segments_map: discoveryResult.segments,
     regime,
+  });
+
+  // Feed market + budget + discovery into AI log
+  aiLog.setMarket({
+    vix,
+    fear_greed: fearGreed,
+    nasdaq_direction: '',
+    nasdaq_open: nasdaq.isOpen,
+    eu_open: euOpen,
+    regime: regime.regime,
+  });
+  aiLog.setBudget(budgetWithSegments);
+  aiLog.setDiscovery(discoveryResult.tickers, discoveryResult.segments);
+  aiLog.setPortfolio({
+    total_usd: portfolioForBudget.total_usd ?? portfolioUsd,
+    cash_usd: portfolioForBudget.cash_usd,
+    daily_pnl_pct: portfolioForBudget.daily_pnl_pct ?? 0,
+    risk_regime: portfolioForBudget.risk_regime ?? 'NORMAL',
+    positions_count: portfolioForBudget.positions.length,
   });
 
   if (discoveryResult.tickers.length === 0) {
@@ -298,6 +320,8 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     await saveNotes(techNotes).catch((err) => console.warn('[Orchestrator] Failed to save tech notes:', err));
   }
 
+  aiLog.setAnalysis(analystOutputs);
+
   // Step 7: Bull/Bear debate (segment-aware)
   reporter.updateAgent('bull', { status: 'running' });
   reporter.updateAgent('bear', { status: 'running' });
@@ -374,6 +398,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     console.log(`[Orchestrator] ${weakSells.length} vente(s) faiblesse relative injectée(s)`);
   }
   const allProposals = [...orderProposals, ...weakSells];
+  aiLog.setProposals(allProposals);
 
   // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });
@@ -385,6 +410,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     collectorOutput.market,
     dailyLossLimitPct,
     collectorOutput.tickers,
+    aiLog.rejections,
   );
   reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 
@@ -400,6 +426,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
       }
     }
   }
+  aiLog.setExecuted(execResults);
 
   // Step 11: Report + AgentPrediction logging
   reporter.updateAgent('reporter', { status: 'running' });
@@ -425,14 +452,17 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const duration = Date.now() - cycleStart;
   console.log(`[Orchestrator] === CYCLE COMPLETE in ${duration}ms ===`);
 
-  await prisma.cycleLog.create({
-    data: {
-      payload: { debateOutputs, execResults, finalPortfolio, market: collectorOutput.market } as any,
-      ordersCount: execResults.length,
-      alertsCount: 0,
-      durationMs: duration,
-    },
-  });
+  await Promise.all([
+    prisma.cycleLog.create({
+      data: {
+        payload: { debateOutputs, execResults, finalPortfolio, market: collectorOutput.market } as any,
+        ordersCount: execResults.length,
+        alertsCount: 0,
+        durationMs: duration,
+      },
+    }),
+    aiLog.save(),
+  ]);
 }
 
 export async function runPipeline(): Promise<void> {

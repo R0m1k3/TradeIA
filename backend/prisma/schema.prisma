@@ -121,3 +121,16 @@ model PreMarketPrep {
   @@index([date, ticker])
   @@index([date, setupSignal])
 }
+
+model AILog {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  durationMs     Int
+  tickersCount   Int
+  proposalsCount Int
+  executedCount  Int
+  rejectionsCount Int
+  payload        Json
+
+  @@index([createdAt])
+}

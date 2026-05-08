@@ -91,6 +91,16 @@ function buildDebateAnalysisItems(debates: DebateOutput[]): LiveAnalysisItem[] {
   });
 }
 
+interface AILogMeta {
+  id: string;
+  createdAt: string;
+  durationMs: number;
+  tickersCount: number;
+  proposalsCount: number;
+  executedCount: number;
+  rejectionsCount: number;
+}
+
 export function Agents() {
   const { agents, signals, debates, cycleTimeline, analysisEvents, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
@@ -98,13 +108,49 @@ export function Agents() {
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
   const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
   const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
+  const [aiLogs, setAiLogs] = useState<AILogMeta[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const lastPerfFetchRef = useRef(0);
+
+  const api = import.meta.env.VITE_API_URL || '/api';
+
+  const fetchAiLogs = () => {
+    setLogsLoading(true);
+    fetch(`${api}/ai-logs`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setAiLogs(data))
+      .catch(() => {})
+      .finally(() => setLogsLoading(false));
+  };
+
+  useEffect(() => { fetchAiLogs(); }, []);
+
+  const downloadAllLogs = () => {
+    window.open(`${api}/ai-logs/download`, '_blank');
+  };
+
+  const downloadLog = (id: string) => {
+    window.open(`${api}/ai-logs/${id}/download`, '_blank');
+  };
+
+  const deleteAllLogs = () => {
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    fetch(`${api}/ai-logs`, { method: 'DELETE' })
+      .then(() => { setAiLogs([]); setDeleteConfirm(false); })
+      .catch(() => {});
+  };
+
+  const deleteLog = (id: string) => {
+    fetch(`${api}/ai-logs/${id}`, { method: 'DELETE' })
+      .then(() => setAiLogs((prev) => prev.filter((l) => l.id !== id)))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     const now = Date.now();
     if (lastPerfFetchRef.current && now - lastPerfFetchRef.current < PERF_REFRESH_MS) return;
     lastPerfFetchRef.current = now;
-    const api = import.meta.env.VITE_API_URL || '/api';
     fetch(`${api}/portfolio/ai-performance`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -434,6 +480,82 @@ export function Agents() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* AI Logs card */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="card-h">
+          <div className="card-h-title">
+            Logs IA <Help tip="Journaux complets de chaque cycle IA : analyse, débats, propositions, rejections risk. Max 3 jours." />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-sm btn-ghost" onClick={fetchAiLogs} disabled={logsLoading}>
+              {logsLoading ? '...' : 'Rafraîchir'}
+            </button>
+            {aiLogs.length > 0 && (
+              <>
+                <button className="btn btn-sm" onClick={downloadAllLogs}>
+                  ↓ Tout télécharger
+                </button>
+                <button
+                  className="btn btn-sm"
+                  style={{ color: deleteConfirm ? 'var(--danger)' : undefined, borderColor: deleteConfirm ? 'var(--danger)' : undefined }}
+                  onClick={deleteAllLogs}
+                  onBlur={() => setDeleteConfirm(false)}
+                >
+                  {deleteConfirm ? 'Confirmer suppression' : 'Tout supprimer'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <div style={{ padding: '0 20px 20px' }}>
+          {aiLogs.length === 0 ? (
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+              Aucun log disponible — les logs apparaissent après le premier cycle IA complet
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ color: 'var(--ink-3)', borderBottom: '1px solid var(--rule)' }}>
+                  <th style={{ textAlign: 'left', padding: '8px 0', fontWeight: 500 }}>Date</th>
+                  <th style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 500 }}>Tickers</th>
+                  <th style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 500 }}>Propositions</th>
+                  <th style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 500 }}>Rejections</th>
+                  <th style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 500 }}>Exécutés</th>
+                  <th style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 500 }}>Durée</th>
+                  <th style={{ textAlign: 'right', padding: '8px 0', fontWeight: 500 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiLogs.map((log) => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--rule)' }}>
+                    <td style={{ padding: '8px 0', color: 'var(--ink)' }}>
+                      {new Date(log.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right', padding: '8px 4px' }}>{log.tickersCount}</td>
+                    <td className="mono" style={{ textAlign: 'right', padding: '8px 4px' }}>{log.proposalsCount}</td>
+                    <td className="mono" style={{ textAlign: 'right', padding: '8px 4px', color: log.rejectionsCount > 0 ? 'var(--warn)' : undefined }}>
+                      {log.rejectionsCount}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right', padding: '8px 4px', color: log.executedCount > 0 ? 'var(--accent)' : 'var(--ink-3)' }}>
+                      {log.executedCount}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right', padding: '8px 4px', color: 'var(--ink-3)' }}>
+                      {log.durationMs > 60000 ? `${Math.round(log.durationMs / 60000)}m` : `${Math.round(log.durationMs / 1000)}s`}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '8px 0' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-sm btn-ghost" onClick={() => downloadLog(log.id)}>↓</button>
+                        <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => deleteLog(log.id)}>×</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

@@ -130,6 +130,7 @@ export class RiskAgent {
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
+    rejections?: Array<{ ticker: string; action: string; reason: string }>,
   ): Promise<ApprovedOrder[]> {
     console.log(`[Risk] Validating ${proposals.length} proposals`);
 
@@ -145,6 +146,7 @@ export class RiskAgent {
       market,
       dailyLossLimitPct,
       tickerData,
+      rejections,
     );
 
     if (preFiltered.length === 0) return [];
@@ -220,6 +222,7 @@ export class RiskAgent {
     market: { vix: number },
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
+    rejections?: Array<{ ticker: string; action: string; reason: string }>,
   ): OrderProposal[] {
     const sectorCounts: Record<string, number> = {};
     for (const pos of portfolio.positions) {
@@ -235,42 +238,46 @@ export class RiskAgent {
       console.log(`[Risk] Macro blackout active: ${macroEvent.kind} on ${macroEvent.date} — blocking new BUYs`);
     }
 
+    const reject = (p: OrderProposal, reason: string) => {
+      console.log(`[Risk] Pre-filter ${p.ticker}: ${reason}`);
+      rejections?.push({ ticker: p.ticker, action: p.action, reason });
+    };
+
     for (const p of proposals) {
       if (macroEvent && p.action === 'BUY') {
-        console.log(`[Risk] Pre-filter ${p.ticker}: macro blackout (${macroEvent.kind} ${macroEvent.date})`);
+        reject(p, `macro blackout (${macroEvent.kind} ${macroEvent.date})`);
         continue;
       }
 
       if (portfolio.daily_pnl_pct <= -dailyLossLimitPct && p.action === 'BUY') {
-        console.log(`[Risk] Pre-filter ${p.ticker}: daily loss limit reached (${portfolio.daily_pnl_pct.toFixed(2)}%)`);
+        reject(p, `daily loss limit reached (${portfolio.daily_pnl_pct.toFixed(2)}%)`);
         continue;
       }
 
       if (portfolio.risk_regime === 'SEVERE_DRAWDOWN' && p.action === 'BUY') {
-        console.log(`[Risk] Pre-filter ${p.ticker}: severe drawdown regime, no new buys`);
+        reject(p, 'severe drawdown regime, no new buys');
         continue;
       }
       if (portfolio.risk_regime === 'DRAWDOWN' && p.action === 'BUY') {
-        console.log(`[Risk] Pre-filter ${p.ticker}: drawdown regime, no new buys`);
+        reject(p, 'drawdown regime, no new buys');
         continue;
       }
 
       if (market.vix > 30 && p.action === 'BUY') {
-        console.log(`[Risk] Pre-filter ${p.ticker}: VIX ${market.vix} > 30`);
+        reject(p, `VIX ${market.vix} > 30`);
         continue;
       }
 
-      // Skip R/R check for SELL orders
       if (p.action === 'BUY') {
         const rr = (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss);
         if (rr < 2.0) {
-          console.log(`[Risk] Pre-filter ${p.ticker}: R/R ${rr.toFixed(2)} < 2.0`);
+          reject(p, `R/R ${rr.toFixed(2)} < 2.0`);
           continue;
         }
       }
 
       if (tickerData?.[p.ticker]?.earnings_blackout) {
-        console.log(`[Risk] Pre-filter ${p.ticker}: earnings blackout`);
+        reject(p, 'earnings blackout');
         continue;
       }
 
@@ -278,7 +285,7 @@ export class RiskAgent {
         const sector = getTickerSector(p.ticker);
         const currentCount = sectorCounts[sector] || 0;
         if (currentCount >= MAX_POSITIONS_PER_SECTOR) {
-          console.log(`[Risk] Pre-filter ${p.ticker}: sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
+          reject(p, `sector ${sector} concentration max (${currentCount}/${MAX_POSITIONS_PER_SECTOR})`);
           continue;
         }
         sectorCounts[sector] = currentCount + 1;

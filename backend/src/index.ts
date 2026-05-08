@@ -17,6 +17,7 @@ import marketRoutes from './routes/market';
 import healthRoutes from './routes/health';
 import backtestRoutes from './routes/backtest';
 import tickersRoutes from './routes/tickers';
+import aiLogsRoutes from './routes/ai-logs';
 
 const app = Fastify({
   logger: true,
@@ -80,6 +81,21 @@ async function ensureMigrations() {
     await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "PreMarketPrep_date_ticker_idx" ON "PreMarketPrep"("date", "ticker")`;
     await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "PreMarketPrep_date_setupSignal_idx" ON "PreMarketPrep"("date", "setupSignal")`;
 
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "AILog" (
+        "id"              TEXT NOT NULL,
+        "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "durationMs"      INTEGER NOT NULL,
+        "tickersCount"    INTEGER NOT NULL,
+        "proposalsCount"  INTEGER NOT NULL,
+        "executedCount"   INTEGER NOT NULL,
+        "rejectionsCount" INTEGER NOT NULL,
+        "payload"         JSONB NOT NULL,
+        CONSTRAINT "AILog_pkey" PRIMARY KEY ("id")
+      )
+    `;
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "AILog_createdAt_idx" ON "AILog"("createdAt")`;
+
     console.log('[Main] ensureMigrations: tables OK');
   } catch (err) {
     console.error('[Main] ensureMigrations failed:', (err as Error).message);
@@ -108,6 +124,7 @@ async function main() {
   await app.register(healthRoutes, { prefix: '/api/health' });
   await app.register(backtestRoutes, { prefix: '/api/backtest' });
   await app.register(tickersRoutes, { prefix: '/api/tickers' });
+  await app.register(aiLogsRoutes, { prefix: '/api/ai-logs' });
 
   initCredentials(prisma);
   await warmCredentialsCache();
