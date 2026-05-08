@@ -46,17 +46,47 @@ function releaseSlot(): void {
   }
 }
 
-async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LLMResponse> {
+function supportsThinking(model: string): boolean {
+  return (
+    model.includes('claude-opus') ||
+    model.includes('claude-sonnet-4') ||
+    model.includes('o1') ||
+    model.includes('o3') ||
+    model.includes('deepseek-r1') ||
+    model.includes('gemini-2.0-flash-thinking')
+  );
+}
+
+function extractOpenRouterContent(raw: unknown): string {
+  if (typeof raw === 'string') return raw;
+  if (Array.isArray(raw)) {
+    // Extended thinking response: array of { type: "thinking"|"text", ... }
+    return (raw as Array<{ type: string; text?: string }>)
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text || '')
+      .join('');
+  }
+  return '';
+}
+
+async function callOpenRouter(model: string, messages: LLMMessage[], thinking?: boolean): Promise<LLMResponse> {
   const start = Date.now();
   const apiKey = await getCredential('openrouter_api_key', 'OPENROUTER_API_KEY');
+
+  const useThinking = thinking && supportsThinking(model);
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: useThinking ? 1 : 0.1,
+    max_tokens: useThinking ? 20000 : 4096,
+  };
+  if (useThinking && (model.includes('claude-opus') || model.includes('claude-sonnet-4'))) {
+    body.thinking = { type: 'enabled', budget_tokens: 12000 };
+  }
+
   const response = await axios.post(
     'https://openrouter.ai/api/v1/chat/completions',
-    {
-      model,
-      messages,
-      temperature: 0.1,
-      max_tokens: 4096,
-    },
+    body,
     {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -64,11 +94,12 @@ async function callOpenRouter(model: string, messages: LLMMessage[]): Promise<LL
         'HTTP-Referer': 'https://nexus-trade.local',
         'X-Title': 'Nexus Trade AI',
       },
-      timeout: 30_000,
+      timeout: useThinking ? 120_000 : 30_000,
     }
   );
 
-  const content = response.data.choices?.[0]?.message?.content || '';
+  const rawContent = response.data.choices?.[0]?.message?.content;
+  const content = extractOpenRouterContent(rawContent);
   const tokensUsed = response.data.usage?.total_tokens || 0;
   return { content: stripMarkdownJson(content), tokensUsed, durationMs: Date.now() - start };
 }
@@ -106,7 +137,8 @@ export async function callLLM(
   agentName: string,
   model: string,
   systemPrompt: string,
-  userContent: string
+  userContent: string,
+  options?: { thinking?: boolean }
 ): Promise<LLMResponse> {
   const messages: LLMMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -116,11 +148,10 @@ export async function callLLM(
   const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
   const maxAttempts = provider === 'ollama' ? 2 : 3;
   const delays = provider === 'ollama'
-    ? [2000, 4000]  // Ollama: longer delays, fewer retries (rate limits)
+    ? [2000, 4000]
     : [1000, 2000, 4000];
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Rate limiting for Ollama — max 3 concurrent calls
     if (provider === 'ollama') {
       await acquireSlot();
     }
@@ -129,7 +160,7 @@ export async function callLLM(
       const result =
         provider === 'ollama'
           ? await callOllama(model, messages)
-          : await callOpenRouter(model, messages);
+          : await callOpenRouter(model, messages, options?.thinking);
 
       console.log(
         JSON.stringify({
@@ -160,7 +191,7 @@ export async function callLLM(
           try {
             const result = provider === 'ollama'
               ? await callOllama(fallbackModel, messages)
-              : await callOpenRouter(fallbackModel, messages);
+              : await callOpenRouter(fallbackModel, messages, false); // no thinking on fallback
             console.log(`[LLM] ${agentName} succeeded with fallback model ${fallbackModel}`);
             return result;
           } catch (fallbackErr) {

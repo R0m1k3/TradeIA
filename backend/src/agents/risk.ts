@@ -197,7 +197,7 @@ export class RiskAgent {
         daily_loss_limit_pct: dailyLossLimitPct,
       });
 
-      const response = await callLLM('risk-manager', MODELS.STRONG, RISK_SYSTEM, prompt);
+      const response = await callLLM('risk-manager', MODELS.STRONG, RISK_SYSTEM, prompt, { thinking: true });
       const parsed = parseJsonResponse<RiskOutput>(response.content);
 
       if (parsed.rejected && parsed.rejected.length > 0) {
