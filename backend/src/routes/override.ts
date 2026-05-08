@@ -42,7 +42,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/close/:ticker', {
     preHandler: async (req, reply) => {
       if (!verifyAdmin(req.headers.authorization)) {
-        reply.code(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
     },
   }, async (req, reply) => {
@@ -74,7 +74,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/block/:ticker', {
     preHandler: async (req, reply) => {
       if (!verifyAdmin(req.headers.authorization)) {
-        reply.code(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
     },
   }, async (req) => {
@@ -92,7 +92,7 @@ const overrideRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/unblock/:ticker', {
     preHandler: async (req, reply) => {
       if (!verifyAdmin(req.headers.authorization)) {
-        reply.code(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
     },
   }, async (req) => {

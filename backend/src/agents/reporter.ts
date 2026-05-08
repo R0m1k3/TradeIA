@@ -196,6 +196,7 @@ export class ReporterAgent {
         nasdaq_status: getNasdaqStatus(),
         macro: (market as any)?.macro || null,
         sector_biases: (market as any)?.sector_biases || null,
+        eu: (market as any)?.eu || null,
         data_freshness: market?.data_freshness || null,
       } as any,
       signals,
