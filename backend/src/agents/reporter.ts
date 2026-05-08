@@ -42,7 +42,7 @@ export class ReporterAgent {
     portfolio?: CycleUpdatePayload['portfolio'],
     market?: { vix: number; fear_greed: number; nasdaq_direction: string; nasdaq_change_pct?: number; macro?: any; sector_biases?: any; data_freshness?: DataQualitySummary },
     watchlist?: string[]
-  ) {
+  ): Promise<NonNullable<CycleUpdatePayload['analysis_events']>> {
     const durationMs = Date.now() - cycleStart;
 
     const signals: CycleUpdatePayload['signals'] = debates.map((d) => ({
@@ -240,6 +240,7 @@ export class ReporterAgent {
     }
 
     console.log(`[Reporter] Cycle broadcast — ${signals.length} signaux, ${orders_executed.length} ordres, ${alerts.length} alertes, ${durationMs}ms`);
+    return analysisEvents;
   }
 
   private async saveAgentPredictions(debates: DebateOutput[], watchlist: string[]): Promise<void> {

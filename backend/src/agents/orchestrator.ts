@@ -437,7 +437,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     await updateEquityPeak(finalPortfolio.total_usd);
   }
 
-  await reporter.finalize(
+  const analysisEvents = await reporter.finalize(
     cycleStart,
     debateOutputs,
     execResults,
@@ -455,7 +455,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   await Promise.all([
     prisma.cycleLog.create({
       data: {
-        payload: { debateOutputs, execResults, finalPortfolio, market: collectorOutput.market } as any,
+        payload: { debateOutputs, execResults, finalPortfolio, market: collectorOutput.market, analysis_events: analysisEvents } as any,
         ordersCount: execResults.length,
         alertsCount: 0,
         durationMs: duration,

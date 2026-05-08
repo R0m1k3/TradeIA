@@ -98,6 +98,7 @@ export function Agents() {
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
   const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
   const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
+  const [activeDebateTicker, setActiveDebateTicker] = useState<string | null>(null);
   const lastPerfFetchRef = useRef(0);
 
   const api = import.meta.env.VITE_API_URL || '/api';
@@ -437,6 +438,160 @@ export function Agents() {
           </div>
         </div>
       </div>
+
+      {/* Live card — debates + reflections feed */}
+      {(() => {
+        const activeTicker = activeDebateTicker ?? debates[0]?.ticker ?? null;
+        const d = debates.length > 0 ? (debates.find((x) => x.ticker === activeTicker) ?? debates[0]) : null;
+        const scoreColor = d ? (d.debate_score > 0 ? 'var(--accent)' : d.debate_score < 0 ? 'var(--danger)' : 'var(--warn)') : 'var(--ink-4)';
+
+        return (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="card-h">
+              <div className="card-h-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: timelineItems.length > 0 ? 'var(--accent)' : 'var(--ink-4)', display: 'inline-block' }} />
+                Live
+              </div>
+              <span className="card-h-meta">
+                {debates.length > 0 ? `${debates.length} débats` : 'réflexions agents'}
+              </span>
+            </div>
+            <div style={{ padding: 16 }}>
+
+              {d ? (
+                <>
+                  {/* Ticker tabs */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                    {debates.map((x) => {
+                      const sc = x.debate_score > 0 ? 'var(--accent)' : x.debate_score < 0 ? 'var(--danger)' : 'var(--warn)';
+                      const isSel = (activeDebateTicker ?? debates[0]?.ticker) === x.ticker;
+                      return (
+                        <button
+                          key={x.ticker}
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setActiveDebateTicker(x.ticker)}
+                          style={{ borderColor: isSel ? sc : undefined, color: isSel ? sc : undefined, fontFamily: 'var(--mono)', fontSize: 11 }}
+                        >
+                          {x.ticker}
+                          <span style={{ marginLeft: 4, color: sc }}>{x.debate_score > 0 ? `+${x.debate_score}` : x.debate_score}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bull / Bear columns */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ background: 'var(--bg-elev-2)', borderRadius: 8, padding: 16, borderLeft: '3px solid var(--accent)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 1 }}>BULL</span>
+                        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{d.bull.conviction}<span style={{ fontSize: 11, color: 'var(--ink-4)' }}>/10</span></div>
+                      </div>
+                      <div style={{ height: 4, background: 'var(--bg-elev)', borderRadius: 999, marginBottom: 12 }}>
+                        <div style={{ width: `${(d.bull.conviction / 10) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 999 }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 12 }}>
+                        {d.bull.technical_case && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Cas technique</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bull.technical_case}</div></div>}
+                        {d.bull.fundamental_catalyst && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Catalyseur</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bull.fundamental_catalyst}</div></div>}
+                        {d.bull.upside_pct != null && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="eyebrow">Objectif hausse</span><span className="mono" style={{ color: 'var(--accent)', fontWeight: 700 }}>+{d.bull.upside_pct.toFixed(1)}%</span></div>}
+                        {d.bull.key_risk && <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '7px 10px' }}><div className="eyebrow" style={{ marginBottom: 3 }}>Risque clé</div><div style={{ color: 'var(--warn)', fontSize: 11 }}>{d.bull.key_risk}</div></div>}
+                        {d.bull.bear_rebuttal_1 && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Contre-arg. bear</div><div style={{ color: 'var(--ink-3)', fontSize: 11, lineHeight: 1.5 }}>{d.bull.bear_rebuttal_1}</div></div>}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--bg-elev-2)', borderRadius: 8, padding: 16, borderLeft: '3px solid var(--danger)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--danger)', letterSpacing: 1 }}>BEAR</span>
+                        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>{d.bear.conviction}<span style={{ fontSize: 11, color: 'var(--ink-4)' }}>/10</span></div>
+                      </div>
+                      <div style={{ height: 4, background: 'var(--bg-elev)', borderRadius: 999, marginBottom: 12 }}>
+                        <div style={{ width: `${(d.bear.conviction / 10) * 100}%`, height: '100%', background: 'var(--danger)', borderRadius: 999 }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 12 }}>
+                        {d.bear.technical_case && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Cas technique</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bear.technical_case}</div></div>}
+                        {d.bear.structural_weakness && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Faiblesse structurelle</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bear.structural_weakness}</div></div>}
+                        {d.bear.downside_pct != null && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="eyebrow">Risque baisse</span><span className="mono" style={{ color: 'var(--danger)', fontWeight: 700 }}>-{d.bear.downside_pct.toFixed(1)}%</span></div>}
+                        {d.bear.strongest_bull_argument && <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '7px 10px' }}><div className="eyebrow" style={{ marginBottom: 3 }}>Meilleur arg. haussier</div><div style={{ color: 'var(--accent)', fontSize: 11 }}>{d.bear.strongest_bull_argument}</div></div>}
+                        {d.bear.bull_rebuttal_1 && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Contre-arg. bull</div><div style={{ color: 'var(--ink-3)', fontSize: 11, lineHeight: 1.5 }}>{d.bear.bull_rebuttal_1}</div></div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analyst footer */}
+                  <div style={{ marginTop: 10, padding: '9px 14px', background: 'var(--bg-elev-2)', borderRadius: 8, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: 18 }}>
+                      {([
+                        { label: 'Biais 4H', val: d.analyst_output.bias_4h, color: d.analyst_output.bias_4h === 'BULLISH' ? 'var(--accent)' : d.analyst_output.bias_4h === 'BEARISH' ? 'var(--danger)' : 'var(--warn)' },
+                        { label: 'Biais 1H', val: d.analyst_output.bias_1h, color: d.analyst_output.bias_1h === 'BULLISH' ? 'var(--accent)' : d.analyst_output.bias_1h === 'BEARISH' ? 'var(--danger)' : 'var(--warn)' },
+                        { label: 'Signal 15m', val: d.analyst_output.signal_15m, color: 'var(--ink-2)' },
+                        { label: 'RSI 15m', val: d.analyst_output.rsi_15m?.toFixed(0), color: 'var(--ink-2)' },
+                        { label: 'Confiance', val: `${d.analyst_output.confidence}%`, color: 'var(--info)' },
+                      ] as { label: string; val: string | undefined; color: string }[]).map(({ label, val, color }) => val != null && (
+                        <div key={label}>
+                          <div className="eyebrow" style={{ marginBottom: 2 }}>{label}</div>
+                          <div className="mono" style={{ fontSize: 12, fontWeight: 600, color }}>{val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="eyebrow" style={{ marginBottom: 2 }}>Verdict</div>
+                      <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>
+                        {d.debate_score > 0 ? `+${d.debate_score}` : d.debate_score}
+                        <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 4 }}>score</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider before reflections feed */}
+                  {timelineItems.length > 0 && <hr style={{ border: 0, borderTop: '1px solid var(--rule)', margin: '16px 0 12px' }} />}
+                </>
+              ) : null}
+
+              {/* Reflections feed — always shown, full-width when no debates */}
+              {timelineItems.length > 0 ? (
+                <div>
+                  {d && <div className="eyebrow" style={{ marginBottom: 8 }}>Réflexions agents</div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: d ? 220 : 420, overflowY: 'auto', paddingRight: 4 }}>
+                    {timelineItems.map((item) => {
+                      const im = AGENT_META[item.agent] || AGENT_META.reporter;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          style={{
+                            textAlign: 'left', border: `1px solid var(--rule)`, background: 'transparent',
+                            borderRadius: 7, padding: '9px 12px', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: im.color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, fontWeight: 600, color: im.color }}>{im.name}</span>
+                              {item.ticker && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', background: 'var(--bg-elev-2)', padding: '1px 5px', borderRadius: 3 }}>{item.ticker}</span>}
+                            </div>
+                            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', flexShrink: 0 }}>{new Date(item.timestamp).toLocaleTimeString('fr-FR')}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.45 }}>
+                            {readingMode === 'beginner' ? item.summarySimple : item.summaryExpert}
+                          </div>
+                          {(item.confidence != null || item.freshnessScore != null) && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 10 }} className="mono">
+                              {item.confidence != null && <span style={{ color: 'var(--accent)' }}>conf. {item.confidence}%</span>}
+                              {item.freshnessScore != null && <span style={{ color: item.freshnessScore >= 70 ? 'var(--accent)' : item.freshnessScore >= 50 ? 'var(--warn)' : 'var(--danger)' }}>fraîcheur {item.freshnessScore}/100</span>}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--ink-4)', padding: '12px 0', textAlign: 'center' }}>
+                  En attente du prochain cycle — les réflexions apparaîtront ici en temps réel.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {selectedItem && (
         <div
