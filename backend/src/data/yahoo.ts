@@ -17,38 +17,70 @@ const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const SUMMARY = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary';
 
 const YAHOO_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+/** Tickers where Yahoo Finance symbol differs from the exchange:base convention */
+const YAHOO_OVERRIDE: Record<string, string> = {
+  'NOVOB:XCSE': 'NOVO-B.CO',   // Novo Nordisk B — Yahoo uses hyphen
+  'EOAN:XETR':  'EOAN.DE',     // E.ON AG — explicit (just in case)
 };
 
 function unixToISO(ts: number): string {
   return new Date(ts * 1000).toISOString();
 }
 
-// Fetch a crumb from Yahoo to authenticate v8/v10 endpoints
+// Session cookies + crumb — Yahoo requires both for reliable EU data
 let cachedCrumb: string | null = null;
-let crumbExpiry = 0;
-let crumbLogged = false;
+let cachedCookies = '';
+let sessionExpiry = 0;
+let sessionLogged = false;
 
-async function getYahooCrumb(): Promise<string | null> {
-  if (cachedCrumb && Date.now() < crumbExpiry) return cachedCrumb;
+async function getYahooSession(): Promise<{ crumb: string | null; cookies: string }> {
+  if (cachedCrumb && Date.now() < sessionExpiry) return { crumb: cachedCrumb, cookies: cachedCookies };
+
   try {
-    const sessionRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: YAHOO_HEADERS,
+    // Step 1: visit finance.yahoo.com to get session cookies (A1/A3/cmp etc.)
+    const homeRes = await axios.get('https://finance.yahoo.com/', {
+      headers: { 'User-Agent': YAHOO_HEADERS['User-Agent'] },
+      timeout: 12_000,
+      validateStatus: () => true,
+      maxRedirects: 5,
+    });
+
+    const setCookieArr: string[] = (homeRes.headers['set-cookie'] as string[] | undefined) ?? [];
+    if (setCookieArr.length > 0) {
+      cachedCookies = setCookieArr.map((c) => c.split(';')[0]).join('; ');
+    }
+
+    // Step 2: fetch crumb with the cookies
+    const crumbRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { ...YAHOO_HEADERS, ...(cachedCookies ? { Cookie: cachedCookies } : {}) },
       timeout: 10_000,
     });
-    if (typeof sessionRes.data === 'string' && sessionRes.data.length > 5) {
-      cachedCrumb = sessionRes.data;
-      crumbExpiry = Date.now() + 3600_000;
-      console.log('[Yahoo] Got crumb for authenticated requests');
-      return cachedCrumb;
+
+    if (typeof crumbRes.data === 'string' && crumbRes.data.length > 4) {
+      cachedCrumb = crumbRes.data.trim();
+      sessionExpiry = Date.now() + 3_600_000;
+      if (!sessionLogged) {
+        console.log('[Yahoo] Session established (crumb + cookies)');
+        sessionLogged = true;
+      }
     }
   } catch {
-    if (!crumbLogged) {
-      console.warn('[Yahoo] Could not get crumb — fundamentals unavailable without auth');
-      crumbLogged = true;
+    if (!sessionLogged) {
+      console.warn('[Yahoo] Could not establish session — requests will proceed without auth');
+      sessionLogged = true;
     }
   }
-  return null;
+
+  return { crumb: cachedCrumb, cookies: cachedCookies };
+}
+
+function buildYahooHeaders(cookies: string): Record<string, string> {
+  return cookies ? { ...YAHOO_HEADERS, Cookie: cookies } : { ...YAHOO_HEADERS };
 }
 
 interface YahooChartResult {
@@ -74,15 +106,15 @@ export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h
     const yahooInterval = interval === '4h' ? '1h' : interval === '1d' ? '1d' : interval;
     const yahooRange = interval === '15m' ? '5d' : interval === '1h' ? '1mo' : range;
 
-    const crumb = await getYahooCrumb();
+    const { crumb, cookies } = await getYahooSession();
     const params: Record<string, string> = { interval: yahooInterval, range: yahooRange };
     if (crumb) params.crumb = crumb;
 
     const response = await axios.get(`${BASE}/${ticker}`, {
       params,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 15_000,
-      validateStatus: () => true, // Don't throw on 401/404
+      validateStatus: () => true,
     });
 
     if (response.status === 401 || response.status === 404) {
@@ -125,13 +157,13 @@ export async function getYahooCurrentPrice(ticker: string): Promise<number | nul
   if (cached) return cached;
 
   try {
-    const crumb = await getYahooCrumb();
+    const { crumb, cookies } = await getYahooSession();
     const params: Record<string, string> = { interval: '1d', range: '1d' };
     if (crumb) params.crumb = crumb;
 
     const response = await axios.get(`${BASE}/${ticker}`, {
       params,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 10_000,
       validateStatus: () => true,
     });
@@ -163,13 +195,13 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
   };
 
   // Try quoteSummary with crumb first
-  const crumb = await getYahooCrumb();
+  const { crumb, cookies } = await getYahooSession();
   if (crumb) {
     try {
       const params: Record<string, string> = { modules: 'defaultKeyStatistics,financialData,earnings,calendarEvents', crumb };
       const response = await axios.get(`${SUMMARY}/${ticker}`, {
         params,
-        headers: YAHOO_HEADERS,
+        headers: buildYahooHeaders(cookies),
         timeout: 15_000,
         validateStatus: () => true,
       });
@@ -204,7 +236,7 @@ export async function getYahooFundamentals(ticker: string): Promise<Fundamentals
 
     const response = await axios.get(`${BASE}/${ticker}`, {
       params: chartParams,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 10_000,
       validateStatus: () => true,
     });
@@ -240,13 +272,13 @@ export async function getYahooVIX(): Promise<number | null> {
   if (cached) return cached;
 
   try {
-    const crumb = await getYahooCrumb();
+    const { crumb, cookies } = await getYahooSession();
     const params: Record<string, string> = { interval: '1d', range: '5d' };
     if (crumb) params.crumb = crumb;
 
     const response = await axios.get(`${BASE}/%5EVIX`, {
       params,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 10_000,
       validateStatus: () => true,
     });
@@ -321,13 +353,13 @@ export async function getNasdaqDirection(): Promise<{ direction: string; change_
   if (cached) return cached;
 
   try {
-    const crumb = await getYahooCrumb();
+    const { crumb, cookies } = await getYahooSession();
     const params: Record<string, string> = { interval: '1d', range: '5d' };
     if (crumb) params.crumb = crumb;
 
     const response = await axios.get(`${BASE}/QQQ`, {
       params,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 10_000,
       validateStatus: () => true,
     });
@@ -395,9 +427,10 @@ export async function getEquityCurrentPrice(ticker: string): Promise<number | nu
   return getTwelveDataCurrentPrice(ticker);
 }
 
-/** Convert Twelve Data exchange symbol to Yahoo Finance symbol */
+/** Convert internal exchange:symbol to Yahoo Finance symbol */
 export function toYahooSymbol(ticker: string): string {
-  if (!ticker.includes(':')) return ticker; // US ticker, no change
+  if (YAHOO_OVERRIDE[ticker]) return YAHOO_OVERRIDE[ticker];
+  if (!ticker.includes(':')) return ticker;
   const [sym, exchange] = ticker.split(':');
   const suffix: Record<string, string> = {
     XETR: '.DE', XPAR: '.PA', LSE: '.L', XSWX: '.SW',
@@ -417,7 +450,7 @@ export interface TickerSnapshotResult {
   volume: number | null;
 }
 
-async function fetchOneTicker(ticker: string, crumb: string | null): Promise<TickerSnapshotResult> {
+async function fetchOneTicker(ticker: string, crumb: string | null, cookies: string): Promise<TickerSnapshotResult> {
   const yahooSym = toYahooSymbol(ticker);
   try {
     const params: Record<string, string> = { interval: '1d', range: '5d' };
@@ -425,7 +458,7 @@ async function fetchOneTicker(ticker: string, crumb: string | null): Promise<Tic
 
     const response = await axios.get(`${BASE}/${encodeURIComponent(yahooSym)}`, {
       params,
-      headers: YAHOO_HEADERS,
+      headers: buildYahooHeaders(cookies),
       timeout: 12_000,
       validateStatus: () => true,
     });
@@ -475,12 +508,12 @@ export async function getTickerSnapshots(tickers: string[]): Promise<TickerSnaps
   }
 
   console.log(`[Yahoo] getTickerSnapshots: fetching ${tickers.length} tickers in batches of ${SNAPSHOT_BATCH}`);
-  const crumb = await getYahooCrumb();
+  const { crumb, cookies } = await getYahooSession();
   const results: TickerSnapshotResult[] = [];
 
   for (let i = 0; i < tickers.length; i += SNAPSHOT_BATCH) {
     const batch = tickers.slice(i, i + SNAPSHOT_BATCH);
-    const batchResults = await Promise.all(batch.map((t) => fetchOneTicker(t, crumb)));
+    const batchResults = await Promise.all(batch.map((t) => fetchOneTicker(t, crumb, cookies)));
     results.push(...batchResults);
   }
 
