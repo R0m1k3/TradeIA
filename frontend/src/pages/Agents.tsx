@@ -91,16 +91,6 @@ function buildDebateAnalysisItems(debates: DebateOutput[]): LiveAnalysisItem[] {
   });
 }
 
-interface AILogMeta {
-  id: string;
-  createdAt: string;
-  durationMs: number;
-  tickersCount: number;
-  proposalsCount: number;
-  executedCount: number;
-  rejectionsCount: number;
-}
-
 export function Agents() {
   const { agents, signals, debates, cycleTimeline, analysisEvents, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
@@ -108,44 +98,9 @@ export function Agents() {
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
   const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
   const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
-  const [aiLogs, setAiLogs] = useState<AILogMeta[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const lastPerfFetchRef = useRef(0);
 
   const api = import.meta.env.VITE_API_URL || '/api';
-
-  const fetchAiLogs = () => {
-    setLogsLoading(true);
-    fetch(`${api}/ai-logs`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setAiLogs(data))
-      .catch(() => {})
-      .finally(() => setLogsLoading(false));
-  };
-
-  useEffect(() => { fetchAiLogs(); }, []);
-
-  const downloadAllLogs = () => {
-    window.open(`${api}/ai-logs/download`, '_blank');
-  };
-
-  const downloadLog = (id: string) => {
-    window.open(`${api}/ai-logs/${id}/download`, '_blank');
-  };
-
-  const deleteAllLogs = () => {
-    if (!deleteConfirm) { setDeleteConfirm(true); return; }
-    fetch(`${api}/ai-logs`, { method: 'DELETE' })
-      .then(() => { setAiLogs([]); setDeleteConfirm(false); })
-      .catch(() => {});
-  };
-
-  const deleteLog = (id: string) => {
-    fetch(`${api}/ai-logs/${id}`, { method: 'DELETE' })
-      .then(() => setAiLogs((prev) => prev.filter((l) => l.id !== id)))
-      .catch(() => {});
-  };
 
   useEffect(() => {
     const now = Date.now();

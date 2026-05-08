@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 
-const MAX_AGE_DAYS = 3;
+const MAX_LOGS = 10;
 
 export interface AILogRejection {
   ticker: string;
@@ -108,12 +108,19 @@ export class AILogCollector {
 }
 
 async function pruneOldLogs(): Promise<void> {
-  const cutoff = new Date(Date.now() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
   try {
-    const { count } = await prisma.aILog.deleteMany({
-      where: { createdAt: { lt: cutoff } },
+    const total = await prisma.aILog.count();
+    if (total < MAX_LOGS) return;
+    // Keep only MAX_LOGS most recent — delete oldest (total - MAX_LOGS + 1) to make room
+    const toDelete = total - MAX_LOGS + 1;
+    const oldest = await prisma.aILog.findMany({
+      orderBy: { createdAt: 'asc' },
+      take: toDelete,
+      select: { id: true },
     });
-    if (count > 0) console.log(`[AILogger] Pruned ${count} logs older than ${MAX_AGE_DAYS} days`);
+    const ids = oldest.map((r) => r.id);
+    const { count } = await prisma.aILog.deleteMany({ where: { id: { in: ids } } });
+    if (count > 0) console.log(`[AILogger] Pruned ${count} old logs (max ${MAX_LOGS} kept)`);
   } catch (err) {
     console.error('[AILogger] Prune failed:', (err as Error).message);
   }

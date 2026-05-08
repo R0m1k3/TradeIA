@@ -50,6 +50,16 @@ function ApiKeyInput({
   );
 }
 
+interface AILogMeta {
+  id: string;
+  createdAt: string;
+  durationMs: number;
+  tickersCount: number;
+  proposalsCount: number;
+  executedCount: number;
+  rejectionsCount: number;
+}
+
 export function Config() {
   const { config, secretsConfigured, fetchConfig, saveConfig, saveSecret, setConfig } = useConfigStore();
   const { fetchPortfolio, fetchHistory, fetchTypeStats } = usePortfolioStore();
@@ -60,6 +70,9 @@ export function Config() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetResult, setResetResult] = useState<string | null>(null);
+  const [aiLogs, setAiLogs] = useState<AILogMeta[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   async function fetchModels() {
     setLoadingModels(true);
@@ -75,8 +88,55 @@ export function Config() {
     }
   }
 
+  async function fetchAiLogs() {
+    setLogsLoading(true);
+    try {
+      const res = await fetch(`${API}/ai-logs`);
+      if (res.ok) setAiLogs(await res.json());
+    } catch { /* ignore */ } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  async function downloadAllLogs() {
+    const res = await fetch(`${API}/ai-logs/download`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadLog(id: string) {
+    const res = await fetch(`${API}/ai-logs/${id}/download`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-log-${id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function deleteLog(id: string) {
+    await fetch(`${API}/ai-logs/${id}`, { method: 'DELETE' });
+    setDeleteConfirm(null);
+    fetchAiLogs();
+  }
+
+  async function deleteAllLogs() {
+    await fetch(`${API}/ai-logs`, { method: 'DELETE' });
+    setDeleteConfirm(null);
+    setAiLogs([]);
+  }
+
   useEffect(() => {
     fetchConfig().then(() => fetchModels());
+    fetchAiLogs();
   }, []);
 
   const prevProviderRef = useRef(config.llm_provider);
@@ -474,6 +534,83 @@ export function Config() {
           </div>
           <div style={{ padding: 20 }}>
             <WatchlistEditor />
+          </div>
+        </div>
+
+        {/* ── AI Cycle Logs ── */}
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <div className="card-h">
+            <div className="card-h-title">
+              Logs IA <Help tip="Historique des cycles IA (max 10). Téléchargez ou supprimez les logs pour analyser le comportement des agents." />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={downloadAllLogs} disabled={aiLogs.length === 0}>
+                Tout télécharger
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => setDeleteConfirm('all')}
+                disabled={aiLogs.length === 0}
+              >
+                Tout supprimer
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            {deleteConfirm === 'all' && (
+              <div style={{ marginBottom: 12, padding: 10, background: 'var(--danger-soft, rgba(255,60,60,0.1))', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: 'var(--danger)' }}>Supprimer tous les logs ?</span>
+                <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={deleteAllLogs}>Confirmer</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Annuler</button>
+              </div>
+            )}
+            {logsLoading && <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Chargement...</div>}
+            {!logsLoading && aiLogs.length === 0 && (
+              <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Aucun log disponible.</div>
+            )}
+            {!logsLoading && aiLogs.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--rule)', color: 'var(--ink-3)' }}>
+                    <th style={{ textAlign: 'left', padding: '4px 8px' }}>Date</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}>Durée</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}>Tickers</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}>Propositions</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}>Exécutés</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}>Rejets</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiLogs.map((log) => (
+                    <>
+                      {deleteConfirm === log.id && (
+                        <tr key={`confirm-${log.id}`}>
+                          <td colSpan={7} style={{ padding: '6px 8px', background: 'var(--danger-soft, rgba(255,60,60,0.1))' }}>
+                            <span style={{ color: 'var(--danger)', fontSize: 12 }}>Supprimer ce log ? </span>
+                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)', marginLeft: 8 }} onClick={() => deleteLog(log.id)}>Confirmer</button>
+                            <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4 }} onClick={() => setDeleteConfirm(null)}>Annuler</button>
+                          </td>
+                        </tr>
+                      )}
+                      <tr key={log.id} style={{ borderBottom: '1px solid var(--rule)' }}>
+                        <td style={{ padding: '6px 8px', color: 'var(--ink-2)' }}>{new Date(log.createdAt).toLocaleString('fr-FR')}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--ink-3)' }}>{(log.durationMs / 1000).toFixed(1)}s</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>{log.tickersCount}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: log.proposalsCount > 0 ? 'var(--accent)' : 'var(--ink-3)' }}>{log.proposalsCount}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: log.executedCount > 0 ? 'var(--accent)' : 'var(--ink-3)' }}>{log.executedCount}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: log.rejectionsCount > 0 ? 'var(--warn)' : 'var(--ink-3)' }}>{log.rejectionsCount}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => downloadLog(log.id)} title="Télécharger">↓</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => setDeleteConfirm(log.id)} title="Supprimer">×</button>
+                        </td>
+                      </tr>
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
