@@ -45,8 +45,13 @@ function mapInterval(interval: '15m' | '1h' | '4h' | '1d'): string {
   return interval;
 }
 
-function normalizeSymbol(ticker: string): string {
-  return ticker.toUpperCase().replace(/^[$^]/, '');
+function parseTwelveDataSymbol(ticker: string): { symbol: string; exchange?: string } {
+  const clean = ticker.toUpperCase().replace(/^[$^]/, '');
+  const parts = clean.split(':');
+  if (parts.length === 2) {
+    return { symbol: parts[0], exchange: parts[1] };
+  }
+  return { symbol: clean };
 }
 
 async function getApiKey(): Promise<string> {
@@ -54,8 +59,8 @@ async function getApiKey(): Promise<string> {
 }
 
 export async function getTwelveDataCurrentPrice(ticker: string): Promise<number | null> {
-  const symbol = normalizeSymbol(ticker);
-  const cacheKey = `twelvedata:price:${symbol}`;
+  const { symbol, exchange } = parseTwelveDataSymbol(ticker);
+  const cacheKey = `twelvedata:price:${symbol}${exchange ? ':' + exchange : ''}`;
   const cached = await cacheGet<number>(cacheKey);
   if (cached) return cached;
 
@@ -66,7 +71,7 @@ export async function getTwelveDataCurrentPrice(ticker: string): Promise<number 
 
   try {
     const response = await axios.get(`${BASE_URL}/price`, {
-      params: { symbol, apikey },
+      params: { symbol, ...(exchange && { exchange }), apikey },
       timeout: 10_000,
       validateStatus: () => true,
     });
@@ -94,8 +99,8 @@ export async function getTwelveDataOHLCV(
   ticker: string,
   interval: '15m' | '1h' | '4h' | '1d',
 ): Promise<OHLCVBar[]> {
-  const symbol = normalizeSymbol(ticker);
-  const cacheKey = `twelvedata:ohlcv:${symbol}:${interval}`;
+  const { symbol, exchange } = parseTwelveDataSymbol(ticker);
+  const cacheKey = `twelvedata:ohlcv:${symbol}${exchange ? ':' + exchange : ''}:${interval}`;
   const cached = await cacheGet<OHLCVBar[]>(cacheKey);
   if (cached) return cached;
 
@@ -108,6 +113,7 @@ export async function getTwelveDataOHLCV(
     const response = await axios.get(`${BASE_URL}/time_series`, {
       params: {
         symbol,
+        ...(exchange && { exchange }),
         interval: mapInterval(interval),
         outputsize: interval === '15m' ? 120 : 160,
         order: 'ASC',
