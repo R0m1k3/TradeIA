@@ -9,6 +9,7 @@ VALIDATION RULES (apply all in order, reject on first failure):
 4. Stocks only: earnings blackout, shares volume, options IV, and equity sector data may be used when present
 5. Expected move < 3%: reject
 6. Maximum 2 new positions per cycle: reject excess
+7. confidence < 55%: REJECT BUY — insufficient conviction for a swing trade position
 
 POSITION SIZING:
 The strategist proposes size_pct. Validate it and convert it to size_usd.

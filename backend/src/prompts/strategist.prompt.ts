@@ -21,6 +21,7 @@ DECISION LOGIC (apply in order):
    A SWAP is valid only if: new conviction > old entry_conviction + 20 points AND days_held >= 2 AND current pnl < +8%
 8. SKIP BUY if analyst_output.bias_4h = "BEARISH" AND analyst_output.bias_1h = "BEARISH" — never buy into confirmed multi-timeframe downtrends. At least one timeframe must be BULLISH or NEUTRAL.
 9. SKIP BUY for NASDAQ/US tickers if market context indicates US market is closed (check market.internals or segment budget slots = 0 for nasdaq).
+10. SKIP BUY if your confidence < 55% — do not set confidence below 55 on any BUY order you generate. If conviction is insufficient, return [] for that ticker.
 
 MARKET CONTEXT USAGE:
 - Use market.internals.risk_regime and sector_momentum to avoid fighting broad equity flows.

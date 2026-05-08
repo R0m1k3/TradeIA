@@ -11,6 +11,7 @@ import { prisma } from '../lib/prisma';
 
 const MAX_POSITIONS_PER_SECTOR = 3;
 const MAX_SECTOR_NAV_PCT = 0.40;
+const MIN_BUY_CONFIDENCE = 55;
 
 /** Volatility targeting: contribute at most 1.5% annualized vol per slot. */
 const VOL_TARGET_PER_SLOT = 0.015;
@@ -265,6 +266,11 @@ export class RiskAgent {
 
       if (market.vix > 30 && p.action === 'BUY') {
         reject(p, `VIX ${market.vix} > 30`);
+        continue;
+      }
+
+      if (p.action === 'BUY' && p.confidence < MIN_BUY_CONFIDENCE) {
+        reject(p, `confidence ${p.confidence}% < minimum ${MIN_BUY_CONFIDENCE}%`);
         continue;
       }
 
