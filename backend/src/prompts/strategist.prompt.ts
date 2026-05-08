@@ -19,6 +19,8 @@ DECISION LOGIC (apply in order):
 6. Do NOT generate duplicate orders for already-held positions.
 7. For SWAP orders: action="SWAP", ticker=new_ticker, swap_sell_ticker=old_ticker_to_sell
    A SWAP is valid only if: new conviction > old entry_conviction + 20 points AND days_held >= 2 AND current pnl < +8%
+8. SKIP BUY if analyst_output.bias_4h = "BEARISH" AND analyst_output.bias_1h = "BEARISH" — never buy into confirmed multi-timeframe downtrends. At least one timeframe must be BULLISH or NEUTRAL.
+9. SKIP BUY for NASDAQ/US tickers if market context indicates US market is closed (check market.internals or segment budget slots = 0 for nasdaq).
 
 MARKET CONTEXT USAGE:
 - Use market.internals.risk_regime and sector_momentum to avoid fighting broad equity flows.

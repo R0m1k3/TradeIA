@@ -38,7 +38,7 @@ export class BalanceController {
     if (!nasdaq_open && eu_open) {
       // Only EU open
       rawSlots = {
-        nasdaq: 1,
+        nasdaq: 0,
         cac40: Math.round(BASE_SLOTS.cac40 * 1.5),
         dax40: Math.round(BASE_SLOTS.dax40 * 1.5),
         ftse100: Math.round(BASE_SLOTS.ftse100 * 1.5),
