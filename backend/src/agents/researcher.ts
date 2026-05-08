@@ -70,18 +70,18 @@ export class ResearcherAgent {
 
       selectedAnalyses = validAnalyses
         .filter((a) => selectedTickers.has(a.ticker))
-        .slice(0, 15);
+        .slice(0, 5);
     } else {
-      // Backward compat: top 10 globally
+      // Backward compat: top 5 globally
       selectedAnalyses = validAnalyses
         .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 10);
+        .slice(0, 5);
     }
 
-    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (max 5 concurrent)`);
+    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (2 concurrent)`);
 
-    // Semaphore: max 5 concurrent ticker debates (each ticker = 2 LLM calls)
-    const CONCURRENCY = 5;
+    // 2 tickers at a time = 4 concurrent LLM calls max — keeps Ollama responsive
+    const CONCURRENCY = 2;
     const results: PromiseSettledResult<DebateOutput | null>[] = [];
     for (let i = 0; i < selectedAnalyses.length; i += CONCURRENCY) {
       const batch = selectedAnalyses.slice(i, i + CONCURRENCY);
