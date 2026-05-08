@@ -78,11 +78,14 @@ export class ResearcherAgent {
         .slice(0, 10);
     }
 
-    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (parallel)`);
+    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (max 5 concurrent)`);
 
-    // Run all debates in parallel
-    const results = await Promise.allSettled(
-      selectedAnalyses.map(async (analysis) => {
+    // Semaphore: max 5 concurrent ticker debates (each ticker = 2 LLM calls)
+    const CONCURRENCY = 5;
+    const results: PromiseSettledResult<DebateOutput | null>[] = [];
+    for (let i = 0; i < selectedAnalyses.length; i += CONCURRENCY) {
+      const batch = selectedAnalyses.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.allSettled(batch.map(async (analysis) => {
         const tickerData = collector.tickers[analysis.ticker];
         if (!tickerData) return null;
 
@@ -118,8 +121,9 @@ export class ResearcherAgent {
           debate_score: bull.conviction - bear.conviction,
           analyst_output: analysis,
         } as DebateOutput;
-      })
-    );
+      }));
+      results.push(...batchResults);
+    }
 
     const validDebates = results
       .filter((r): r is PromiseFulfilledResult<DebateOutput> => r.status === 'fulfilled' && r.value !== null)
