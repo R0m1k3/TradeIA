@@ -55,7 +55,14 @@ export const useSignalsStore = create<SignalsStore>((set) => ({
   cycleTimeline: [],
 
   setSignals: (signals) => set({ signals }),
-  setMarket: (market) => set((state) => ({ market: { ...state.market, ...market } })),
+  setMarket: (market) => set((state) => {
+    // Only merge keys with non-null values — prevents live-state heartbeats from wiping
+    // sector_biases / macro / data_freshness that were set by a full cycle broadcast
+    const clean = Object.fromEntries(
+      Object.entries(market as unknown as Record<string, unknown>).filter(([, v]) => v !== null && v !== undefined)
+    );
+    return { market: { ...state.market, ...clean } };
+  }),
   setOrdersExecuted: (ordersExecuted) => set({ ordersExecuted }),
   setDebates: (debates) => set({ debates }),
   setAnalysisEvents: (analysisEvents) => set((state) => ({ analysisEvents: [...state.analysisEvents.slice(-80), ...analysisEvents].slice(-80) })),
