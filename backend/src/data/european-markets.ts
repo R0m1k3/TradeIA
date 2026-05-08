@@ -1,6 +1,5 @@
-import axios from 'axios';
-import { getCredential } from '../config/credentials';
 import { cacheGet, cacheSet, TTL } from './cache';
+import { getTickerSnapshots } from './yahoo';
 
 export interface EUIndexData {
   cac40_change_pct: number;
@@ -17,20 +16,7 @@ export interface EUMarketStatus {
   nextOpen: string;
 }
 
-const TWELVE_DATA = 'https://api.twelvedata.com';
-
-// European index symbols for Twelve Data / Yahoo
-const EU_INDICES = {
-  cac40: { twelve: '^FCHI', yahoo: '^FCHI' },
-  dax: { twelve: '^GDAXI', yahoo: '^GDAXI' },
-  ftse100: { twelve: '^FTSE', yahoo: '^FTSE' },
-};
-
-async function getTwelveDataKey(): Promise<string | null> {
-  return getCredential('twelve_data_key', 'TWELVE_DATA_KEY');
-}
-
-/** Get daily change % for CAC 40, DAX, FTSE 100 */
+/** Get daily change % for CAC 40, DAX, FTSE 100 via getTickerSnapshots (shared crumb + proven path) */
 export async function getEUIndexDirection(): Promise<EUIndexData> {
   const cacheKey = 'eu:index_direction';
   const cached = await cacheGet<EUIndexData>(cacheKey);
@@ -43,84 +29,17 @@ export async function getEUIndexDirection(): Promise<EUIndexData> {
     eu_market_open: isEuropeanMarketOpen(new Date()),
   };
 
-  // Try Twelve Data first (covers all three indices with one API key)
-  const apikey = await getTwelveDataKey();
-  if (apikey) {
-    try {
-      const symbols = Object.values(EU_INDICES).map(s => s.twelve).join(',');
-      const response = await axios.get(`${TWELVE_DATA}/quote`, {
-        params: { symbol: symbols, apikey },
-        timeout: 10_000,
-        validateStatus: () => true,
-      });
-
-      if (response.status === 200) {
-        const data = response.data;
-        // Twelve Data returns either an object (single) or map of symbols
-        const extract = (sym: string): number => {
-          const entry = data[sym] || data;
-          const pct = parseFloat(entry?.percent_change || entry?.change_percent || '0');
-          return isNaN(pct) ? 0 : pct;
-        };
-        result.cac40_change_pct = Math.round(extract(EU_INDICES.cac40.twelve) * 100) / 100;
-        result.dax_change_pct = Math.round(extract(EU_INDICES.dax.twelve) * 100) / 100;
-        result.ftse100_change_pct = Math.round(extract(EU_INDICES.ftse100.twelve) * 100) / 100;
-
-        await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
-        return result;
-      }
-    } catch (err) {
-      console.warn('[EU Markets] Twelve Data failed:', (err as Error).message);
-    }
-  }
-
-  // Fallback: Yahoo Finance for each index
-  const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
-  const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
-
-  // Get Yahoo crumb
-  let crumb: string | null = null;
   try {
-    const crumbRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: YAHOO_HEADERS,
-      timeout: 10_000,
-    });
-    if (typeof crumbRes.data === 'string' && crumbRes.data.length > 5) {
-      crumb = crumbRes.data;
+    const snapshots = await getTickerSnapshots(['^FCHI', '^GDAXI', '^FTSE']);
+    for (const s of snapshots) {
+      const pct = s.change_1d_pct !== null ? Math.round(s.change_1d_pct * 100) / 100 : 0;
+      if (s.ticker === '^FCHI') result.cac40_change_pct = pct;
+      else if (s.ticker === '^GDAXI') result.dax_change_pct = pct;
+      else if (s.ticker === '^FTSE') result.ftse100_change_pct = pct;
     }
-  } catch {
-    // Continue without crumb
-  }
-
-  for (const [key, sym] of Object.entries(EU_INDICES)) {
-    try {
-      const params: Record<string, string> = { interval: '1d', range: '5d' };
-      if (crumb) params.crumb = crumb;
-      const response = await axios.get(`${YAHOO_BASE}/${sym.yahoo}`, {
-        params,
-        headers: YAHOO_HEADERS,
-        timeout: 10_000,
-        validateStatus: () => true,
-      });
-
-      if (response.status === 200) {
-        const closes = response.data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
-        if (closes && closes.length >= 2) {
-          const validCloses = closes.filter((c: number | null) => c !== null);
-          if (validCloses.length >= 2) {
-            const today = validCloses[validCloses.length - 1];
-            const yesterday = validCloses[validCloses.length - 2];
-            const pct = ((today - yesterday) / yesterday) * 100;
-            const rounded = Math.round(pct * 100) / 100;
-            if (key === 'cac40') result.cac40_change_pct = rounded;
-            if (key === 'dax') result.dax_change_pct = rounded;
-            if (key === 'ftse100') result.ftse100_change_pct = rounded;
-          }
-        }
-      }
-    } catch {
-      // Continue with other indices
-    }
+    console.log(`[EU Markets] CAC40 ${result.cac40_change_pct}% DAX ${result.dax_change_pct}% FTSE ${result.ftse100_change_pct}%`);
+  } catch (err) {
+    console.warn('[EU Markets] getEUIndexDirection failed:', (err as Error).message);
   }
 
   await cacheSet(cacheKey, result, TTL.MARKET_CONTEXT);
