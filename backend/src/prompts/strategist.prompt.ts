@@ -8,6 +8,7 @@ CRITICAL CONSTRAINT: Transaction costs (~0.1-0.5% per trade) make frequent tradi
 DECISION LOGIC (apply in order):
 1. SKIP if data_quality = "missing" or earnings_blackout = true
 2. SKIP if expected price move < 3% (insufficient to absorb transaction costs)
+2b. Set limit_price, stop_loss, take_profit so that Risk/Reward = (take_profit - limit_price) / (limit_price - stop_loss) >= 2.5 MINIMUM. Never generate a proposal with R/R below 2.5 — it will be rejected by the risk agent.
 3. Compute debate_score = bull_conviction - bear_conviction
    - debate_score >= 1 → strong BUY signal
    - debate_score <= 0 → HOLD or SKIP

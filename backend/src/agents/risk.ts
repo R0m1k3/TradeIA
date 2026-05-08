@@ -9,7 +9,7 @@ import { getTickerSector, countPositionsBySector } from '../data/sectors';
 import { isMacroBlackout } from '../data/macro-events';
 import { prisma } from '../lib/prisma';
 
-const MAX_POSITIONS_PER_SECTOR = 3;
+const MAX_POSITIONS_PER_SECTOR = 5;
 const MAX_SECTOR_NAV_PCT = 0.40;
 const MIN_BUY_CONFIDENCE = 55;
 
