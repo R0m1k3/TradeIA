@@ -59,10 +59,11 @@ export class ResearcherAgent {
       const selectedTickers = new Set<string>();
 
       for (const [seg, alloc] of Object.entries(budget.segments) as Array<[MarketSegment, { slots: number; candidates_to_analyze: number }]>) {
+        const perSegCap = Math.max(alloc.slots * 3, 5);
         const segAnalyses = validAnalyses
           .filter((a) => ticker_segments[a.ticker] === seg)
           .sort((a, b) => b.confidence - a.confidence)
-          .slice(0, alloc.slots + 1);
+          .slice(0, perSegCap);
 
         for (const a of segAnalyses) {
           selectedTickers.add(a.ticker);
@@ -71,7 +72,7 @@ export class ResearcherAgent {
 
       selectedAnalyses = validAnalyses
         .filter((a) => selectedTickers.has(a.ticker))
-        .slice(0, 5);
+        .slice(0, 30);
     } else {
       // Backward compat: top 5 globally
       selectedAnalyses = validAnalyses
@@ -79,10 +80,9 @@ export class ResearcherAgent {
         .slice(0, 5);
     }
 
-    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (2 concurrent)`);
+    console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (4 concurrent)`);
 
-    // 2 tickers at a time = 4 concurrent LLM calls max — keeps Ollama responsive
-    const CONCURRENCY = 2;
+    const CONCURRENCY = 4;
     const results: PromiseSettledResult<DebateOutput | null>[] = [];
     for (let i = 0; i < selectedAnalyses.length; i += CONCURRENCY) {
       const batch = selectedAnalyses.slice(i, i + CONCURRENCY);

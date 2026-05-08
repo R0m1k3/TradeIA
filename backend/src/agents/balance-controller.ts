@@ -100,7 +100,7 @@ export class BalanceController {
       if (reducedSlots > 0) {
         segments[seg] = {
           slots: freeSlots,
-          candidates_to_analyze: freeSlots * 3 || (existingCount > 0 ? 3 : 0),
+          candidates_to_analyze: 999, // analyst sees full segment list (deterministic, no LLM cost)
         };
         total_new_slots += freeSlots;
       }
