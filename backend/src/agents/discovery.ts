@@ -11,7 +11,7 @@ export interface DiscoveryResult {
 }
 
 export const NASDAQ_100: string[] = [
-  'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMGN', 'AMZN', 'ANSS',
+  'AAPL', 'ABNB', 'ADBE', 'ADI', 'ADP', 'ADSK', 'AEP', 'AMGN', 'AMZN', 'SNPS',
   'ARM', 'ASML', 'AVGO', 'AXON', 'AZN', 'BIIB', 'BKNG', 'BKR', 'CDNS', 'CDW',
   'CEG', 'CHTR', 'CMCSA', 'COIN', 'COST', 'CPRT', 'CRWD', 'CTAS', 'CTSH', 'DASH',
   'DDOG', 'DLTR', 'DXCM', 'EA', 'EXC', 'FANG', 'FAST', 'FTNT', 'GE', 'GILD',
@@ -26,7 +26,7 @@ export const NASDAQ_100: string[] = [
 export const DAX_40: string[] = [
   'SAP:XETR', 'SIE:XETR', 'ALV:XETR', 'DTE:XETR', 'BAS:XETR', 'BMW:XETR', 'MBG:XETR',
   'BAYN:XETR', 'ADS:XETR', 'DBK:XETR', 'BEI:XETR', 'CBK:XETR', 'CON:XETR', 'DB1:XETR',
-  'DHL:XETR', 'EON:XETR', 'FME:XETR', 'FRE:XETR', 'HEID:XETR', 'HEN3:XETR', 'IFX:XETR',
+  'DHL:XETR', 'EOAN:XETR', 'FME:XETR', 'FRE:XETR', 'HEID:XETR', 'HEN3:XETR', 'IFX:XETR',
   'MRK:XETR', 'MUV2:XETR', 'PAH3:XETR', 'P911:XETR', 'PUM:XETR', 'QIA:XETR', 'RHM:XETR',
   'RWE:XETR', 'SRT3:XETR', 'SHL:XETR', 'SY1:XETR', 'VOW3:XETR', 'VNA:XETR', 'ZAL:XETR',
   'ENR:XETR', 'MTX:XETR', 'BNR:XETR', 'BOSS:XETR', 'DTG:XETR',
@@ -38,7 +38,7 @@ export const CAC_40: string[] = [
   'CAP:XPAR', 'CA:XPAR', 'DG:XPAR', 'EL:XPAR', 'EN:XPAR', 'GLE:XPAR', 'HO:XPAR',
   'ML:XPAR', 'ORA:XPAR', 'PUB:XPAR', 'RI:XPAR', 'RNO:XPAR', 'SAF:XPAR', 'SGO:XPAR',
   'STLA:XPAR', 'STM:XPAR', 'URW:XPAR', 'VIE:XPAR', 'VIV:XPAR', 'WLN:XPAR', 'ERF:XPAR',
-  'SG:XPAR', 'NK:XPAR', 'FP:XPAR', 'CS:XPAR', 'VK:XPAR',
+  'NK:XPAR', 'CS:XPAR', 'VK:XPAR',
 ];
 
 export const FTSE_100: string[] = [

@@ -13,8 +13,9 @@ export interface Fundamentals {
   market_cap: number | null;
 }
 
-const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
-const SUMMARY = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary';
+const BASE = 'https://query2.finance.yahoo.com/v8/finance/chart';
+const BASE_Q1 = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const SUMMARY = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary';
 
 const YAHOO_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -41,39 +42,46 @@ let sessionLogged = false;
 async function getYahooSession(): Promise<{ crumb: string | null; cookies: string }> {
   if (cachedCrumb && Date.now() < sessionExpiry) return { crumb: cachedCrumb, cookies: cachedCookies };
 
+  // Strategy: try query2 crumb endpoint directly (avoids GDPR consent redirect for EU servers)
+  // If that fails, try with finance.yahoo.com home cookies
   try {
-    // Step 1: visit finance.yahoo.com to get session cookies (A1/A3/cmp etc.)
-    const homeRes = await axios.get('https://finance.yahoo.com/', {
-      headers: { 'User-Agent': YAHOO_HEADERS['User-Agent'] },
-      timeout: 12_000,
-      validateStatus: () => true,
-      maxRedirects: 5,
-    });
+    for (const crumbUrl of [
+      'https://query2.finance.yahoo.com/v1/test/getcrumb',
+      'https://query1.finance.yahoo.com/v1/test/getcrumb',
+    ]) {
+      try {
+        const crumbRes = await axios.get(crumbUrl, {
+          headers: { ...YAHOO_HEADERS, ...(cachedCookies ? { Cookie: cachedCookies } : {}) },
+          timeout: 8_000,
+          validateStatus: () => true,
+        });
 
-    const setCookieArr: string[] = (homeRes.headers['set-cookie'] as string[] | undefined) ?? [];
-    if (setCookieArr.length > 0) {
-      cachedCookies = setCookieArr.map((c) => c.split(';')[0]).join('; ');
-    }
+        // Also capture any cookies set by the crumb endpoint itself
+        const setCookieArr: string[] = (crumbRes.headers['set-cookie'] as string[] | undefined) ?? [];
+        if (setCookieArr.length > 0 && !cachedCookies) {
+          cachedCookies = setCookieArr.map((c) => c.split(';')[0]).join('; ');
+        }
 
-    // Step 2: fetch crumb with the cookies
-    const crumbRes = await axios.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: { ...YAHOO_HEADERS, ...(cachedCookies ? { Cookie: cachedCookies } : {}) },
-      timeout: 10_000,
-    });
-
-    if (typeof crumbRes.data === 'string' && crumbRes.data.length > 4) {
-      cachedCrumb = crumbRes.data.trim();
-      sessionExpiry = Date.now() + 3_600_000;
-      if (!sessionLogged) {
-        console.log('[Yahoo] Session established (crumb + cookies)');
-        sessionLogged = true;
+        if (typeof crumbRes.data === 'string' && crumbRes.data.length > 4) {
+          cachedCrumb = crumbRes.data.trim();
+          sessionExpiry = Date.now() + 3_600_000;
+          if (!sessionLogged) {
+            console.log(`[Yahoo] Crumb obtained from ${crumbUrl.includes('query2') ? 'query2' : 'query1'}`);
+            sessionLogged = true;
+          }
+          break;
+        }
+      } catch {
+        // try next endpoint
       }
     }
   } catch {
-    if (!sessionLogged) {
-      console.warn('[Yahoo] Could not establish session — requests will proceed without auth');
-      sessionLogged = true;
-    }
+    // ignore
+  }
+
+  if (!cachedCrumb && !sessionLogged) {
+    console.warn('[Yahoo] Could not obtain crumb — proceeding without auth (EU tickers may 404)');
+    sessionLogged = true;
   }
 
   return { crumb: cachedCrumb, cookies: cachedCookies };
@@ -118,6 +126,30 @@ export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h
     });
 
     if (response.status === 401 || response.status === 404) {
+      // query2 failed — retry with query1 for EU tickers
+      if (ticker.includes('.')) {
+        const q1Res = await axios.get(`${BASE_Q1}/${ticker}`, {
+          params,
+          headers: buildYahooHeaders(cookies),
+          timeout: 15_000,
+          validateStatus: () => true,
+        });
+        if (q1Res.status === 200) {
+          const r2: YahooChartResult = q1Res.data?.chart?.result?.[0];
+          if (r2?.timestamp && r2?.indicators?.quote?.[0]) {
+            const q2 = r2.indicators.quote[0];
+            const bars2: OHLCVBar[] = [];
+            for (let i = 0; i < r2.timestamp!.length; i++) {
+              const o = q2.open?.[i]; const h = q2.high?.[i]; const l = q2.low?.[i]; const c = q2.close?.[i];
+              if (o != null && h != null && l != null && c != null) bars2.push({ time: unixToISO(r2.timestamp![i]), open: o, high: h, low: l, close: c, volume: q2.volume?.[i] ?? 0 });
+            }
+            if (bars2.length > 0) {
+              await cacheSet(cacheKey, bars2, interval === '15m' ? TTL.OHLCV : TTL.FUNDAMENTALS);
+              return bars2;
+            }
+          }
+        }
+      }
       console.warn(`[Yahoo] getOHLCV ${ticker} ${interval}: HTTP ${response.status} — skipping`);
       return [];
     }
