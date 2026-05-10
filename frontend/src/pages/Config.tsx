@@ -65,6 +65,8 @@ export function Config() {
   const { fetchPortfolio, fetchHistory, fetchTypeStats } = usePortfolioStore();
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [alpacaTestResult, setAlpacaTestResult] = useState<string | null>(null);
+  const [testingAlpaca, setTestingAlpaca] = useState(false);
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -156,6 +158,23 @@ export function Config() {
     await saveConfig(safeConfig);
     await fetchModels();
     setSaving(false);
+  }
+
+  async function testAlpaca() {
+    setTestingAlpaca(true);
+    setAlpacaTestResult(null);
+    try {
+      const res = await fetch(`${API}/config/test-alpaca`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setAlpacaTestResult(`✓ ${data.message} — Equity $${data.equity} | Cash $${data.cash}`);
+      } else {
+        setAlpacaTestResult(`✗ ${data.message}`);
+      }
+    } catch {
+      setAlpacaTestResult('✗ Connexion échouée');
+    }
+    setTestingAlpaca(false);
   }
 
   async function testLLM() {
@@ -370,6 +389,98 @@ export function Config() {
             <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
               Astuce : Twelve Data couvre les actions US et européennes. EODHD est un bon complément pour les données historiques et fondamentales européennes.
               L'application croise Twelve Data, Polygon, Yahoo, EODHD, TradingView et les flux news.
+            </div>
+          </div>
+        </div>
+
+        {/* ── Broker d'exécution ── */}
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <div className="card-h">
+            <div className="card-h-title">
+              Broker d'exécution <Help tip="Choisissez comment les ordres sont exécutés : simulation locale ou Alpaca (paper/live)." />
+            </div>
+          </div>
+          <div style={{ padding: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <div>
+                <label className="label">Type de broker</label>
+                <select
+                  className="select"
+                  value={config.broker_type}
+                  onChange={(e) => saveConfig({ broker_type: e.target.value })}
+                  style={{ marginBottom: 16 }}
+                >
+                  <option value="mock">Mock (simulation locale)</option>
+                  <option value="alpaca">Alpaca (paper ou live)</option>
+                  <option value="none">Aucun (dry-run, analyse seulement)</option>
+                </select>
+
+                {config.broker_type === 'mock' && (
+                  <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)' }}>
+                    Simulation locale — aucun argent réel. Trades exécutés en base avec slippage simulé.
+                  </div>
+                )}
+
+                {config.broker_type === 'none' && (
+                  <div style={{ padding: 12, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)' }}>
+                    Dry-run — les agents analysent et valident les ordres mais n'exécutent rien.
+                  </div>
+                )}
+
+                {config.broker_type === 'alpaca' && (
+                  <div>
+                    <label className="label">Environnement Alpaca</label>
+                    <select
+                      className="select"
+                      value={config.alpaca_base_url}
+                      onChange={(e) => saveConfig({ alpaca_base_url: e.target.value })}
+                      style={{ marginBottom: 16 }}
+                    >
+                      <option value="https://paper-api.alpaca.markets">Paper Trading (gratuit, aucun risque)</option>
+                      <option value="https://api.alpaca.markets">Live Trading (argent réel ⚠️)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {config.broker_type === 'alpaca' && (
+                <div>
+                  <ApiKeyInput
+                    label="Alpaca API Key"
+                    configured={secretsConfigured.alpaca_key}
+                    placeholder="PKXXXXXXXXXXXXXXXXXXXXXXXX"
+                    onSave={(val) => saveSecret('alpaca_key', val)}
+                  />
+                  <ApiKeyInput
+                    label="Alpaca Secret Key"
+                    configured={secretsConfigured.alpaca_secret}
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    onSave={(val) => saveSecret('alpaca_secret', val)}
+                  />
+                  <div style={{ padding: 10, background: 'var(--bg-elev-2)', borderRadius: 6, fontSize: 11, color: 'var(--ink-3)', marginBottom: 12 }}>
+                    Créez un compte sur{' '}
+                    <strong style={{ color: 'var(--ink-2)' }}>app.alpaca.markets</strong>
+                    {' '}→ Paper Account → API Keys. Paper trading = gratuit, pas de vérification d'identité requise.
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={testAlpaca}
+                      disabled={testingAlpaca || !secretsConfigured.alpaca_key || !secretsConfigured.alpaca_secret}
+                    >
+                      {testingAlpaca ? 'Test...' : 'Tester la connexion'}
+                    </button>
+                    {alpacaTestResult && (
+                      <span className="mono" style={{
+                        fontSize: 12,
+                        color: alpacaTestResult.startsWith('✓') ? 'var(--accent)' : 'var(--danger)',
+                      }}>
+                        {alpacaTestResult}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

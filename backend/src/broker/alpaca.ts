@@ -1,12 +1,13 @@
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { broadcastPositionClosed } from '../websocket';
+import { getCredential } from '../config/credentials';
 import type { ApprovedOrder, ExecutionResult, Position } from './mock';
 
-function getAlpacaConfig(): { key: string; secret: string; baseUrl: string } {
-  const key = process.env.ALPACA_KEY ?? '';
-  const secret = process.env.ALPACA_SECRET ?? '';
-  const baseUrl = process.env.ALPACA_BASE_URL ?? 'https://paper-api.alpaca.markets';
+async function getAlpacaConfig(): Promise<{ key: string; secret: string; baseUrl: string }> {
+  const key = await getCredential('alpaca_key', 'ALPACA_KEY');
+  const secret = await getCredential('alpaca_secret', 'ALPACA_SECRET');
+  const baseUrl = await getCredential('alpaca_base_url', 'ALPACA_BASE_URL') || 'https://paper-api.alpaca.markets';
   if (!key || !secret) throw new Error('ALPACA_KEY et ALPACA_SECRET requis (BROKER_TYPE=alpaca)');
   return { key, secret, baseUrl };
 }
@@ -28,7 +29,7 @@ function toAlpacaSymbol(ticker: string): string {
 }
 
 export async function executeAlpacaOrder(order: ApprovedOrder): Promise<ExecutionResult> {
-  const { key, secret, baseUrl } = getAlpacaConfig();
+  const { key, secret, baseUrl } = await getAlpacaConfig();
   const headers = alpacaHeaders(key, secret);
   const symbol = toAlpacaSymbol(order.ticker);
 
@@ -121,7 +122,7 @@ export interface AlpacaAccount {
 }
 
 export async function getAlpacaAccount(): Promise<AlpacaAccount> {
-  const { key, secret, baseUrl } = getAlpacaConfig();
+  const { key, secret, baseUrl } = await getAlpacaConfig();
   const res = await axios.get(`${baseUrl}/v2/account`, {
     headers: alpacaHeaders(key, secret),
     timeout: 8_000,
@@ -136,7 +137,7 @@ export async function getAlpacaAccount(): Promise<AlpacaAccount> {
 }
 
 export async function getAlpacaPositions(): Promise<Position[]> {
-  const { key, secret, baseUrl } = getAlpacaConfig();
+  const { key, secret, baseUrl } = await getAlpacaConfig();
   const res = await axios.get(`${baseUrl}/v2/positions`, {
     headers: alpacaHeaders(key, secret),
     timeout: 8_000,
@@ -155,7 +156,7 @@ export async function getAlpacaPositions(): Promise<Position[]> {
 }
 
 export async function closeAlpacaPosition(symbol: string): Promise<void> {
-  const { key, secret, baseUrl } = getAlpacaConfig();
+  const { key, secret, baseUrl } = await getAlpacaConfig();
   await axios.delete(`${baseUrl}/v2/positions/${toAlpacaSymbol(symbol)}`, {
     headers: alpacaHeaders(key, secret),
     timeout: 8_000,
@@ -174,7 +175,7 @@ export async function closeAlpacaPosition(symbol: string): Promise<void> {
 }
 
 export async function cancelAllAlpacaOrders(): Promise<void> {
-  const { key, secret, baseUrl } = getAlpacaConfig();
+  const { key, secret, baseUrl } = await getAlpacaConfig();
   await axios.delete(`${baseUrl}/v2/orders`, {
     headers: alpacaHeaders(key, secret),
     timeout: 8_000,

@@ -23,6 +23,25 @@ const KEYS_TO_INVALIDATE = new Set([
   'model_strong',
   'llm_provider',
   'eodhd_key',
+  // Broker
+  'broker_type',
+  'alpaca_key',
+  'alpaca_secret',
+  'alpaca_base_url',
+]);
+
+const SECRET_KEYS = new Set([
+  'openrouter_api_key',
+  'alpha_vantage_key',
+  'polygon_key',
+  'finnhub_key',
+  'twelve_data_key',
+  'fred_api_key',
+  'socialdata_key',
+  'ollama_api_key',
+  'eodhd_key',
+  'alpaca_key',
+  'alpaca_secret',
 ]);
 
 const configRoutes: FastifyPluginAsync = async (fastify) => {
@@ -32,19 +51,15 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
     const secretsConfigured: Record<string, boolean> = {};
 
     for (const c of configs) {
-      if (KEYS_TO_INVALIDATE.has(c.key)) {
-        if (['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key', 'eodhd_key'].includes(c.key)) {
-          secretsConfigured[c.key] = c.value.length > 0;
-        } else {
-          result[c.key] = c.value;
-        }
+      if (SECRET_KEYS.has(c.key)) {
+        secretsConfigured[c.key] = c.value.length > 0;
       } else {
         result[c.key] = c.value;
       }
     }
 
-    // Ensure all sensitive keys appear in secrets_configured
-    for (const key of ['openrouter_api_key', 'alpha_vantage_key', 'polygon_key', 'finnhub_key', 'twelve_data_key', 'fred_api_key', 'socialdata_key', 'ollama_api_key', 'eodhd_key']) {
+    // Ensure all secret keys appear in secrets_configured (false if not set)
+    for (const key of SECRET_KEYS) {
       if (!(key in secretsConfigured)) secretsConfigured[key] = false;
     }
 
@@ -60,6 +75,8 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
       daily_loss_limit_pct: result.daily_loss_limit_pct || process.env.DAILY_LOSS_LIMIT_PCT || '',
       max_drawdown_pct: result.max_drawdown_pct || '10',
       mock_broker: result.mock_broker || process.env.MOCK_BROKER || '',
+      broker_type: result.broker_type || process.env.BROKER_TYPE || 'mock',
+      alpaca_base_url: result.alpaca_base_url || process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets',
       secrets_configured: secretsConfigured,
     };
   });
@@ -175,6 +192,41 @@ const configRoutes: FastifyPluginAsync = async (fastify) => {
           'qwen/qwen-2.5-72b-instruct',
         ];
       }
+    }
+  });
+
+  fastify.post('/test-alpaca', async (_req, reply) => {
+    try {
+      const { getCredential } = await import('../config/credentials');
+      const key = await getCredential('alpaca_key', 'ALPACA_KEY');
+      const secret = await getCredential('alpaca_secret', 'ALPACA_SECRET');
+      const baseUrl = await getCredential('alpaca_base_url', 'ALPACA_BASE_URL') || 'https://paper-api.alpaca.markets';
+
+      if (!key || !secret) {
+        return reply.status(400).send({ success: false, message: 'ALPACA_KEY et ALPACA_SECRET requis' });
+      }
+
+      const res = await axios.get(`${baseUrl}/v2/account`, {
+        headers: { 'APCA-API-KEY-ID': key, 'APCA-API-SECRET-KEY': secret },
+        timeout: 8_000,
+      });
+
+      const acc = res.data;
+      const mode = baseUrl.includes('paper') ? 'Paper Trading' : 'Live Trading';
+      return {
+        success: true,
+        message: `Alpaca connecté (${mode})`,
+        equity: parseFloat(acc.equity).toFixed(2),
+        cash: parseFloat(acc.cash).toFixed(2),
+        status: acc.status,
+        mode,
+      };
+    } catch (err: any) {
+      const msg = err.response?.status === 403 ? 'Clés invalides (403 Forbidden)' :
+                  err.response?.status === 401 ? 'Clés invalides (401 Unauthorized)' :
+                  err.code === 'ECONNREFUSED' ? 'Connexion refusée' :
+                  err.message;
+      return reply.status(500).send({ success: false, message: msg });
     }
   });
 

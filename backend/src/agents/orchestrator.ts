@@ -420,7 +420,8 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   // MOCK_BROKER=true (default) → simulation locale
   // MOCK_BROKER=false sans BROKER_TYPE=alpaca → dry-run (pas d'exécution)
   const execResults = [];
-  const brokerType = process.env.BROKER_TYPE ?? (process.env.MOCK_BROKER !== 'false' ? 'mock' : 'none');
+  const brokerTypeRaw = await getCredential('broker_type', 'BROKER_TYPE');
+  const brokerType = brokerTypeRaw || (process.env.MOCK_BROKER !== 'false' ? 'mock' : 'none');
   for (const order of approvedOrders) {
     try {
       if (brokerType === 'alpaca') {

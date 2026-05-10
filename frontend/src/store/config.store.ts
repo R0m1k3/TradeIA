@@ -11,6 +11,8 @@ interface Config {
   max_drawdown_pct: string;
   mock_broker: string;
   ollama_base_url: string;
+  broker_type: string;
+  alpaca_base_url: string;
   [key: string]: string;
 }
 
@@ -23,6 +25,8 @@ interface ConfigSecrets {
   fred_api_key: boolean;
   ollama_api_key: boolean;
   eodhd_key: boolean;
+  alpaca_key: boolean;
+  alpaca_secret: boolean;
 }
 
 interface ConfigStore {
@@ -50,6 +54,8 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     max_drawdown_pct: '10',
     mock_broker: 'true',
     ollama_base_url: '',
+    broker_type: 'mock',
+    alpaca_base_url: 'https://paper-api.alpaca.markets',
   },
   secretsConfigured: {
     openrouter_api_key: false,
@@ -60,6 +66,8 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     fred_api_key: false,
     ollama_api_key: false,
     eodhd_key: false,
+    alpaca_key: false,
+    alpaca_secret: false,
   },
   paused: false,
 
