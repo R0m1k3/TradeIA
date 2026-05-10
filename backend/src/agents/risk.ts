@@ -12,6 +12,7 @@ import { prisma } from '../lib/prisma';
 const MAX_POSITIONS_PER_SECTOR = 5;
 const MAX_SECTOR_NAV_PCT = 0.40;
 const MIN_BUY_CONFIDENCE = 55;
+const CORR_THRESHOLD = 0.65; // au-delà : réduire la taille proportionnellement
 
 /** Volatility targeting: contribute at most 1.5% annualized vol per slot. */
 const VOL_TARGET_PER_SLOT = 0.015;
@@ -38,6 +39,35 @@ function volatilityBasedSizeCap(
 interface RiskOutput {
   approved: ApprovedOrder[];
   rejected: Array<{ ticker: string; action: string; rejection_reason: string }>;
+}
+
+/** Pearson correlation entre deux séries de rendements. Retourne 0 si données insuffisantes. */
+function pearsonCorrelation(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  if (n < 10) return 0;
+  const ax = a.slice(-n);
+  const bx = b.slice(-n);
+  const meanA = ax.reduce((s, v) => s + v, 0) / n;
+  const meanB = bx.reduce((s, v) => s + v, 0) / n;
+  let num = 0, varA = 0, varB = 0;
+  for (let i = 0; i < n; i++) {
+    const da = ax[i] - meanA;
+    const db = bx[i] - meanB;
+    num += da * db;
+    varA += da * da;
+    varB += db * db;
+  }
+  const denom = Math.sqrt(varA * varB);
+  return denom > 0 ? num / denom : 0;
+}
+
+/** Rendements logarithmiques depuis une série de closes 4H. */
+function closes4hToReturns(bars4h: { close: number }[]): number[] {
+  if (bars4h.length < 2) return [];
+  return bars4h.slice(1).map((b, i) => {
+    const prev = bars4h[i].close;
+    return prev > 0 ? (b.close - prev) / prev : 0;
+  });
 }
 
 function calcExpectedMove(price: number, iv30: number | null, holdDays: number): number | null {
@@ -137,6 +167,15 @@ export class RiskAgent {
 
     if (proposals.length === 0) return [];
 
+    // Calcul Kelly par type de trade (async, depuis l'historique DB)
+    const tradeTypes = [...new Set(proposals.map((p) => p.trade_type))];
+    const kellyFractions: Record<string, number> = {};
+    await Promise.all(
+      tradeTypes.map(async (tt) => {
+        kellyFractions[tt] = await this.getKellyFractionSync(tt);
+      })
+    );
+
     // Expand SWAP proposals into SELL + BUY pairs first
     const expandedProposals = expandSwaps(proposals, portfolio.positions);
 
@@ -158,7 +197,8 @@ export class RiskAgent {
       portfolio,
       market.vix,
       dailyLossLimitPct,
-      tickerData
+      tickerData,
+      kellyFractions
     );
 
     if (deterministicApproved.length === 0) return [];
@@ -309,7 +349,8 @@ export class RiskAgent {
     portfolio: { cash_usd?: number; daily_pnl_pct: number; risk_regime: string; positions: { ticker: string; sizeUsd?: number }[] },
     vix: number,
     dailyLossLimitPct: number,
-    tickerData?: Record<string, TickerData>
+    tickerData?: Record<string, TickerData>,
+    kellyFractions: Record<string, number> = {}
   ): ApprovedOrder[] {
     const approved: ApprovedOrder[] = [];
 
@@ -351,6 +392,14 @@ export class RiskAgent {
 
       let sizeUsd = portfolioUsd * (p.size_pct / 100) * sizingMultiplier;
 
+      // Kelly cap: fraction historique par type de trade (half-Kelly)
+      const kellyFrac = kellyFractions[p.trade_type] ?? 0.4;
+      const kellyCap = portfolioUsd * kellyFrac;
+      if (sizeUsd > kellyCap) {
+        console.log(`[Risk] ${p.ticker}: Kelly cap type=${p.trade_type} frac=${kellyFrac.toFixed(3)} — $${sizeUsd.toFixed(0)} → $${kellyCap.toFixed(0)}`);
+        sizeUsd = kellyCap;
+      }
+
       const td = tickerData?.[p.ticker];
       const opts = td?.options as { iv30?: number | null } | undefined;
       const iv30 = opts?.iv30 ?? null;
@@ -373,6 +422,31 @@ export class RiskAgent {
         sizeUsd = volCap;
       }
       sizeUsd = Math.min(sizeUsd, portfolioUsd * 0.50);
+
+      // Corrélation portefeuille: réduire la taille si trop corrélé aux positions existantes
+      if (p.action === 'BUY' && tickerData && portfolio.positions.length > 0) {
+        const proposed4h = (tickerData[p.ticker]?.ohlcv_4h as { close: number }[] | undefined) ?? [];
+        if (proposed4h.length >= 20) {
+          const proposedReturns = closes4hToReturns(proposed4h);
+          let totalCorr = 0, corrCount = 0;
+          for (const pos of portfolio.positions) {
+            const pos4h = (tickerData[pos.ticker]?.ohlcv_4h as { close: number }[] | undefined) ?? [];
+            if (pos4h.length >= 20) {
+              const posReturns = closes4hToReturns(pos4h);
+              totalCorr += pearsonCorrelation(proposedReturns, posReturns);
+              corrCount++;
+            }
+          }
+          if (corrCount > 0) {
+            const avgCorr = totalCorr / corrCount;
+            if (avgCorr > CORR_THRESHOLD) {
+              const penalty = 1 - Math.min(0.5, (avgCorr - CORR_THRESHOLD) * 2.5);
+              console.log(`[Risk] ${p.ticker}: corrélation portefeuille ${avgCorr.toFixed(2)} > ${CORR_THRESHOLD} — réduction taille ${((1 - penalty) * 100).toFixed(0)}%`);
+              sizeUsd *= penalty;
+            }
+          }
+        }
+      }
 
       if (p.action === 'BUY') {
         const sector = getTickerSector(p.ticker);

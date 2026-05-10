@@ -8,6 +8,7 @@ import { ReporterAgent } from './reporter';
 import { BalanceController } from './balance-controller';
 import { classifyRegime } from './regime';
 import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquityPeak } from '../broker/mock';
+import { executeAlpacaOrder } from '../broker/alpaca';
 import { detectStrategyDecay } from '../broker/backtest';
 import { prisma } from '../lib/prisma';
 import { getCredential } from '../config/credentials';
@@ -415,15 +416,22 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 
   // Step 10: Execute orders
+  // BROKER_TYPE=alpaca → Alpaca live/paper API
+  // MOCK_BROKER=true (default) → simulation locale
+  // MOCK_BROKER=false sans BROKER_TYPE=alpaca → dry-run (pas d'exécution)
   const execResults = [];
-  if (process.env.MOCK_BROKER !== 'false') {
-    for (const order of approvedOrders) {
-      try {
+  const brokerType = process.env.BROKER_TYPE ?? (process.env.MOCK_BROKER !== 'false' ? 'mock' : 'none');
+  for (const order of approvedOrders) {
+    try {
+      if (brokerType === 'alpaca') {
+        const result = await executeAlpacaOrder(order);
+        execResults.push(result);
+      } else if (brokerType === 'mock') {
         const result = await executeOrder(order);
         execResults.push(result);
-      } catch (err) {
-        console.error(`[Orchestrator] Order execution failed for ${order.ticker}:`, err);
       }
+    } catch (err) {
+      console.error(`[Orchestrator] Order execution failed for ${order.ticker} (broker=${brokerType}):`, err);
     }
   }
   aiLog.setExecuted(execResults);

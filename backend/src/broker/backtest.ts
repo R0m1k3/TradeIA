@@ -219,17 +219,39 @@ export function runBacktest(
   };
 }
 
-/**
- * Track strategy performance for decay detection.
- * Compares recent performance (last 30 trades) vs historical performance.
- */
-export async function detectStrategyDecay(): Promise<{
+function calcSharpe(pnls: number[]): number {
+  if (pnls.length < 2) return 0;
+  const avg = pnls.reduce((s, p) => s + p, 0) / pnls.length;
+  const std = Math.sqrt(pnls.reduce((s, p) => s + (p - avg) ** 2, 0) / (pnls.length - 1));
+  return std > 0 ? (avg / std) * Math.sqrt(252) : 0;
+}
+
+function calcProfitFactor(pnls: number[]): number {
+  const gross = pnls.filter((p) => p > 0).reduce((s, p) => s + p, 0);
+  const loss = Math.abs(pnls.filter((p) => p <= 0).reduce((s, p) => s + p, 0));
+  if (loss === 0) return gross > 0 ? Infinity : 0;
+  return gross / loss;
+}
+
+export interface DecayResult {
   recent_win_rate: number;
   historical_win_rate: number;
-  decay_detected: boolean;
   recent_sharpe: number;
+  historical_sharpe: number;
+  recent_profit_factor: number;
+  historical_profit_factor: number;
+  decay_detected: boolean;
+  decay_reasons: string[];
   message: string;
-}> {
+}
+
+/**
+ * Détecte le decay de stratégie sur 3 métriques :
+ * - Win rate (récent < 50% historique)
+ * - Sharpe (récent < 0 quand historique > 0.5)
+ * - Profit factor (récent < 1.0 quand historique > 1.5)
+ */
+export async function detectStrategyDecay(): Promise<DecayResult> {
   const recentTrades = await prisma.trade.findMany({
     where: { closedAt: { not: null }, pnlUsd: { not: null } },
     orderBy: { closedAt: 'desc' },
@@ -247,37 +269,145 @@ export async function detectStrategyDecay(): Promise<{
     return {
       recent_win_rate: 0,
       historical_win_rate: 0,
-      decay_detected: false,
       recent_sharpe: 0,
-      message: 'Pas assez de trades pour détecter le decay',
+      historical_sharpe: 0,
+      recent_profit_factor: 0,
+      historical_profit_factor: 0,
+      decay_detected: false,
+      decay_reasons: [],
+      message: 'Pas assez de trades pour détecter le decay (minimum 10)',
     };
   }
 
-  const recentWinRate = recentTrades.filter((t) => (t.pnlUsd ?? 0) > 0).length / recentTrades.length;
-  const recentAvgPnl = recentTrades.reduce((s, t) => s + (t.pnlUsd ?? 0), 0) / recentTrades.length;
+  const recentPnls = recentTrades.map((t) => t.pnlUsd ?? 0);
+  const histPnls = historicalTrades.map((t) => t.pnlUsd ?? 0);
 
-  const historicalWinRate = historicalTrades.length > 0
-    ? historicalTrades.filter((t) => (t.pnlUsd ?? 0) > 0).length / historicalTrades.length
+  const recentWinRate = recentPnls.filter((p) => p > 0).length / recentPnls.length;
+  const historicalWinRate = histPnls.length > 0
+    ? histPnls.filter((p) => p > 0).length / histPnls.length
     : recentWinRate;
 
-  // Decay: recent performance < 50% of historical
-  const decayDetected = historicalWinRate > 0 && recentWinRate < historicalWinRate * 0.5;
+  const recentSharpe = calcSharpe(recentPnls);
+  const historicalSharpe = histPnls.length > 1 ? calcSharpe(histPnls) : recentSharpe;
 
-  // Simple Sharpe approximation from recent PnLs
-  const pnls = recentTrades.map((t) => t.pnlUsd ?? 0);
-  const avgPnl = pnls.reduce((s, p) => s + p, 0) / pnls.length;
-  const stdPnl = pnls.length > 1
-    ? Math.sqrt(pnls.reduce((s, p) => s + (p - avgPnl) ** 2, 0) / (pnls.length - 1))
-    : 1;
-  const recentSharpe = stdPnl > 0 ? (avgPnl / stdPnl) * Math.sqrt(252) : 0;
+  const recentPF = calcProfitFactor(recentPnls);
+  const historicalPF = histPnls.length > 0 ? calcProfitFactor(histPnls) : recentPF;
+
+  // 3 conditions de decay indépendantes
+  const winRateDecay = historicalWinRate > 0 && recentWinRate < historicalWinRate * 0.5;
+  const sharpeDecay = historicalSharpe > 0.5 && recentSharpe < 0;
+  const pfDecay = isFinite(historicalPF) && historicalPF > 1.5 && isFinite(recentPF) && recentPF < 1.0;
+
+  const decayDetected = winRateDecay || sharpeDecay || pfDecay;
+
+  const decayReasons: string[] = [];
+  if (winRateDecay) decayReasons.push(`win rate ${(recentWinRate * 100).toFixed(1)}% vs ${(historicalWinRate * 100).toFixed(1)}% hist`);
+  if (sharpeDecay) decayReasons.push(`Sharpe ${recentSharpe.toFixed(2)} vs ${historicalSharpe.toFixed(2)} hist`);
+  if (pfDecay) decayReasons.push(`profit factor ${recentPF.toFixed(2)} vs ${historicalPF.toFixed(2)} hist`);
 
   return {
     recent_win_rate: recentWinRate,
     historical_win_rate: historicalWinRate,
-    decay_detected: decayDetected,
     recent_sharpe: recentSharpe,
+    historical_sharpe: historicalSharpe,
+    recent_profit_factor: recentPF,
+    historical_profit_factor: historicalPF,
+    decay_detected: decayDetected,
+    decay_reasons: decayReasons,
     message: decayDetected
-      ? `STRATEGY DECAY: win rate ${(recentWinRate * 100).toFixed(1)}% vs ${(historicalWinRate * 100).toFixed(1)}% historical`
-      : `Strategy healthy: ${(recentWinRate * 100).toFixed(1)}% win rate`,
+      ? `STRATEGY DECAY: ${decayReasons.join(' | ')}`
+      : `Stratégie saine: WR=${(recentWinRate * 100).toFixed(1)}% Sharpe=${recentSharpe.toFixed(2)} PF=${isFinite(recentPF) ? recentPF.toFixed(2) : '∞'}`,
+  };
+}
+
+// ─── Walk-forward backtest ────────────────────────────────────────────────────
+
+export interface WalkForwardWindow {
+  train_start: string;
+  train_end: string;
+  test_start: string;
+  test_end: string;
+  train_result: BacktestResult;
+  test_result: BacktestResult;
+}
+
+export interface WalkForwardResult {
+  windows: WalkForwardWindow[];
+  overall_test_sharpe: number;
+  overall_test_win_rate: number;
+  overall_test_profit_factor: number;
+  /** train_sharpe / test_sharpe moyen — ratio > 2 = risque d'overfitting */
+  degradation_ratio: number;
+  overfitting_warning: boolean;
+}
+
+/**
+ * Walk-forward backtest: découpe les bars en fenêtres roulantes train/test.
+ * Valide si la stratégie se comporte de façon cohérente hors-échantillon.
+ *
+ * @param trainDays  Barres dans la fenêtre d'entraînement (défaut: 90)
+ * @param testDays   Barres dans la fenêtre de test (défaut: 30)
+ */
+export function runWalkForwardBacktest(
+  bars: BacktestBar[],
+  orders: ApprovedOrder[],
+  initialCapital: number,
+  trainDays = 90,
+  testDays = 30
+): WalkForwardResult {
+  const windows: WalkForwardWindow[] = [];
+  const windowSize = trainDays + testDays;
+
+  // Avance par testDays à chaque itération (walk-forward anchored rolling)
+  for (let start = 0; start + windowSize <= bars.length; start += testDays) {
+    const trainBars = bars.slice(start, start + trainDays);
+    const testBars = bars.slice(start + trainDays, start + windowSize);
+
+    if (trainBars.length < 20 || testBars.length < 5) break;
+
+    const trainResult = runBacktest(trainBars, orders, initialCapital);
+    const testResult = runBacktest(testBars, orders, initialCapital);
+
+    windows.push({
+      train_start: trainBars[0].time,
+      train_end: trainBars[trainBars.length - 1].time,
+      test_start: testBars[0].time,
+      test_end: testBars[testBars.length - 1].time,
+      train_result: trainResult,
+      test_result: testResult,
+    });
+  }
+
+  if (windows.length === 0) {
+    return {
+      windows: [],
+      overall_test_sharpe: 0,
+      overall_test_win_rate: 0,
+      overall_test_profit_factor: 0,
+      degradation_ratio: 0,
+      overfitting_warning: false,
+    };
+  }
+
+  const n = windows.length;
+  const avgTestSharpe = windows.reduce((s, w) => s + w.test_result.sharpe_ratio, 0) / n;
+  const avgTrainSharpe = windows.reduce((s, w) => s + w.train_result.sharpe_ratio, 0) / n;
+  const avgTestWinRate = windows.reduce((s, w) => s + w.test_result.win_rate, 0) / n;
+  const avgTestPF = windows.reduce((s, w) => {
+    const pf = w.test_result.profit_factor;
+    return s + (isFinite(pf) ? pf : 0);
+  }, 0) / n;
+
+  const degradationRatio = avgTestSharpe > 0.01
+    ? avgTrainSharpe / avgTestSharpe
+    : avgTrainSharpe > 0 ? 99 : 0;
+
+  return {
+    windows,
+    overall_test_sharpe: avgTestSharpe,
+    overall_test_win_rate: avgTestWinRate,
+    overall_test_profit_factor: avgTestPF,
+    degradation_ratio: degradationRatio,
+    overfitting_warning: degradationRatio > 2,
   };
 }
