@@ -10,6 +10,37 @@ export interface LLMResponse {
   content: string;
   tokensUsed: number;
   durationMs: number;
+  cached?: boolean;
+}
+
+// ── Token budget tracker (resets each cycle via resetTokenBudget) ──
+let cycleTokensUsed = 0;
+const TOKEN_BUDGET = parseInt(process.env.LLM_TOKEN_BUDGET_PER_CYCLE || '50000', 10);
+
+export function resetTokenBudget() { cycleTokensUsed = 0; }
+export function getCycleTokensUsed() { return cycleTokensUsed; }
+
+// ── In-memory LLM response cache ──
+const LLM_CACHE_TTL_MS = parseInt(process.env.LLM_CACHE_TTL_SECONDS || '120', 10) * 1000;
+const llmCache = new Map<number, { result: LLMResponse; expiresAt: number }>();
+
+function djb2Hash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (((hash << 5) + hash) ^ str.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function getCacheKey(model: string, systemPrompt: string, userContent: string): number {
+  return djb2Hash(model + '||' + systemPrompt + '||' + userContent);
+}
+
+function pruneLlmCache() {
+  const now = Date.now();
+  for (const [k, v] of llmCache) {
+    if (v.expiresAt < now) llmCache.delete(k);
+  }
 }
 
 async function sleep(ms: number) {
@@ -20,7 +51,7 @@ function stripMarkdownJson(raw: string): string {
   return raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 }
 
-// ── Concurrency limiter for Ollama (cloud models have rate limits) ──
+// ── Concurrency limiter for Ollama ──
 const MAX_CONCURRENT = Math.max(1, parseInt(process.env.LLM_MAX_CONCURRENT || '1', 10));
 let activeCalls = 0;
 const callQueue: (() => void)[] = [];
@@ -60,7 +91,6 @@ function supportsThinking(model: string): boolean {
 function extractOpenRouterContent(raw: unknown): string {
   if (typeof raw === 'string') return raw;
   if (Array.isArray(raw)) {
-    // Extended thinking response: array of { type: "thinking"|"text", ... }
     return (raw as Array<{ type: string; text?: string }>)
       .filter((b) => b.type === 'text')
       .map((b) => b.text || '')
@@ -69,16 +99,22 @@ function extractOpenRouterContent(raw: unknown): string {
   return '';
 }
 
-async function callOpenRouter(model: string, messages: LLMMessage[], thinking?: boolean): Promise<LLMResponse> {
+async function callOpenRouter(
+  model: string,
+  messages: LLMMessage[],
+  maxTokens: number,
+  thinking?: boolean
+): Promise<LLMResponse> {
   const start = Date.now();
   const apiKey = await getCredential('openrouter_api_key', 'OPENROUTER_API_KEY');
 
   const useThinking = thinking && supportsThinking(model);
+  const effectiveMaxTokens = useThinking ? 20000 : maxTokens;
   const body: Record<string, unknown> = {
     model,
     messages,
     temperature: useThinking ? 1 : 0.1,
-    max_tokens: useThinking ? 20000 : 4096,
+    max_tokens: effectiveMaxTokens,
   };
   if (useThinking && (model.includes('claude-opus') || model.includes('claude-sonnet-4'))) {
     body.thinking = { type: 'enabled', budget_tokens: 12000 };
@@ -104,7 +140,11 @@ async function callOpenRouter(model: string, messages: LLMMessage[], thinking?: 
   return { content: stripMarkdownJson(content), tokensUsed, durationMs: Date.now() - start };
 }
 
-async function callOllama(model: string, messages: LLMMessage[]): Promise<LLMResponse> {
+async function callOllama(
+  model: string,
+  messages: LLMMessage[],
+  _maxTokens: number
+): Promise<LLMResponse> {
   const start = Date.now();
   const baseUrl = (await getCredential('ollama_base_url', 'OLLAMA_BASE_URL') || 'http://ollama:11434').replace(/\/+$/, '');
   const apiKey = await getCredential('ollama_api_key', 'OLLAMA_API_KEY');
@@ -138,13 +178,32 @@ export async function callLLM(
   model: string,
   systemPrompt: string,
   userContent: string,
+  maxTokens = 1200,
   options?: { thinking?: boolean }
 ): Promise<LLMResponse> {
+  // Budget guard
+  if (cycleTokensUsed >= TOKEN_BUDGET) {
+    throw new Error(`[LLM] Token budget exhausted (${cycleTokensUsed}/${TOKEN_BUDGET}) — skipping ${agentName}`);
+  }
+
   const messages: LLMMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userContent },
   ];
 
+  // Skip cache for thinking calls (non-deterministic)
+  const useThinking = options?.thinking;
+  if (!useThinking) {
+    pruneLlmCache();
+    const cacheKey = getCacheKey(model, systemPrompt, userContent);
+    const cached = llmCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      console.log(JSON.stringify({ event: 'llm_cache_hit', agent: agentName, model }));
+      return { ...cached.result, cached: true };
+    }
+  }
+
+  const cacheKey = getCacheKey(model, systemPrompt, userContent);
   const provider = await getCredential('llm_provider', 'LLM_PROVIDER') || 'openrouter';
   const maxAttempts = provider === 'ollama' ? 2 : 3;
   const delays = provider === 'ollama'
@@ -159,8 +218,10 @@ export async function callLLM(
     try {
       const result =
         provider === 'ollama'
-          ? await callOllama(model, messages)
-          : await callOpenRouter(model, messages, options?.thinking);
+          ? await callOllama(model, messages, maxTokens)
+          : await callOpenRouter(model, messages, maxTokens, useThinking);
+
+      cycleTokensUsed += result.tokensUsed;
 
       console.log(
         JSON.stringify({
@@ -169,9 +230,15 @@ export async function callLLM(
           model,
           duration_ms: result.durationMs,
           tokens_used: result.tokensUsed,
+          cycle_total: cycleTokensUsed,
+          thinking: useThinking || false,
           provider,
         })
       );
+
+      if (!useThinking) {
+        llmCache.set(cacheKey, { result, expiresAt: Date.now() + LLM_CACHE_TTL_MS });
+      }
 
       return result;
     } catch (err) {
@@ -183,16 +250,17 @@ export async function callLLM(
         body ? JSON.stringify(body) : ''
       );
 
-      // Model fallback: if auth/rate-limit/gateway overload, try a smaller cloud model.
       if (attempt === maxAttempts - 2 && (status === 401 || status === 403 || status === 429 || status === 502 || status === 503)) {
         const fallbackModel = downgradeModel(model);
         if (fallbackModel !== model) {
           console.warn(`[LLM] Retrying ${agentName} with fallback model: ${fallbackModel}`);
           try {
             const result = provider === 'ollama'
-              ? await callOllama(fallbackModel, messages)
-              : await callOpenRouter(fallbackModel, messages, false); // no thinking on fallback
+              ? await callOllama(fallbackModel, messages, maxTokens)
+              : await callOpenRouter(fallbackModel, messages, maxTokens, false);
+            cycleTokensUsed += result.tokensUsed;
             console.log(`[LLM] ${agentName} succeeded with fallback model ${fallbackModel}`);
+            llmCache.set(cacheKey, { result, expiresAt: Date.now() + LLM_CACHE_TTL_MS });
             return result;
           } catch (fallbackErr) {
             throw new Error(`LLM call failed for agent ${agentName} (tried ${model} + ${fallbackModel}): ${(fallbackErr as Error).message}`);
@@ -216,13 +284,11 @@ export async function callLLM(
 }
 
 function downgradeModel(model: string): string {
-  // Ollama cloud models: downgrade pro → flash
   if (model.includes('pro')) return model.replace('pro', 'flash');
   if (model.includes('glm-5.1')) return 'deepseek-v4-flash:cloud';
   if (model.includes('kimi')) return 'deepseek-v4-flash:cloud';
   if (model.includes('gemma4')) return 'deepseek-v4-flash:cloud';
   if (model.includes('qwen3.6')) return 'deepseek-v4-flash:cloud';
-  // OpenRouter: downgrade as before
   if (model.includes('opus')) return model.replace(/opus[^/]*/, 'sonnet-4-6');
   if (model.includes('sonnet')) return model.replace(/sonnet[^/]*/, 'haiku-4-5');
   return model;

@@ -76,7 +76,7 @@ export class AnalystAgent {
               rss_news: data.news,
             });
 
-            const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
+            const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt, 900);
             const parsed = parseJsonResponse<{ analyses: AnalystOutput[] }>(response.content);
 
             if (parsed.analyses && parsed.analyses.length > 0) {
@@ -131,7 +131,7 @@ export class AnalystAgent {
             rss_news: data.news,
           });
 
-          const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt);
+          const response = await callLLM('analyst', MODELS.MID, ANALYST_SYSTEM, prompt, 900);
           const parsed = parseJsonResponse<{ analyses: AnalystOutput[] }>(response.content);
 
           if (parsed.analyses && parsed.analyses.length > 0) {

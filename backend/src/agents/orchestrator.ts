@@ -23,6 +23,7 @@ import type { Position } from '../broker/mock';
 import { saveSnapshots } from '../models/ticker-snapshot';
 import { saveNotes } from '../models/ticker-note';
 import { AILogCollector } from '../utils/ai-logger';
+import { resetTokenBudget, getCycleTokensUsed } from '../llm/client';
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
 
@@ -146,6 +147,7 @@ async function checkCircuitBreaker(
 
 async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const cycleStart = Date.now();
+  resetTokenBudget();
 
   const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
   const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');

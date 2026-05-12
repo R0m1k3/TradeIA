@@ -58,7 +58,7 @@ export class StrategistAgent {
         swapCandidates,
       });
 
-      const response = await callLLM('strategist', MODELS.STRONG, STRATEGIST_SYSTEM, prompt, { thinking: true });
+      const response = await callLLM('strategist', MODELS.MID, STRATEGIST_SYSTEM, prompt, 1500);
       const parsed = parseJsonResponse<OrderProposal[]>(response.content);
 
       if (!Array.isArray(parsed)) {
