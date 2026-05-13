@@ -324,6 +324,37 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
 
   aiLog.setAnalysis(analystOutputs);
 
+  // Log analyst-stage filtering to explain why proposals_raw may be empty
+  {
+    type AnalystOut = { ticker: string; signal_15m: string; bias_4h: string; confidence: number; skip_reason: string | null; data_freshness_score?: number };
+    const ao = analystOutputs as AnalystOut[];
+    const skipped = ao.filter((a) => !!a.skip_reason || a.signal_15m === 'NEUTRAL');
+    const signalDist: Record<string, number> = {};
+    const biasDist: Record<string, number> = {};
+    for (const a of ao) {
+      signalDist[a.signal_15m] = (signalDist[a.signal_15m] || 0) + 1;
+      biasDist[a.bias_4h] = (biasDist[a.bias_4h] || 0) + 1;
+    }
+    const avgConf = ao.length > 0 ? Math.round(ao.reduce((s, a) => s + a.confidence, 0) / ao.length) : 0;
+    const avgFresh = ao.length > 0 ? Math.round(ao.reduce((s, a) => s + (a.data_freshness_score ?? 0), 0) / ao.length) : 0;
+    console.log(`[Orchestrator] Analyst filter: ${ao.length} total, ${ao.length - skipped.length} actionable, ${skipped.length} skipped — signals: ${JSON.stringify(signalDist)}, 4H bias: ${JSON.stringify(biasDist)}`);
+    aiLog.setAnalystFilter({
+      total: ao.length,
+      actionable: ao.length - skipped.length,
+      skipped: skipped.map((a) => ({
+        ticker: a.ticker,
+        reason: a.skip_reason ?? 'NEUTRAL signal',
+        confidence: a.confidence,
+        signal_15m: a.signal_15m,
+        bias_4h: a.bias_4h,
+      })),
+      signal_distribution: signalDist,
+      bias_4h_distribution: biasDist,
+      avg_confidence: avgConf,
+      avg_freshness_score: avgFresh,
+    });
+  }
+
   // Step 7: Bull/Bear debate (segment-aware)
   reporter.updateAgent('bull', { status: 'running' });
   reporter.updateAgent('bear', { status: 'running' });

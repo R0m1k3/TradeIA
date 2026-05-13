@@ -107,32 +107,38 @@ export class CollectorAgent {
               if (!p || bars_15m.length === 0) quality = 'missing';
               else if (bars_15m.length < 50) quality = 'partial';
 
+              // Evaluate actual OHLCV data quality for freshness scoring
+              const ohlcvQuality = bars_15m.length >= 50 ? 'fresh' : bars_15m.length > 0 ? 'delayed' : 'missing';
+              const tvStatus = tv.recommendation === 'UNKNOWN' ? 'stale' : 'fresh';
+
               const dataFreshness = summarizeFreshness([
                 sourceFreshness(
                   'Yahoo Finance',
-                  p ? 'delayed' : 'missing',
-                  'Données actions gratuites susceptibles d\'être retardées ou incomplètes.',
+                  p ? ohlcvQuality : 'missing',
+                  p
+                    ? `${bars_15m.length} bougies 15m disponibles.`
+                    : 'Prix indisponible.',
                   latestObservedAt(bars_15m as unknown[])
                 ),
                 sourceFreshness(
                   'TradingView scanner',
-                  tv.recommendation === 'UNKNOWN' ? 'missing' : 'fresh',
+                  tvStatus,
                   tv.recommendation === 'UNKNOWN'
-                    ? 'Signal TradingView indisponible pour ce ticker.'
+                    ? 'Signal TradingView temporairement indisponible (rate-limit ou erreur réseau).'
                     : `Signal technique ${tv.recommendation}.`
                 ),
                 sourceFreshness(
                   'Google News/RSS',
-                  newsData.length > 0 ? 'fresh' : 'missing',
+                  newsData.length > 0 ? 'fresh' : 'stale',
                   newsData.length > 0
                     ? `${newsData.length} news récentes trouvées.`
                     : 'Aucune news récente exploitable trouvée.'
                 ),
                 sourceFreshness(
                   'Twelve Data',
-                  twelveDataKey ? 'fresh' : 'missing',
+                  twelveDataKey ? (bars_15m.length >= 50 ? 'fresh' : 'delayed') : 'missing',
                   twelveDataKey
-                    ? 'Clé configurée, source API prioritaire pour prix et bougies actions.'
+                    ? `Clé configurée — ${bars_15m.length} bougies 15m collectées.`
                     : 'Clé Twelve Data absente, fallback Yahoo utilisé.'
                 ),
                 sourceFreshness(
@@ -144,7 +150,7 @@ export class CollectorAgent {
                 ),
                 sourceFreshness(
                   'EODHD',
-                  eodhdKey ? 'fresh' : 'missing',
+                  eodhdKey ? (bars_15m.length > 0 ? 'fresh' : 'delayed') : 'missing',
                   eodhdKey
                     ? 'Clé configurée, données historiques et fondamentales européennes disponibles.'
                     : 'Clé EODHD absente, données européennes limitées à Twelve Data + Yahoo.'

@@ -134,7 +134,9 @@ export async function getFinanceNews(limit = 20): Promise<NewsItem[]> {
   unique.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
   const items = unique.slice(0, limit);
 
-  await cacheSet(cacheKey, items, TTL.NEWS);
+  if (items.length > 0) {
+    await cacheSet(cacheKey, items, TTL.NEWS);
+  }
   return items;
 }
 
@@ -164,7 +166,9 @@ export async function getTickerNewsRSS(ticker: string, limit = 10): Promise<News
       .filter((item) => item.tickers.includes(ticker) || item.title.toUpperCase().includes(ticker))
       .slice(0, limit);
 
-    await cacheSet(cacheKey, items, TTL.NEWS);
+    if (items.length > 0) {
+      await cacheSet(cacheKey, items, TTL.NEWS);
+    }
     return items;
   } catch {
     return [];

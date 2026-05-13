@@ -8,6 +8,14 @@ export interface AILogRejection {
   reason: string;
 }
 
+export interface AILogAnalystSkip {
+  ticker: string;
+  reason: string;
+  confidence: number;
+  signal_15m: string;
+  bias_4h: string;
+}
+
 export interface AILogPayload {
   cycleStart: string;
   durationMs: number;
@@ -29,6 +37,15 @@ export interface AILogPayload {
     segments?: Record<string, string>;
   };
   analysis: unknown[];
+  analyst_filter?: {
+    total: number;
+    actionable: number;
+    skipped: AILogAnalystSkip[];
+    signal_distribution: Record<string, number>;
+    bias_4h_distribution: Record<string, number>;
+    avg_confidence: number;
+    avg_freshness_score: number;
+  };
   proposals_raw: unknown[];
   risk_filter: {
     accepted: string[];
@@ -69,6 +86,10 @@ export class AILogCollector {
 
   setAnalysis(outputs: unknown[]): void {
     this.payload.analysis = outputs;
+  }
+
+  setAnalystFilter(filter: AILogPayload['analyst_filter']): void {
+    this.payload.analyst_filter = filter;
   }
 
   setProposals(proposals: unknown[]): void {

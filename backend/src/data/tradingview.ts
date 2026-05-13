@@ -45,9 +45,13 @@ export async function getTradingViewSignal(ticker: string): Promise<TradingViewS
         return result;
       }
     }
-    return { recommendation: 'UNKNOWN', score: 0 };
+    const unknownResult: TradingViewSignal = { recommendation: 'UNKNOWN', score: 0 };
+    await cacheSet(cacheKey, unknownResult, 120); // 2 min backoff on parse failure
+    return unknownResult;
   } catch (err) {
     console.warn(`[TradingView] Failed to get signal for ${ticker}:`, (err as Error).message);
-    return { recommendation: 'UNKNOWN', score: 0 };
+    const unknownResult: TradingViewSignal = { recommendation: 'UNKNOWN', score: 0 };
+    await cacheSet(cacheKey, unknownResult, 120); // 2 min backoff on API failure
+    return unknownResult;
   }
 }
