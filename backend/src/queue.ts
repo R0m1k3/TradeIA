@@ -86,15 +86,17 @@ export async function addCycleJob(mode: CycleMode = 'full') {
     return;
   }
 
+  const isSingleton = mode === 'full' || mode === 'pre_market';
   await tradingQueue.add(
     `trading-cycle-${mode}`,
     { mode },
     {
-      // Singleton jobId for full/pre_market cycles: prevents duplicate cycles in the queue.
-      // BullMQ silently drops the add if a job with this ID is already waiting or active.
-      jobId: mode === 'full' ? 'full-cycle-singleton' : mode === 'pre_market' ? 'pre-market-singleton' : undefined,
-      removeOnComplete: 50,
-      removeOnFail: 20,
+      // Singleton jobId for full/pre_market: deduplicates while the job is waiting or active.
+      // removeOnComplete/removeOnFail must be true so the ID is freed once the job finishes,
+      // allowing the next scheduled cycle to be enqueued.
+      jobId: isSingleton ? `${mode}-singleton` : undefined,
+      removeOnComplete: isSingleton ? true : 50,
+      removeOnFail: isSingleton ? true : 20,
       attempts: 1,
     }
   );
