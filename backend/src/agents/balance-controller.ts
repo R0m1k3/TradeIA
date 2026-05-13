@@ -100,7 +100,7 @@ export class BalanceController {
       if (reducedSlots > 0) {
         segments[seg] = {
           slots: freeSlots,
-          candidates_to_analyze: 999, // analyst sees full segment list (deterministic, no LLM cost)
+          candidates_to_analyze: 50, // top 50 by momentum per segment — caps API load while keeping coverage
         };
         total_new_slots += freeSlots;
       }

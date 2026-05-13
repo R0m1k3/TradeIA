@@ -198,7 +198,8 @@ export class RiskAgent {
       market.vix,
       dailyLossLimitPct,
       tickerData,
-      kellyFractions
+      kellyFractions,
+      rejections,
     );
 
     if (deterministicApproved.length === 0) return [];
@@ -209,7 +210,7 @@ export class RiskAgent {
 
     if (ambiguousOrders.length === 0) {
       console.log(`[Risk] All ${deterministicApproved.length} orders validated deterministically`);
-      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio);
+      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio, rejections);
     }
 
     try {
@@ -249,10 +250,10 @@ export class RiskAgent {
       const llmApproved = parsed.approved || [];
       const nonAmbiguous = deterministicApproved.filter((o) => o.confidence >= 70 && market.vix <= 25);
       console.log(`[Risk] Final: ${nonAmbiguous.length} deterministic + ${llmApproved.length} LLM-validated`);
-      return this.enforceCashBudget([...nonAmbiguous, ...llmApproved], portfolioUsd, portfolio);
+      return this.enforceCashBudget([...nonAmbiguous, ...llmApproved], portfolioUsd, portfolio, rejections);
     } catch (err) {
       console.warn('[Risk] LLM failed, using deterministic results:', (err as Error).message);
-      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio);
+      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio, rejections);
     }
   }
 
@@ -350,7 +351,8 @@ export class RiskAgent {
     vix: number,
     dailyLossLimitPct: number,
     tickerData?: Record<string, TickerData>,
-    kellyFractions: Record<string, number> = {}
+    kellyFractions: Record<string, number> = {},
+    rejections?: Array<{ ticker: string; action: string; reason: string }>,
   ): ApprovedOrder[] {
     const approved: ApprovedOrder[] = [];
 
@@ -458,7 +460,9 @@ export class RiskAgent {
             console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV, reducing from $${sizeUsd.toFixed(0)} to $${adjustedSize.toFixed(0)}`);
             sizeUsd = adjustedSize;
           } else {
-            console.log(`[Risk] ${p.ticker}: sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap, skipping`);
+            const reason = `sector ${sector} at ${(currentExposure / portfolioUsd * 100).toFixed(1)}% NAV cap (max ${MAX_SECTOR_NAV_PCT * 100}%)`;
+            console.log(`[Risk] ${p.ticker}: ${reason}, skipping`);
+            rejections?.push({ ticker: p.ticker, action: p.action, reason });
             continue;
           }
         }
@@ -490,7 +494,8 @@ export class RiskAgent {
   private enforceCashBudget(
     orders: ApprovedOrder[],
     portfolioUsd: number,
-    portfolio: { cash_usd?: number; positions: { sizeUsd?: number }[] }
+    portfolio: { cash_usd?: number; positions: { sizeUsd?: number }[] },
+    rejections?: Array<{ ticker: string; action: string; reason: string }>,
   ): ApprovedOrder[] {
     let remainingCash = portfolio.cash_usd;
 
@@ -514,7 +519,9 @@ export class RiskAgent {
 
       const sizeUsd = Math.min(order.size_usd, Math.max(0, remainingCash));
       if (sizeUsd < 1) {
-        console.log(`[Risk] ${order.ticker}: rejected, no cash left (requested $${order.size_usd.toFixed(0)})`);
+        const reason = `insufficient cash: requested $${order.size_usd.toFixed(0)}, available $${remainingCash.toFixed(2)}`;
+        console.log(`[Risk] ${order.ticker}: rejected — ${reason}`);
+        rejections?.push({ ticker: order.ticker, action: order.action, reason });
         continue;
       }
 

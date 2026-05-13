@@ -82,6 +82,13 @@ export class AnalystAgent {
             if (parsed.analyses && parsed.analyses.length > 0) {
               // Validate LLM output against deterministic values
               for (const analysis of parsed.analyses) {
+                // Sanitize all LLM string outputs — LLMs often add trailing whitespace
+                analysis.bias_4h = (analysis.bias_4h || 'NEUTRAL').trim() as AnalystOutput['bias_4h'];
+                analysis.bias_1h = (analysis.bias_1h || 'NEUTRAL').trim() as AnalystOutput['bias_1h'];
+                analysis.signal_15m = (analysis.signal_15m || 'NEUTRAL').trim() as AnalystOutput['signal_15m'];
+                analysis.trade_type = (analysis.trade_type || 'C').trim() as AnalystOutput['trade_type'];
+                analysis.macd_signal = (analysis.macd_signal || 'neutral').trim();
+                analysis.candle_pattern = (analysis.candle_pattern || 'aucun').trim();
                 analysis.data_quality = data.data_quality;
                 analysis.data_freshness_score = data.data_freshness.score;
                 if (data.data_freshness.score < 60) {
@@ -142,6 +149,11 @@ export class AnalystAgent {
           if (parsed.analyses && parsed.analyses.length > 0) {
             results.push(...parsed.analyses.map((analysis) => ({
               ...analysis,
+              bias_4h: (analysis.bias_4h || 'NEUTRAL').trim() as AnalystOutput['bias_4h'],
+              bias_1h: (analysis.bias_1h || 'NEUTRAL').trim() as AnalystOutput['bias_1h'],
+              signal_15m: (analysis.signal_15m || 'NEUTRAL').trim() as AnalystOutput['signal_15m'],
+              trade_type: (analysis.trade_type || 'C').trim() as AnalystOutput['trade_type'],
+              macd_signal: (analysis.macd_signal || 'neutral').trim(),
               data_quality: data.data_quality,
               data_freshness_score: data.data_freshness.score,
             })));
@@ -224,11 +236,16 @@ export class AnalystAgent {
     else if (indicators.rsi_14 !== null && indicators.rsi_14 < 30) candle_pattern = 'survente';
     else if (indicators.rsi_14 !== null && indicators.rsi_14 > 70) candle_pattern = 'surachat';
 
+    // Sanitize: trim to avoid silent string-matching bugs from LLM whitespace
+    const cleanBias4h = (bias_4h || '').trim() as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    const cleanBias1h = (bias_1h || '').trim() as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    const cleanSignal15m = (signal_15m || '').trim() as 'BUY' | 'SELL' | 'NEUTRAL';
+
     return {
       ticker,
-      bias_4h,
-      bias_1h,
-      signal_15m,
+      bias_4h: cleanBias4h,
+      bias_1h: cleanBias1h,
+      signal_15m: cleanSignal15m,
       trade_type,
       entry_price: levels.entry,
       stop_loss: levels.stop_loss,

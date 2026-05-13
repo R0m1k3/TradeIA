@@ -264,35 +264,45 @@ export function compute4HBias(indicators: IndicatorValues): 'BULLISH' | 'BEARISH
 }
 
 export function compute15mSignal(indicators: IndicatorValues): 'BUY' | 'SELL' | 'NEUTRAL' {
-  const { rsi_14, macd_signal, volume_ratio, adx, bb_lower, bb_upper, rsi_divergence, support_levels, resistance_levels } = indicators;
+  const { rsi_14, macd_signal, volume_ratio, adx, bb_lower, bb_upper, bb_middle, rsi_divergence, ema_9, ema_21 } = indicators;
 
-  if (rsi_14 === null || macd_signal === 'neutral') return 'NEUTRAL';
+  if (rsi_14 === null) return 'NEUTRAL';
 
-  const highVolume = volume_ratio !== null && volume_ratio > 1.5;
+  const highVolume = volume_ratio !== null && volume_ratio > 1.3;
+  const macdOk = macd_signal !== 'bearish';  // macd not contradicting longs
+  const macdBearOk = macd_signal !== 'bullish'; // macd not contradicting shorts
 
   // RSI divergence overrides — strongest signal
-  if (rsi_divergence === 'bullish' && rsi_14 < 40) return 'BUY';
-  if (rsi_divergence === 'bearish' && rsi_14 > 60) return 'SELL';
+  if (rsi_divergence === 'bullish' && rsi_14 < 45) return 'BUY';
+  if (rsi_divergence === 'bearish' && rsi_14 > 55) return 'SELL';
 
   // Type C: Mean-reversion logic (ADX < 20 = ranging market)
-  // In ranges: buy oversold at support, sell overbought at resistance
   const isRanging = adx !== null && adx < 20;
   if (isRanging) {
-    // Buy when oversold near lower BB (support zone in range)
-    if (rsi_14 < 30 && macd_signal !== 'bearish') return 'BUY';
-    // Sell when overbought near upper BB (resistance zone in range)
-    if (rsi_14 > 70 && macd_signal !== 'bullish') return 'SELL';
-    // Moderate mean-reversion signals
-    if (rsi_14 < 35) return 'BUY';
-    if (rsi_14 > 65) return 'SELL';
+    // Buy when oversold near lower BB
+    if (rsi_14 < 30 && macdOk) return 'BUY';
+    // Sell when overbought near upper BB
+    if (rsi_14 > 70 && macdBearOk) return 'SELL';
+    // Moderate mean-reversion with BB confirmation
+    if (rsi_14 < 40 && bb_lower !== null && bb_middle !== null && highVolume) return 'BUY';
+    if (rsi_14 > 60 && bb_upper !== null && bb_middle !== null && highVolume) return 'SELL';
+    // Weak mean-reversion — require EMA confirmation
+    if (rsi_14 < 45 && ema_9 !== null && ema_21 !== null && ema_9 > ema_21) return 'BUY';
+    if (rsi_14 > 55 && ema_9 !== null && ema_21 !== null && ema_9 < ema_21) return 'SELL';
     return 'NEUTRAL';
   }
 
   // Type A/B: Momentum logic (trending market)
   if (rsi_14 < 30 && macd_signal === 'bullish' && highVolume) return 'BUY';
   if (rsi_14 > 70 && macd_signal === 'bearish' && highVolume) return 'SELL';
-  if (rsi_14 < 35 && macd_signal === 'bullish') return 'BUY';
-  if (rsi_14 > 65 && macd_signal === 'bearish') return 'SELL';
+  if (rsi_14 < 40 && macd_signal === 'bullish') return 'BUY';
+  if (rsi_14 > 60 && macd_signal === 'bearish') return 'SELL';
+  // Weaker momentum signals: RSI above/below midline + MACD confirmation
+  if (rsi_14 > 50 && rsi_14 < 60 && macd_signal === 'bullish' && highVolume) return 'BUY';
+  if (rsi_14 < 50 && rsi_14 > 40 && macd_signal === 'bearish' && highVolume) return 'SELL';
+  // EMA alignment signals (trend continuation on pullback)
+  if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 > ema_21 && macd_signal === 'bullish') return 'BUY';
+  if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 < ema_21 && macd_signal === 'bearish') return 'SELL';
 
   return 'NEUTRAL';
 }

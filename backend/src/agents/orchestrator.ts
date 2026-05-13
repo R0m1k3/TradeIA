@@ -326,14 +326,37 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
 
   // Log analyst-stage filtering to explain why proposals_raw may be empty
   {
-    type AnalystOut = { ticker: string; signal_15m: string; bias_4h: string; confidence: number; skip_reason: string | null; data_freshness_score?: number };
+    type AnalystOut = { ticker: string; signal_15m: string; bias_4h: string; bias_1h: string; confidence: number; skip_reason: string | null; data_freshness_score?: number };
     const ao = analystOutputs as AnalystOut[];
-    const skipped = ao.filter((a) => !!a.skip_reason || a.signal_15m === 'NEUTRAL');
+    // Regime alignment: if prefer_momentum is true (bull_trend), auto-skip BEARISH 4H bias setups
+    const regimeSkips: typeof ao = [];
+    if (regime.prefer_momentum) {
+      for (const a of ao) {
+        const bias4h = (a.bias_4h || '').trim();
+        if (bias4h === 'BEARISH' && !a.skip_reason) {
+          a.skip_reason = `Regime ${regime.regime} prefers momentum — skipping BEARISH 4H bias`;
+          regimeSkips.push(a);
+        }
+        // Also require signal_15m coherence with bias_1h or bias_4h for confidence boost
+        const sig = (a.signal_15m || '').trim();
+        const bias1h = (a.bias_1h || '').trim();
+        if (sig === 'BUY' && bias4h === 'BEARISH' && bias1h !== 'BULLISH') {
+          if (!a.skip_reason) a.skip_reason = `Signal BUY contredit bias_4h BEARISH sans confirmation 1H`;
+        }
+      }
+    }
+    if (regimeSkips.length > 0) {
+      console.log(`[Orchestrator] Regime filter (${regime.regime}): skipped ${regimeSkips.length} BEARISH-bias tickers`);
+    }
+
+    const skipped = ao.filter((a) => !!a.skip_reason || (a.signal_15m || '').trim() === 'NEUTRAL');
     const signalDist: Record<string, number> = {};
     const biasDist: Record<string, number> = {};
     for (const a of ao) {
-      signalDist[a.signal_15m] = (signalDist[a.signal_15m] || 0) + 1;
-      biasDist[a.bias_4h] = (biasDist[a.bias_4h] || 0) + 1;
+      const sig = (a.signal_15m || '').trim();
+      const bias = (a.bias_4h || '').trim();
+      signalDist[sig] = (signalDist[sig] || 0) + 1;
+      biasDist[bias] = (biasDist[bias] || 0) + 1;
     }
     const avgConf = ao.length > 0 ? Math.round(ao.reduce((s, a) => s + a.confidence, 0) / ao.length) : 0;
     const avgFresh = ao.length > 0 ? Math.round(ao.reduce((s, a) => s + (a.data_freshness_score ?? 0), 0) / ao.length) : 0;
@@ -345,8 +368,8 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
         ticker: a.ticker,
         reason: a.skip_reason ?? 'NEUTRAL signal',
         confidence: a.confidence,
-        signal_15m: a.signal_15m,
-        bias_4h: a.bias_4h,
+        signal_15m: (a.signal_15m || '').trim(),
+        bias_4h: (a.bias_4h || '').trim(),
       })),
       signal_distribution: signalDist,
       bias_4h_distribution: biasDist,
@@ -447,9 +470,15 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   );
   reporter.updateAgent('risk', { status: 'ok', lastRun: new Date().toISOString() });
 
-  // Step 10: Execute orders (mock broker)
-  const execResults = [];
-  if (process.env.MOCK_BROKER !== 'false') {
+  // Step 10: Track approved orders separately from executed
+  aiLog.setApproved(approvedOrders);
+
+  // Step 10b: Execute orders (mock broker)
+  const execResults: Awaited<ReturnType<typeof executeOrder>>[] = [];
+  const dryRun = process.env.MOCK_BROKER === 'false' || process.env.DRY_RUN === 'true';
+  if (dryRun) {
+    console.log(`[Orchestrator] [DRY_RUN] Orders skipped — ${approvedOrders.length} order(s) would have been sent: ${approvedOrders.map(o => `${o.ticker} ${o.action} $${o.size_usd.toFixed(0)}`).join(', ') || 'none'}`);
+  } else {
     for (const order of approvedOrders) {
       try {
         const result = await executeOrder(order);

@@ -47,6 +47,7 @@ export interface AILogPayload {
     avg_freshness_score: number;
   };
   proposals_raw: unknown[];
+  proposals_approved: unknown[];
   risk_filter: {
     accepted: string[];
     rejected: AILogRejection[];
@@ -69,6 +70,7 @@ export class AILogCollector {
   constructor(cycleStartMs: number) {
     this.cycleStart = cycleStartMs;
     this.payload.cycleStart = new Date(cycleStartMs).toISOString();
+    this.payload.proposals_approved = [];
     this.payload.risk_filter = { accepted: [], rejected: this.rejections };
   }
 
@@ -96,10 +98,14 @@ export class AILogCollector {
     this.payload.proposals_raw = proposals;
   }
 
-  setExecuted(orders: unknown[]): void {
-    this.payload.executed = orders;
+  setApproved(orders: unknown[]): void {
+    this.payload.proposals_approved = orders;
     const accepted = (orders as Array<{ ticker: string }>).map((o) => o.ticker);
     this.payload.risk_filter = { accepted, rejected: this.rejections };
+  }
+
+  setExecuted(orders: unknown[]): void {
+    this.payload.executed = orders;
   }
 
   setPortfolio(portfolio: AILogPayload['portfolio_snapshot']): void {

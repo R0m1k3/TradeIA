@@ -72,8 +72,9 @@ export class CollectorAgent {
 
       const rawData: Record<string, unknown> = {};
 
-      for (let i = 0; i < watchlist.length; i += 10) {
-        const chunk = watchlist.slice(i, i + 10);
+      const CHUNK_SIZE = 20; // 20 parallel tickers per batch — balances API rate limits vs latency
+      for (let i = 0; i < watchlist.length; i += CHUNK_SIZE) {
+        const chunk = watchlist.slice(i, i + CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (ticker) => {
             try {
