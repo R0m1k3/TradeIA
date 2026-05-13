@@ -157,12 +157,14 @@ function computeFromBars(bars: OHLCVBar[]): FrameIndicators {
     }
   }
 
-  // Volume ratio
-  const volAvg = volumes.length > 20
-    ? volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20
+  // Volume ratio — ignore zero-volume bars (null data from Yahoo, pre/post market)
+  const nonZeroVols = volumes.slice(-21, -1).filter((v) => v > 0);
+  const volAvg = nonZeroVols.length >= 5
+    ? nonZeroVols.reduce((a, b) => a + b, 0) / nonZeroVols.length
     : null;
-  const volume_ratio = volAvg && volAvg > 0
-    ? (volumes[volumes.length - 1] ?? 0) / volAvg
+  const lastVol = volumes[volumes.length - 1];
+  const volume_ratio = volAvg && volAvg > 0 && lastVol > 0
+    ? lastVol / volAvg
     : null;
 
   return {

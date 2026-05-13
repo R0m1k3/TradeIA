@@ -105,14 +105,41 @@ interface YahooChartResult {
   };
 }
 
+/** Aggregate 1h bars into 4h bars (open of first, high/low of group, close of last) */
+function aggregate1hTo4h(bars: OHLCVBar[]): OHLCVBar[] {
+  const result: OHLCVBar[] = [];
+  for (let i = 0; i < bars.length; i += 4) {
+    const group = bars.slice(i, Math.min(i + 4, bars.length));
+    if (group.length === 0) continue;
+    result.push({
+      time: group[0].time,
+      open: group[0].open,
+      high: Math.max(...group.map((b) => b.high)),
+      low: Math.min(...group.map((b) => b.low)),
+      close: group[group.length - 1].close,
+      volume: group.reduce((sum, b) => sum + b.volume, 0),
+    });
+  }
+  return result;
+}
+
 export async function getYahooOHLCV(ticker: string, interval: '15m' | '1h' | '4h' | '1d', range: string = '1mo'): Promise<OHLCVBar[]> {
   const cacheKey = `yahoo:ohlcv:${ticker}:${interval}`;
   const cached = await cacheGet<OHLCVBar[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    const yahooInterval = interval === '4h' ? '1h' : interval === '1d' ? '1d' : interval;
-    const yahooRange = interval === '15m' ? '5d' : interval === '1h' ? '1mo' : range;
+    // 4h: Yahoo doesn't support it natively — fetch 3 months of 1h bars and aggregate
+    // This gives proper EMA-9/21/50 on a 4-hour timeframe (not on 1h masquerading as 4h)
+    if (interval === '4h') {
+      const bars1h = await getYahooOHLCV(ticker, '1h', '3mo');
+      const bars4h = aggregate1hTo4h(bars1h);
+      await cacheSet(cacheKey, bars4h, TTL.OHLCV);
+      return bars4h;
+    }
+
+    const yahooInterval = interval;
+    const yahooRange = interval === '15m' ? '5d' : range;
 
     const { crumb, cookies } = await getYahooSession();
     const params: Record<string, string> = { interval: yahooInterval, range: yahooRange };

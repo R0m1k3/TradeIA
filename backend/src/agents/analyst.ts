@@ -85,8 +85,13 @@ export class AnalystAgent {
                 analysis.data_quality = data.data_quality;
                 analysis.data_freshness_score = data.data_freshness.score;
                 if (data.data_freshness.score < 60) {
+                  // Cap confidence but don't block — Yahoo Finance (delayed) scores ~17-70
+                  // depending on secondary sources; low score ≠ bad OHLCV data
                   analysis.confidence = Math.min(analysis.confidence, 55);
-                  analysis.skip_reason = analysis.skip_reason || 'Qualité des données limitée';
+                }
+                if (data.data_freshness.score < 40) {
+                  // Truly stale/missing data — mark for soft skip
+                  analysis.skip_reason = analysis.skip_reason || 'Données trop anciennes ou incomplètes';
                 }
                 if (analysis.confidence <= 0) {
                   analysis.skip_reason = analysis.skip_reason || 'LLM low confidence';

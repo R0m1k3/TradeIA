@@ -23,7 +23,16 @@
       "Read(//c/Users/Bureau/AppData/Local/Microsoft/WindowsApps/**)",
       "Bash(find /c -maxdepth 6 -name \"python.exe\" -type f)",
       "Bash(rtk docker *)",
-      "Bash(docker compose *)"
+      "Bash(node *)",
+      "Bash(python -m json.tool C:/GIT/TradeIA/graphify-out/.graphify_chunk_01.json)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose ps *)",
+      "Bash(rm -f .graphify_*.json .graphify_uncached.txt .graphify_python)",
+      "Bash(rm -rf graphify-out/cache graphify-out/.graphify_chunk_*.json)",
+      "Bash(git stash *)",
+      "Bash(git reset *)",
+      "WebFetch(domain:lama.vonrodbox.eu)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

@@ -50,7 +50,20 @@ export class ResearcherAgent {
     budget?: AllocationBudget
   ): Promise<DebateOutput[]> {
     const validAnalyses = analystOutputs
-      .filter((a) => a.confidence > 0 && !a.skip_reason);
+      .filter((a) => {
+        if (a.confidence <= 0) {
+          console.log(`[Researcher] Skip ${a.ticker}: confidence=${a.confidence}, skip_reason="${a.skip_reason ?? 'none'}"`);
+          return false;
+        }
+        if (a.data_quality === 'missing') {
+          console.log(`[Researcher] Skip ${a.ticker}: data_quality=missing`);
+          return false;
+        }
+        if (a.skip_reason) {
+          console.log(`[Researcher] ${a.ticker}: skip_reason="${a.skip_reason}" (confidence=${a.confidence}) — including with degraded confidence`);
+        }
+        return true;
+      });
 
     let selectedAnalyses: AnalystOutput[];
 
