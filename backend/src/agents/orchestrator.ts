@@ -6,6 +6,7 @@ import { StrategistAgent } from './strategist';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
 import { BalanceController } from './balance-controller';
+import type { AllocationBudget } from './balance-controller';
 import { classifyRegime } from './regime';
 import { executeOrder, getPortfolioState, markToMarket, closeTrade, updateEquityPeak } from '../broker/mock';
 import { detectStrategyDecay } from '../broker/backtest';
@@ -93,6 +94,64 @@ function generateWeaknessExits(
     });
   }
   return sells;
+}
+
+interface RiskPreCheckResult {
+  ticker: string;
+  action: string;
+  status: 'ACCEPTED' | 'REJECTED';
+  risk_usd: number;
+  cash_available: number;
+  free_slots: number;
+  rejection_reason: string;
+}
+
+function riskPreCheck(
+  proposals: OrderProposal[],
+  portfolioUsd: number,
+  portfolio: { cash_usd?: number; positions: Array<{ ticker: string }> },
+  budget: AllocationBudget,
+): RiskPreCheckResult[] {
+  const riskPerSlotPct = budget.risk_per_slot_pct;
+  const cashAvailable = portfolio.cash_usd ?? (portfolioUsd - 0); // fallback
+  const totalFreeSlots = budget.total_new_slots;
+  const currentPositions = portfolio.positions.length;
+
+  return proposals.map((p) => {
+    const sizeUsd = portfolioUsd * (p.size_pct / 100);
+    const maxRiskUsd = portfolioUsd * (riskPerSlotPct / 100);
+    const riskUsd = Math.min(sizeUsd, maxRiskUsd);
+
+    // Check 1: risk_per_slot_pct * equity <= cash_disponible
+    if (riskUsd > cashAvailable) {
+      return {
+        ticker: p.ticker, action: p.action, status: 'REJECTED' as const,
+        risk_usd: Math.round(riskUsd * 100) / 100,
+        cash_available: Math.round(cashAvailable * 100) / 100,
+        free_slots: totalFreeSlots,
+        rejection_reason: `risk_usd $${riskUsd.toFixed(2)} > cash $${cashAvailable.toFixed(2)}`,
+      };
+    }
+
+    // Check 2: positions_count + 1 <= max_slots (for BUY only)
+    if (p.action === 'BUY' && totalFreeSlots <= 0) {
+      return {
+        ticker: p.ticker, action: p.action, status: 'REJECTED' as const,
+        risk_usd: Math.round(riskUsd * 100) / 100,
+        cash_available: Math.round(cashAvailable * 100) / 100,
+        free_slots: totalFreeSlots,
+        rejection_reason: `no free slots (${currentPositions} positions, 0 free)`,
+      };
+    }
+
+    return {
+      ticker: p.ticker, action: p.action, status: 'ACCEPTED' as const,
+      risk_usd: Math.round(riskUsd * 100) / 100,
+      cash_available: Math.round(cashAvailable * 100) / 100,
+      free_slots: totalFreeSlots,
+      rejection_reason: '',
+    };
+  });
 }
 
 let isRunning = false;
@@ -437,16 +496,29 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
       current_signal: 'HOLD',
     }));
 
+  console.log(`[Orchestrator] Strategist input: ${debateOutputs.length} debates, ${heldTickers.length} held, ${swapCandidates.length} swaps, regime=${regime.regime}`);
+
   const strategist = new StrategistAgent();
-  const orderProposals = await strategist.run(
-    debateOutputs,
-    portfolio,
-    collectorOutput.market,
-    heldTickers,
-    budgetWithSegments,
-    swapCandidates.length > 0 ? swapCandidates : undefined
-  );
-  reporter.updateAgent('strategist', { status: 'ok', lastRun: new Date().toISOString() });
+  let orderProposals: OrderProposal[] = [];
+  try {
+    orderProposals = await strategist.run(
+      debateOutputs,
+      portfolio,
+      collectorOutput.market,
+      heldTickers,
+      budgetWithSegments,
+      swapCandidates.length > 0 ? swapCandidates : undefined,
+      regime,
+    );
+    console.log(`[Orchestrator] Strategist output: ${orderProposals.length} proposals`);
+    if (orderProposals.length === 0 && debateOutputs.length > 0) {
+      console.warn('[Orchestrator] DIAG: Strategist returned 0 proposals despite having debates. Possible LLM filter too strict.');
+    }
+  } catch (err) {
+    console.error('[Orchestrator] Strategist exception:', (err as Error).message);
+    orderProposals = [];
+  }
+  reporter.updateAgent('strategist', { status: orderProposals.length > 0 ? 'ok' : 'error', lastRun: new Date().toISOString() });
 
   // Step 8b: Inject relative weakness exits (deterministic, bypass LLM)
   const weakSells = generateWeaknessExits(portfolio.positions, collectorOutput.market.sector_biases);
@@ -455,6 +527,16 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   }
   const allProposals = [...orderProposals, ...weakSells];
   aiLog.setProposals(allProposals);
+
+  // Step 8c: Risk pre-check — explicit validation before RiskAgent
+  const preCheckResults = riskPreCheck(allProposals, portfolioUsd, portfolio, budgetWithSegments);
+  for (const r of preCheckResults) {
+    console.log(`[Orchestrator] RISK_PRE_CHECK: ${JSON.stringify(r)}`);
+    if (r.status === 'REJECTED') {
+      aiLog.rejections.push({ ticker: r.ticker, action: r.action, reason: r.rejection_reason });
+    }
+  }
+  aiLog.setRiskFilter(preCheckResults);
 
   // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });

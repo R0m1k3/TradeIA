@@ -100,12 +100,21 @@ export class AILogCollector {
 
   setApproved(orders: unknown[]): void {
     this.payload.proposals_approved = orders;
-    const accepted = (orders as Array<{ ticker: string }>).map((o) => o.ticker);
-    this.payload.risk_filter = { accepted, rejected: this.rejections };
+  }
+
+  setRiskFilter(results: Array<{ ticker: string; action: string; status: string; risk_usd: number; rejection_reason: string }>): void {
+    const accepted = results.filter((r) => r.status === 'ACCEPTED').map((r) => r.ticker);
+    const rejected = results
+      .filter((r) => r.status === 'REJECTED')
+      .map((r) => ({ ticker: r.ticker, action: r.action, reason: r.rejection_reason }));
+    this.payload.risk_filter = { accepted, rejected: [...this.rejections, ...rejected] };
   }
 
   setExecuted(orders: unknown[]): void {
     this.payload.executed = orders;
+    const accepted = (orders as Array<{ ticker: string }>).map((o) => o.ticker);
+    const existingAccepted = this.payload.risk_filter?.accepted ?? [];
+    this.payload.risk_filter = { accepted: [...new Set([...existingAccepted, ...accepted])], rejected: this.rejections };
   }
 
   setPortfolio(portfolio: AILogPayload['portfolio_snapshot']): void {

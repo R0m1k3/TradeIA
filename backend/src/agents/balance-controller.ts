@@ -82,25 +82,33 @@ export class BalanceController {
       }
     }
 
-    // Step 5: Compute final slots
+    // Step 5: Compute final slots with candidates_to_analyze capped at 150 total
     const segments: Partial<Record<MarketSegment, { slots: number; candidates_to_analyze: number }>> = {};
     let total_new_slots = 0;
     let swap_allowed = false;
 
-    for (const [seg, base] of Object.entries(rawSlots) as Array<[MarketSegment, number]>) {
+    // Calculate proportional candidates_to_analyze per segment (max 150 total, min 10 per active segment)
+    const activeSegments = (Object.entries(rawSlots) as Array<[MarketSegment, number]>)
+      .filter(([_, base]) => base > 0);
+    const totalBaseSlots = activeSegments.reduce((sum, [_, b]) => sum + b, 0);
+    const MAX_TOTAL_CANDIDATES = 150;
+    const MIN_PER_SEG = 10;
+
+    for (const [seg, base] of activeSegments) {
       const reducedSlots = Math.floor(base * combinedFactor);
       const existingCount = positionsBySegment[seg] ?? 0;
       const freeSlots = Math.max(0, reducedSlots - existingCount);
 
-      // If no free slots but positions exist → swap might be allowed
       if (freeSlots === 0 && existingCount > 0) {
         swap_allowed = true;
       }
 
       if (reducedSlots > 0) {
+        const proportionalCandidates = Math.round((base / totalBaseSlots) * MAX_TOTAL_CANDIDATES);
+        const candidatesCap = Math.max(MIN_PER_SEG, proportionalCandidates);
         segments[seg] = {
           slots: freeSlots,
-          candidates_to_analyze: 50, // top 50 by momentum per segment — caps API load while keeping coverage
+          candidates_to_analyze: candidatesCap, // proportional cap (150 total across segments)
         };
         total_new_slots += freeSlots;
       }

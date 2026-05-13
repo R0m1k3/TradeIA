@@ -4,6 +4,7 @@ import { buildStrategistPrompt, STRATEGIST_SYSTEM } from '../prompts/strategist.
 import type { DebateOutput } from './researcher';
 import type { MarketSegment } from './discovery';
 import type { AllocationBudget } from './balance-controller';
+import type { RegimeAssessment } from './regime';
 
 export interface SwapCandidate {
   ticker: string;
@@ -38,9 +39,10 @@ export class StrategistAgent {
     market: { vix: number; fear_greed: number; nasdaq_direction: string },
     heldTickers: string[],
     budget?: AllocationBudget,
-    swapCandidates?: SwapCandidate[]
+    swapCandidates?: SwapCandidate[],
+    regime?: RegimeAssessment,
   ): Promise<OrderProposal[]> {
-    console.log(`[Strategist] Processing ${debates.length} debate outcomes`);
+    console.log(`[Strategist] Processing ${debates.length} debate outcomes, regime=${regime?.regime ?? 'N/A'}`);
     const MODELS = await getModels();
 
     if (debates.length === 0) {
@@ -56,17 +58,23 @@ export class StrategistAgent {
         held_tickers: heldTickers,
         budget,
         swapCandidates,
+        regime,
       });
 
-      const response = await callLLM('strategist', MODELS.MID, STRATEGIST_SYSTEM, prompt, 1500);
+      console.log(`[Strategist] Sending ${prompt.length} chars to LLM (${debates.length} debates)`);
+      const response = await callLLM('strategist', MODELS.STRONG, STRATEGIST_SYSTEM, prompt, 1200, { thinking: true });
+      console.log(`[Strategist] LLM response: ${response.content.length} chars`);
       const parsed = parseJsonResponse<OrderProposal[]>(response.content);
 
       if (!Array.isArray(parsed)) {
-        console.warn('[Strategist] Response was not an array, returning []');
+        console.warn('[Strategist] Response was not an array, got:', typeof parsed);
         return [];
       }
 
       console.log(`[Strategist] Generated ${parsed.length} order proposals`);
+      if (parsed.length === 0) {
+        console.warn('[Strategist] DIAG: LLM returned empty array despite receiving debates. Check prompt rules.');
+      }
       return parsed;
     } catch (err) {
       console.error('[Strategist] Error:', err);
