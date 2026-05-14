@@ -35,6 +35,13 @@ export class AnalystAgent {
     const minLlmConfidence = Math.max(0, parseInt(process.env.ANALYST_LLM_MIN_CONFIDENCE || '55', 10));
     let llmAnalysesUsed = 0;
 
+    // Sequential counter: pre-check LLM budget under lock to avoid race in Promise.all
+    const tryClaimLlmSlot = (): boolean => {
+      if (llmAnalysesUsed >= maxLlmAnalyses) return false;
+      llmAnalysesUsed++;
+      return true;
+    };
+
     await Promise.all(
       Object.entries(collectorOutput.tickers).map(async ([ticker, data]) => {
         if (data.data_quality === 'missing') {
@@ -49,7 +56,7 @@ export class AnalystAgent {
           const shouldUseLlm =
             maxLlmAnalyses > 0 &&
             deterministic.confidence >= minLlmConfidence &&
-            llmAnalysesUsed++ < maxLlmAnalyses;
+            tryClaimLlmSlot();
 
           if (!shouldUseLlm) {
             results.push({

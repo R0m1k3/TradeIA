@@ -496,6 +496,15 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
 
   const strategist = new StrategistAgent();
   let orderProposals: OrderProposal[] = [];
+
+  // Debug: log pipeline state before strategist
+  const actionableCount = analystOutputs.filter((a) => !a.skip_reason && a.confidence > 0 && a.data_quality !== 'missing').length;
+  console.log(`[Orchestrator] STRATEGIST INPUT: ${debateOutputs.length} debates, ${actionableCount} actionable, ${heldTickers.length} held, ${budgetWithSegments.total_new_slots} free slots, regime=${regime.regime}`);
+  if (debateOutputs.length > 0) {
+    const topDebates = debateOutputs.slice(0, 3).map((d) => `${d.ticker}(conf=${d.analyst_output.confidence},debate=${d.debate_score})`).join(', ');
+    console.log(`[Orchestrator] STRATEGIST TOP DEBATES: ${topDebates}`);
+  }
+
   try {
     orderProposals = await strategist.run(
       debateOutputs,
@@ -509,6 +518,12 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     console.log(`[Orchestrator] Strategist output: ${orderProposals.length} proposals`);
     if (orderProposals.length === 0 && debateOutputs.length > 0) {
       console.warn('[Orchestrator] DIAG: Strategist returned 0 proposals despite having debates. Possible LLM filter too strict.');
+      console.warn(`[Orchestrator] DIAG details: debates=${debateOutputs.length}, regime=${regime.regime}, free_slots=${budgetWithSegments.total_new_slots}, held=[${heldTickers.join(',')}]`);
+      // Log each debate's key stats to diagnose why LLM rejected all
+      for (const d of debateOutputs.slice(0, 5)) {
+        const a = d.analyst_output;
+        console.warn(`[Orchestrator] DIAG debate: ${d.ticker} conf=${a.confidence} signal=${a.signal_15m} bias4h=${a.bias_4h} debate_score=${d.debate_score}`);
+      }
     }
   } catch (err) {
     console.error('[Orchestrator] Strategist exception:', (err as Error).message);
@@ -524,21 +539,25 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const allProposals = [...orderProposals, ...weakSells];
   aiLog.setProposals(allProposals);
 
-  // Step 8c: Risk pre-check — explicit validation before RiskAgent
+  // Step 8c: Risk pre-check — enforce slot and budget limits before RiskAgent
   const preCheckResults = riskPreCheck(allProposals, portfolioUsd, portfolio, budgetWithSegments);
-  for (const r of preCheckResults) {
-    console.log(`[Orchestrator] RISK_PRE_CHECK: ${JSON.stringify(r)}`);
+  const preCheckedProposals = allProposals.filter((p, i) => {
+    const r = preCheckResults[i];
     if (r.status === 'REJECTED') {
+      console.log(`[Orchestrator] RISK_PRE_CHECK REJECTED: ${r.ticker} ${r.action} — ${r.rejection_reason}`);
       aiLog.rejections.push({ ticker: r.ticker, action: r.action, reason: r.rejection_reason });
+      return false;
     }
-  }
+    console.log(`[Orchestrator] RISK_PRE_CHECK ACCEPTED: ${r.ticker} ${r.action} — risk_usd=$${r.risk_usd}, cash=$${r.cash_available}, slots=${r.free_slots}`);
+    return true;
+  });
   aiLog.setRiskFilter(preCheckResults);
 
   // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });
   const risk = new RiskAgent();
   const approvedOrders = await risk.run(
-    allProposals,
+    preCheckedProposals,
     portfolioUsd,
     portfolio,
     collectorOutput.market,
