@@ -11,7 +11,7 @@ import { prisma } from '../lib/prisma';
 
 const MAX_POSITIONS_PER_SECTOR = 5;
 const MAX_SECTOR_NAV_PCT = 0.40;
-const MIN_BUY_CONFIDENCE = 55;
+const MIN_BUY_CONFIDENCE = 40;
 const CORR_THRESHOLD = 0.65; // au-delà : réduire la taille proportionnellement
 
 /** Volatility targeting: contribute at most 1.5% annualized vol per slot. */
@@ -316,7 +316,12 @@ export class RiskAgent {
       }
 
       if (p.action === 'BUY') {
-        const rr = (p.take_profit - p.limit_price) / (p.limit_price - p.stop_loss);
+        const denominator = p.limit_price - p.stop_loss;
+        if (denominator <= 0) {
+          reject(p, `invalid stop_loss (>= limit_price $${p.limit_price})`);
+          continue;
+        }
+        const rr = (p.take_profit - p.limit_price) / denominator;
         if (rr < 2.0) {
           reject(p, `R/R ${rr.toFixed(2)} < 2.0`);
           continue;

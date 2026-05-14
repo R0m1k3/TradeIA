@@ -194,7 +194,6 @@ export class AnalystAgent {
     const bias_4h = compute4HBias(indicators);
     const signal_15m = compute15mSignal(indicators);
     const trade_type = computeTradeType(indicators);
-    const levels = computeLevels(currentPrice, indicators.atr_14, signal_15m);
 
     // Determine 1h bias from RSI + MACD
     let bias_1h: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
@@ -225,16 +224,34 @@ export class AnalystAgent {
     else if (indicators.rsi_14 !== null && indicators.rsi_14 < 30) candle_pattern = 'survente';
     else if (indicators.rsi_14 !== null && indicators.rsi_14 > 70) candle_pattern = 'surachat';
 
+    // Override NEUTRAL signal when candle pattern gives clear direction
+    // This prevents the bot from ignoring setups with strong reversal/continuation signals
+    let finalSignal = signal_15m;
+    if (finalSignal === 'NEUTRAL') {
+      if (candle_pattern === 'survente' || candle_pattern === 'sous_bande_inferieure') {
+        finalSignal = 'BUY';
+      } else if (candle_pattern === 'surachat' || candle_pattern === 'au_dessus_bande_superieure') {
+        finalSignal = 'SELL';
+      }
+    }
+
     // Sanitize: trim to avoid silent string-matching bugs from LLM whitespace
     const cleanBias4h = (bias_4h || '').trim() as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
     const cleanBias1h = (bias_1h || '').trim() as 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-    const cleanSignal15m = (signal_15m || '').trim() as 'BUY' | 'SELL' | 'NEUTRAL';
+    const cleanSignal15m = (finalSignal || '').trim() as 'BUY' | 'SELL' | 'NEUTRAL';
+
+    // Compute entry/stop/TP from final signal (may differ from original NEUTRAL)
+    const levels = computeLevels(currentPrice, indicators.atr_14, cleanSignal15m);
 
     // Penalties — même logique que le prompt LLM
     if (indicators.rsi_14 !== null && indicators.rsi_14 > 75) confidence -= 15; // surachat
     if (indicators.rsi_14 !== null && indicators.rsi_14 < 25 && cleanSignal15m === 'BUY') confidence += 10; // survente rebond
     if (indicators.volume_ratio !== null && indicators.volume_ratio < 0.7) confidence -= 10; // volume faible
     if (indicators.adx !== null && indicators.adx < 15) confidence -= 10; // pas de tendance
+    // Candle pattern forced signal → boost confidence (pattern confirms direction)
+    if (signal_15m === 'NEUTRAL' && finalSignal !== 'NEUTRAL' && candle_pattern !== 'aucun') {
+      confidence += 10;
+    }
     // Neutral setup cap — relaxed when volume or pattern confirms
     if (cleanBias4h === 'NEUTRAL' && cleanSignal15m === 'NEUTRAL') {
       const hasVolConfirm = indicators.volume_ratio !== null && indicators.volume_ratio > 1.5;
@@ -242,7 +259,7 @@ export class AnalystAgent {
       if (hasVolConfirm || hasPatternConfirm) {
         confidence = Math.min(confidence, 60); // allow borderline actionable
       } else {
-        confidence = Math.min(confidence, 45);
+        confidence = Math.min(confidence, 50);
       }
     }
 
@@ -267,9 +284,7 @@ export class AnalystAgent {
       candle_pattern,
       confidence,
       skip_reason: (cleanBias4h === 'NEUTRAL' && cleanSignal15m === 'NEUTRAL')
-        ? (candle_pattern !== 'aucun' || (indicators.volume_ratio !== null && indicators.volume_ratio > 1.5)
-          ? null
-          : 'Setup trop neutre, pas de conviction directionnelle')
+        ? 'Setup trop neutre, pas de conviction directionnelle'
         : null,
     };
   }

@@ -387,28 +387,24 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   {
     type AnalystOut = { ticker: string; signal_15m: string; bias_4h: string; bias_1h: string; confidence: number; skip_reason: string | null; data_freshness_score?: number };
     const ao = analystOutputs as AnalystOut[];
-    // Regime alignment: if prefer_momentum is true (bull_trend), auto-skip BEARISH 4H bias setups
-    const regimeSkips: typeof ao = [];
+    // Regime-aware confidence penalty: never skip bearish setups in bull regime —
+    // they are pullback/mean-reversion opportunities (strategist rule 8).
+    // Apply a -5 confidence penalty to flag contrarian entry risk.
+    const regimePenalties: Array<{ ticker: string; reason: string }> = [];
     if (regime.prefer_momentum) {
       for (const a of ao) {
         const bias4h = (a.bias_4h || '').trim();
-        if (bias4h === 'BEARISH' && !a.skip_reason) {
-          a.skip_reason = `Regime ${regime.regime} prefers momentum — skipping BEARISH 4H bias`;
-          regimeSkips.push(a);
-        }
-        // Also require signal_15m coherence with bias_1h or bias_4h for confidence boost
-        const sig = (a.signal_15m || '').trim();
-        const bias1h = (a.bias_1h || '').trim();
-        if (sig === 'BUY' && bias4h === 'BEARISH' && bias1h !== 'BULLISH') {
-          if (!a.skip_reason) a.skip_reason = `Signal BUY contredit bias_4h BEARISH sans confirmation 1H`;
+        if (bias4h === 'BEARISH' && a.confidence > 0) {
+          a.confidence = Math.max(0, a.confidence - 5);
+          regimePenalties.push({ ticker: a.ticker, reason: `bull regime: -5 confidence for BEARISH 4H` });
         }
       }
     }
-    if (regimeSkips.length > 0) {
-      console.log(`[Orchestrator] Regime filter (${regime.regime}): skipped ${regimeSkips.length} BEARISH-bias tickers`);
+    if (regimePenalties.length > 0) {
+      console.log(`[Orchestrator] Regime penalty (${regime.regime}): ${regimePenalties.length} BEARISH-bias tickers got -5 confidence`);
     }
 
-    const skipped = ao.filter((a) => !!a.skip_reason || (a.signal_15m || '').trim() === 'NEUTRAL');
+    const skipped = ao.filter((a) => !!a.skip_reason);
     const signalDist: Record<string, number> = {};
     const biasDist: Record<string, number> = {};
     for (const a of ao) {

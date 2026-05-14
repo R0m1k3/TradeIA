@@ -304,6 +304,14 @@ export function compute15mSignal(indicators: IndicatorValues): 'BUY' | 'SELL' | 
   if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 > ema_21 && macd_signal === 'bullish') return 'BUY';
   if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 < ema_21 && macd_signal === 'bearish') return 'SELL';
 
+  // Extreme RSI → force directional signal (never stay NEUTRAL at extremes)
+  if (rsi_14 < 30) return 'BUY';
+  if (rsi_14 > 70) return 'SELL';
+
+  // BB breakout with directional RSI bias
+  if (bb_lower !== null && rsi_14 < 40) return 'BUY';
+  if (bb_upper !== null && rsi_14 > 60) return 'SELL';
+
   return 'NEUTRAL';
 }
 

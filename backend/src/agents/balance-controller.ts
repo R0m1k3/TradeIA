@@ -82,17 +82,14 @@ export class BalanceController {
       }
     }
 
-    // Step 5: Compute final slots with candidates_to_analyze capped at 150 total
+    // Step 5: Compute final slots with candidates_to_analyze capped at 20 per segment (80 total max)
     const segments: Partial<Record<MarketSegment, { slots: number; candidates_to_analyze: number }>> = {};
     let total_new_slots = 0;
     let swap_allowed = false;
 
-    // Calculate proportional candidates_to_analyze per segment (max 150 total, min 10 per active segment)
+    const MAX_CANDIDATES_PER_SEG = 20;
     const activeSegments = (Object.entries(rawSlots) as Array<[MarketSegment, number]>)
       .filter(([_, base]) => base > 0);
-    const totalBaseSlots = activeSegments.reduce((sum, [_, b]) => sum + b, 0);
-    const MAX_TOTAL_CANDIDATES = 150;
-    const MIN_PER_SEG = 10;
 
     for (const [seg, base] of activeSegments) {
       const reducedSlots = Math.floor(base * combinedFactor);
@@ -104,11 +101,11 @@ export class BalanceController {
       }
 
       if (reducedSlots > 0) {
-        const proportionalCandidates = Math.round((base / totalBaseSlots) * MAX_TOTAL_CANDIDATES);
-        const candidatesCap = Math.max(MIN_PER_SEG, proportionalCandidates);
+        // More slots → more candidates, but never exceed 20 per segment
+        const candidatesForSeg = Math.min(MAX_CANDIDATES_PER_SEG, freeSlots * 5 + 10);
         segments[seg] = {
           slots: freeSlots,
-          candidates_to_analyze: candidatesCap, // proportional cap (150 total across segments)
+          candidates_to_analyze: candidatesForSeg,
         };
         total_new_slots += freeSlots;
       }
