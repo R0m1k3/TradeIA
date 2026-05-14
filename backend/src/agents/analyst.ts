@@ -96,6 +96,8 @@ export class AnalystAgent {
                 analysis.trade_type = (analysis.trade_type || 'C').trim() as AnalystOutput['trade_type'];
                 analysis.macd_signal = (analysis.macd_signal || 'neutral').trim();
                 analysis.candle_pattern = (analysis.candle_pattern || 'aucun').trim();
+                // LLM sets volume_ratio=0 when data is missing — treat as neutral (1.0) not zero volume
+                if (!analysis.volume_ratio || analysis.volume_ratio <= 0) analysis.volume_ratio = 1.0;
                 analysis.data_quality = data.data_quality;
                 analysis.data_freshness_score = data.data_freshness.score;
                 if (data.data_freshness.score < 60) {

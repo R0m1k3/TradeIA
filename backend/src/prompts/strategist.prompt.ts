@@ -146,14 +146,26 @@ export function buildStrategistPrompt(data: {
     ? `REGIME: ${data.regime.regime} (conf=${data.regime.confidence}% sizing=${data.regime.sizing_multiplier} momentum=${data.regime.prefer_momentum})\n⚠️ BEARISH 4H in bull regime = PULLBACK ENTRY (type B/C, size 3-15%), NOT a skip!\n`
     : '';
 
-  const debateRows = debates.map(buildCompactDebateRow).join('\n');
+  const heldSet = new Set(data.held_tickers);
+  const buyCandidates = debates.filter(
+    (d) => d.analyst_output.signal_15m === 'BUY' && !heldSet.has(d.ticker)
+  ).sort((a, b) => b.analyst_output.confidence - a.analyst_output.confidence);
 
-  return `Generate trade orders. Held (skip BUY): ${data.held_tickers.join(', ') || 'none'}
+  const otherDebates = debates.filter(
+    (d) => d.analyst_output.signal_15m !== 'BUY' || heldSet.has(d.ticker)
+  );
+
+  const buySection = buyCandidates.length > 0
+    ? `\n⚡ BUY CANDIDATES — generate proposals for these (${buyCandidates.length}):\n${buyCandidates.map(buildCompactDebateRow).join('\n')}\n`
+    : '\n⚡ BUY CANDIDATES: none\n';
+
+  const refSection = otherDebates.length > 0
+    ? `\n📋 REFERENCE (SELL=exit held only, NEUTRAL=low priority, held=exit-signal check):\n${otherDebates.map(buildCompactDebateRow).join('\n')}\n`
+    : '';
+
+  return `Generate trade orders. Held (skip BUY unless exit signal): ${data.held_tickers.join(', ') || 'none'}
 Portfolio: ${JSON.stringify(compactPortfolio)}
 Market: ${JSON.stringify(compactMarket)}
-${regimeSection}${budgetSection}${swapSection}
-DEBATES (${debates.length} tickers — format: ticker | signal/4h/1h | conf | score(Bull/bear) | price sl tp rr | rsi vol pattern type | BULL case | BEAR case):
-${debateRows}
-
-Output JSON array only. Generate ≥1 proposal if any setup qualifies. Empty [] only if truly nothing.`;
+${regimeSection}${budgetSection}${swapSection}${buySection}${refSection}
+Output JSON array only. Generate ≥1 proposal if any BUY CANDIDATE qualifies. Empty [] only if truly nothing.`;
 }
