@@ -73,7 +73,7 @@ export class ResearcherAgent {
       const selectedTickers = new Set<string>();
 
       for (const [seg, alloc] of Object.entries(budget.segments) as Array<[MarketSegment, { slots: number; candidates_to_analyze: number }]>) {
-        const perSegCap = Math.max(alloc.slots * 3, 5);
+        const perSegCap = Math.max(alloc.slots * 2, 3);
         const segAnalyses = validAnalyses
           .filter((a) => ticker_segments[a.ticker] === seg)
           .sort((a, b) => b.confidence - a.confidence)
@@ -86,7 +86,7 @@ export class ResearcherAgent {
 
       selectedAnalyses = validAnalyses
         .filter((a) => selectedTickers.has(a.ticker))
-        .slice(0, 30);
+        .slice(0, 12);
     } else {
       // Backward compat: top 5 globally
       selectedAnalyses = validAnalyses

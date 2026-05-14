@@ -521,6 +521,7 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     console.log(`[Orchestrator] Pre-filter: ${debateOutputs.length} debates → ${strategistDebates.length} sent to strategist`);
   }
 
+  let strategistError: string | undefined;
   try {
     orderProposals = await strategist.run(
       strategistDebates,
@@ -535,7 +536,6 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     if (orderProposals.length === 0 && debateOutputs.length > 0) {
       console.warn('[Orchestrator] DIAG: Strategist returned 0 proposals despite having debates. Possible LLM filter too strict.');
       console.warn(`[Orchestrator] DIAG details: debates=${debateOutputs.length}, regime=${regime.regime}, free_slots=${budgetWithSegments.total_new_slots}, held=[${heldTickers.join(',')}]`);
-      // Log each debate's key stats to diagnose why LLM rejected all
       for (const d of debateOutputs.slice(0, 5)) {
         const a = d.analyst_output;
         console.warn(`[Orchestrator] DIAG debate: ${d.ticker} conf=${a.confidence} signal=${a.signal_15m} bias4h=${a.bias_4h} debate_score=${d.debate_score}`);
@@ -543,9 +543,15 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     }
   } catch (err) {
     console.error('[Orchestrator] Strategist exception:', (err as Error).message);
+    strategistError = (err as Error).message;
     orderProposals = [];
   }
-  reporter.updateAgent('strategist', { status: orderProposals.length > 0 ? 'ok' : 'error', lastRun: new Date().toISOString() });
+  // 'error' only on real exception — 0 proposals = market had nothing valid, not a system error
+  reporter.updateAgent('strategist', {
+    status: strategistError ? 'error' : 'ok',
+    lastRun: new Date().toISOString(),
+    error: strategistError,
+  });
 
   // Step 8b: Inject relative weakness exits (deterministic, bypass LLM)
   const weakSells = generateWeaknessExits(portfolio.positions, collectorOutput.market.sector_biases);
