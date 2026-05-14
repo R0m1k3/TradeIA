@@ -21,6 +21,8 @@ import type { SwapCandidate, OrderProposal } from './strategist';
 import type { MarketSegment } from './discovery';
 import type { SectorBias } from '../data/sectors';
 import type { Position } from '../broker/mock';
+import { PortfolioAllocator, computePortfolioMetrics } from './portfolio-allocator';
+import type { AllocationResult } from './portfolio-allocator';
 import { saveSnapshots } from '../models/ticker-snapshot';
 import { saveNotes } from '../models/ticker-note';
 import { AILogCollector } from '../utils/ai-logger';
@@ -96,63 +98,6 @@ function generateWeaknessExits(
   return sells;
 }
 
-interface RiskPreCheckResult {
-  ticker: string;
-  action: string;
-  status: 'ACCEPTED' | 'REJECTED';
-  risk_usd: number;
-  cash_available: number;
-  free_slots: number;
-  rejection_reason: string;
-}
-
-function riskPreCheck(
-  proposals: OrderProposal[],
-  portfolioUsd: number,
-  portfolio: { cash_usd?: number; positions: Array<{ ticker: string }> },
-  budget: AllocationBudget,
-): RiskPreCheckResult[] {
-  const riskPerSlotPct = budget.risk_per_slot_pct;
-  const cashAvailable = portfolio.cash_usd ?? (portfolioUsd - 0); // fallback
-  const totalFreeSlots = budget.total_new_slots;
-  const currentPositions = portfolio.positions.length;
-
-  return proposals.map((p) => {
-    const sizeUsd = portfolioUsd * (p.size_pct / 100);
-    const maxRiskUsd = portfolioUsd * (riskPerSlotPct / 100);
-    const riskUsd = Math.min(sizeUsd, maxRiskUsd);
-
-    // Check 1: risk_per_slot_pct * equity <= cash_disponible
-    if (riskUsd > cashAvailable) {
-      return {
-        ticker: p.ticker, action: p.action, status: 'REJECTED' as const,
-        risk_usd: Math.round(riskUsd * 100) / 100,
-        cash_available: Math.round(cashAvailable * 100) / 100,
-        free_slots: totalFreeSlots,
-        rejection_reason: `risk_usd $${riskUsd.toFixed(2)} > cash $${cashAvailable.toFixed(2)}`,
-      };
-    }
-
-    // Check 2: positions_count + 1 <= max_slots (for BUY only)
-    if (p.action === 'BUY' && totalFreeSlots <= 0) {
-      return {
-        ticker: p.ticker, action: p.action, status: 'REJECTED' as const,
-        risk_usd: Math.round(riskUsd * 100) / 100,
-        cash_available: Math.round(cashAvailable * 100) / 100,
-        free_slots: totalFreeSlots,
-        rejection_reason: `no free slots (${currentPositions} positions, 0 free)`,
-      };
-    }
-
-    return {
-      ticker: p.ticker, action: p.action, status: 'ACCEPTED' as const,
-      risk_usd: Math.round(riskUsd * 100) / 100,
-      cash_available: Math.round(cashAvailable * 100) / 100,
-      free_slots: totalFreeSlots,
-      rejection_reason: '',
-    };
-  });
-}
 
 let isRunning = false;
 
@@ -562,19 +507,54 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
   const allProposals = [...orderProposals, ...weakSells];
   aiLog.setProposals(allProposals);
 
-  // Step 8c: Risk pre-check — enforce slot and budget limits before RiskAgent
-  const preCheckResults = riskPreCheck(allProposals, portfolioUsd, portfolio, budgetWithSegments);
-  const preCheckedProposals = allProposals.filter((p, i) => {
-    const r = preCheckResults[i];
-    if (r.status === 'REJECTED') {
-      console.log(`[Orchestrator] RISK_PRE_CHECK REJECTED: ${r.ticker} ${r.action} — ${r.rejection_reason}`);
-      aiLog.rejections.push({ ticker: r.ticker, action: r.action, reason: r.rejection_reason });
-      return false;
-    }
-    console.log(`[Orchestrator] RISK_PRE_CHECK ACCEPTED: ${r.ticker} ${r.action} — risk_usd=$${r.risk_usd}, cash=$${r.cash_available}, slots=${r.free_slots}`);
-    return true;
+  // Step 8c: Portfolio-level allocation — heat budget, opportunity cost, thesis invalidation
+  const allocator = new PortfolioAllocator();
+  const sectorBiases = (collectorOutput.market.sector_biases ?? {}) as Record<string, SectorBias>;
+  const allocation: AllocationResult = allocator.allocate(
+    allProposals,
+    portfolio.positions,
+    debateOutputs,
+    budgetWithSegments,
+    portfolioUsd,
+    sectorBiases,
+    regime,
+  );
+
+  // Log allocation decisions
+  for (const logLine of allocation.allocation_log) {
+    console.log(`[Orchestrator] ALLOCATOR: ${logLine}`);
+  }
+  if (allocation.portfolio_heat.must_release) {
+    broadcastAlert('warning', `Portfolio heat ${allocation.portfolio_heat.current_heat_pct.toFixed(1)}% > cap ${allocation.portfolio_heat.max_heat_pct}% — forcing exits`);
+  }
+  if (allocation.sell_recommendations.length > 0) {
+    console.log(`[Orchestrator] SELL recommendations: ${allocation.sell_recommendations.map((s) => `${s.ticker} (${s.reasoning?.slice(0, 60)})`).join(', ')}`);
+  }
+
+  // Merge allocator sells with remaining proposals (allocator-approved buys only)
+  const preCheckedProposals = [...allocation.sell_recommendations, ...allocation.approved_proposals];
+  console.log(`[Orchestrator] Allocator: ${allocation.approved_proposals.length} BUY(s) approved, ${allocation.sell_recommendations.length} SELL(s), heat ${allocation.portfolio_heat.current_heat_pct.toFixed(1)}%`);
+
+  // Compute and broadcast portfolio metrics
+  const portfolioMetrics = computePortfolioMetrics(
+    portfolio.positions,
+    portfolioUsd,
+    portfolio.cash_usd,
+    portfolio.daily_pnl_pct,
+    portfolio.risk_regime,
+    debateOutputs,
+    sectorBiases,
+  );
+  broadcastAnalysisEvent({
+    id: `portfolio-metrics-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    agent: 'allocator',
+    stage: 'allocate',
+    title: `Portfolio: ${portfolioMetrics.position_count} pos, heat ${portfolioMetrics.portfolio_heat_pct.toFixed(1)}%/${portfolioMetrics.max_heat_pct}%, cash ${portfolioMetrics.cash_pct.toFixed(0)}%`,
+    summary_simple: `${portfolioMetrics.position_count} positions, risque global ${portfolioMetrics.portfolio_heat_pct.toFixed(1)}%, cash ${portfolioMetrics.cash_pct.toFixed(0)}%, coût d'opportunité $${portfolioMetrics.opportunity_cost_usd.toFixed(0)}`,
+    summary_expert: `Heat=${portfolioMetrics.portfolio_heat_pct}/${portfolioMetrics.max_heat_pct}% Cash=${portfolioMetrics.cash_pct}% Invested=${portfolioMetrics.invested_pct}% PnL=${portfolioMetrics.unrealized_pnl_pct.toFixed(2)}% Sectors=${JSON.stringify(portfolioMetrics.sector_concentration)} WeakPositions=${portfolioMetrics.weak_positions.length} OppCost=$${portfolioMetrics.opportunity_cost_usd.toFixed(0)}`,
+    freshness_score: undefined,
   });
-  aiLog.setRiskFilter(preCheckResults);
 
   // Step 9: Risk validation
   reporter.updateAgent('risk', { status: 'running' });

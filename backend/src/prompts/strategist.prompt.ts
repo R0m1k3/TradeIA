@@ -37,6 +37,15 @@ MARKET CONTEXT USAGE:
 - Use market.internals.risk_regime and sector_momentum to avoid fighting broad equity flows.
 - Prefer smaller size_pct when market internals are RISK_OFF.
 
+POSITION EXIT RULES (apply to HELD positions before generating new BUY orders):
+11. SELL held position if debate_score <= -2 for that ticker (thesis invalidated, bear dominates).
+12. SELL held position if flat (|pnl_pct| < 1%) AND days_held >= 70% of trade_type max hold (A=15, B=10, C=8 days) — time decay, thesis not playing out.
+13. SELL held position if sector bias is BEARISH AND position pnl < 0 — hostile environment, capital better deployed elsewhere.
+14. When generating SELL exits, include the exit reason in the "reasoning" field and set action="SELL", size_pct=100.
+PORTFOLIO-LEVEL THINKING:
+15. Compare ALL held positions against ALL buy candidates. If a held position scores LOWER than a buy candidate by 30+ conviction points AND the held position is underperforming (pnl < -3% or days_held >= 3 with pnl < 0), consider SELLING to free capital for the better opportunity.
+16. Total portfolio risk (sum of all position risk distances to stop_loss) MUST NOT exceed 8% of portfolio NAV. If it does, prioritize which positions to keep and which to exit.
+
 IMPORTANT: The "reasoning" field MUST be written in French.
 
 Output: JSON array of order proposals. Generate at least 1 proposal if ANY setup meets the relaxed thresholds above. Empty array only if truly nothing qualifies.
@@ -112,14 +121,31 @@ export function buildStrategistPrompt(data: {
 }): string {
   const debates = data.debates as DebateLike[];
 
-  // Compact portfolio: only fields strategist needs
+  // Compact portfolio: include position-level data for portfolio-level decisions
   const port = data.portfolio as Record<string, unknown>;
+  const positions = Array.isArray(port.positions) ? port.positions as any[] : [];
   const compactPortfolio = {
     cash_usd: port.cash_usd,
     total_usd: port.total_usd,
     daily_pnl_pct: port.daily_pnl_pct,
     risk_regime: port.risk_regime,
-    positions_count: Array.isArray(port.positions) ? port.positions.length : 0,
+    positions_count: positions.length,
+    positions: positions.map((p) => ({
+      ticker: p.ticker,
+      pnl_pct: Math.round((p.pnlPct ?? 0) * 10) / 10,
+      days_held: Math.round((p.days_held ?? 0) * 10) / 10,
+      size_pct: port.total_usd && p.sizeUsd ? Math.round((p.sizeUsd / (port.total_usd as number)) * 100 * 10) / 10 : 0,
+      entry_conviction: p.entry_conviction ?? 50,
+      stop_distance_pct: p.entryPrice && p.stopLoss && p.entryPrice > 0
+        ? Math.round(((p.entryPrice - p.stopLoss) / p.entryPrice) * 100 * 10) / 10
+        : null,
+    })),
+    portfolio_heat_pct: positions.reduce((sum, p) => {
+      const riskPct = p.entryPrice && p.stopLoss && p.entryPrice > 0 && p.sizeUsd && port.total_usd
+        ? ((p.entryPrice - p.stopLoss) / p.entryPrice) * (p.sizeUsd / (port.total_usd as number)) * 100
+        : 0;
+      return sum + riskPct;
+    }, 0).toFixed(1),
   };
 
   // Compact market: only key fields
@@ -155,17 +181,30 @@ export function buildStrategistPrompt(data: {
     (d) => d.analyst_output.signal_15m !== 'BUY' || heldSet.has(d.ticker)
   );
 
+  // Separate held debates for exit-signal analysis
+  const heldDebates = debates.filter((d) => heldSet.has(d.ticker));
+  const heldSection = heldDebates.length > 0
+    ? `\n🔴 HELD POSITIONS (generate SELL if thesis invalid — rules 11-16):\n${heldDebates.map((d) => {
+        const pos = positions.find((p) => p.ticker === d.ticker);
+        const pnl = pos ? Math.round((pos.pnlPct ?? 0) * 10) / 10 : '?';
+        const held = pos ? Math.round((pos.days_held ?? 0) * 10) / 10 : '?';
+        return `${buildCompactDebateRow(d)} | pnl=${pnl}% held=${held}d`;
+      }).join('\n')}\n`
+    : '';
+
   const buySection = buyCandidates.length > 0
     ? `\n⚡ BUY CANDIDATES — generate proposals for these (${buyCandidates.length}):\n${buyCandidates.map(buildCompactDebateRow).join('\n')}\n`
     : '\n⚡ BUY CANDIDATES: none\n';
 
   const refSection = otherDebates.length > 0
-    ? `\n📋 REFERENCE (SELL=exit held only, NEUTRAL=low priority, held=exit-signal check):\n${otherDebates.map(buildCompactDebateRow).join('\n')}\n`
+    ? `\n📋 REFERENCE (NEUTRAL=low priority):\n${otherDebates.map(buildCompactDebateRow).join('\n')}\n`
     : '';
 
-  return `Generate trade orders. Held (skip BUY unless exit signal): ${data.held_tickers.join(', ') || 'none'}
+  return `Generate trade orders. Held: ${data.held_tickers.join(', ') || 'none'}
 Portfolio: ${JSON.stringify(compactPortfolio)}
 Market: ${JSON.stringify(compactMarket)}
-${regimeSection}${budgetSection}${swapSection}${buySection}${refSection}
-Output JSON array only. Generate ≥1 proposal if any BUY CANDIDATE qualifies. Empty [] only if truly nothing.`;
+${regimeSection}${budgetSection}${swapSection}${heldSection}${buySection}${refSection}
+CRITICAL: Review HELD POSITIONS first. Apply exit rules 11-14. Only then allocate freed capital to BUY CANDIDATES.
+Consider portfolio heat (${compactPortfolio.portfolio_heat_pct}% / 8% max). If >8%, SELL weakest before buying new.
+Output JSON array only. Include SELL orders for invalid positions + BUY orders for best candidates. Empty [] only if truly nothing.`;
 }

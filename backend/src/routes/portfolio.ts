@@ -2,6 +2,9 @@ import { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { getPortfolioState } from '../broker/mock';
 import { getCredential } from '../config/credentials';
+import { computePortfolioHeat, computePortfolioMetrics } from '../agents/portfolio-allocator';
+import { getTickerSector } from '../data/sectors';
+import { getYahooVIX, getFearAndGreed } from '../data/yahoo';
 
 const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/', async () => {
@@ -111,6 +114,32 @@ const portfolioRoutes: FastifyPluginAsync = async (fastify) => {
     } catch {
       return { total: 0, resolved: 0, correct: 0, win_rate: 0, by_direction: { BUY: { total: 0, correct: 0 }, SELL: { total: 0, correct: 0 }, HOLD: { total: 0, correct: 0 } } };
     }
+  });
+
+  /** Portfolio-level metrics: heat, concentration, opportunity cost */
+  fastify.get('/metrics', async () => {
+    const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
+    const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
+    const portfolio = await getPortfolioState(portfolioUsd);
+
+    const heat = computePortfolioHeat(portfolio.positions, portfolioUsd);
+    const emptyDebates: any[] = [];
+    const emptySectors: Record<string, any> = {};
+
+    const metrics = computePortfolioMetrics(
+      portfolio.positions,
+      portfolio.total_usd,
+      portfolio.cash_usd,
+      portfolio.daily_pnl_pct,
+      portfolio.risk_regime,
+      emptyDebates,
+      emptySectors,
+    );
+
+    return {
+      ...metrics,
+      position_risks: heat.position_risks,
+    };
   });
 
   /** Performance stats by trade type (A/B/C) */

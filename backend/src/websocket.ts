@@ -156,7 +156,7 @@ export interface AnalysisEvent {
   id: string;
   timestamp: string;
   agent: string;
-  stage: 'collect' | 'analyze' | 'debate' | 'risk' | 'decision' | 'execute' | 'report';
+  stage: 'collect' | 'analyze' | 'debate' | 'risk' | 'decision' | 'allocate' | 'execute' | 'report';
   title: string;
   summary_simple: string;
   summary_expert: string;
