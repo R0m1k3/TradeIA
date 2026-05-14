@@ -441,7 +441,8 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     analystOutputs,
     collectorOutput,
     discoveryResult.segments,
-    budgetWithSegments
+    budgetWithSegments,
+    portfolioForBudget.positions.map((p) => p.ticker),
   );
   reporter.updateAgent('bull', { status: 'ok', lastRun: new Date().toISOString() });
   reporter.updateAgent('bear', { status: 'ok', lastRun: new Date().toISOString() });

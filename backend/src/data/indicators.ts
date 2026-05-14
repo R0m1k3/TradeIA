@@ -300,9 +300,14 @@ export function compute15mSignal(indicators: IndicatorValues): 'BUY' | 'SELL' | 
   // Weaker momentum signals: RSI above/below midline + MACD confirmation
   if (rsi_14 > 50 && rsi_14 < 60 && macd_signal === 'bullish' && highVolume) return 'BUY';
   if (rsi_14 < 50 && rsi_14 > 40 && macd_signal === 'bearish' && highVolume) return 'SELL';
-  // EMA alignment signals (trend continuation on pullback)
-  if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 > ema_21 && macd_signal === 'bullish') return 'BUY';
-  if (rsi_14 > 45 && rsi_14 < 55 && ema_9 !== null && ema_21 !== null && ema_9 < ema_21 && macd_signal === 'bearish') return 'SELL';
+  // EMA alignment signals (trend continuation on pullback) — RSI must be clearly directional
+  if (rsi_14 > 50 && rsi_14 < 62 && ema_9 !== null && ema_21 !== null && ema_9 > ema_21 && macd_signal === 'bullish') return 'BUY';
+  if (rsi_14 > 55 && rsi_14 < 68 && ema_9 !== null && ema_21 !== null && ema_9 < ema_21 && macd_signal === 'bearish') return 'SELL';
+
+  // ROC momentum: strong upward move + RSI not overbought = BUY regardless of MACD lag
+  if (indicators.roc_10 !== null && indicators.roc_10 > 2.5 && rsi_14 < 65 && macd_signal !== 'bearish') return 'BUY';
+  // ROC downward momentum: strong downward move + RSI not oversold = SELL
+  if (indicators.roc_10 !== null && indicators.roc_10 < -2.5 && rsi_14 > 35 && macd_signal !== 'bullish') return 'SELL';
 
   // Extreme RSI → force directional signal (never stay NEUTRAL at extremes)
   if (rsi_14 < 30) return 'BUY';

@@ -47,7 +47,8 @@ export class ResearcherAgent {
     analystOutputs: AnalystOutput[],
     collector: CollectorOutput,
     ticker_segments?: Record<string, MarketSegment>,
-    budget?: AllocationBudget
+    budget?: AllocationBudget,
+    heldTickers?: string[]
   ): Promise<DebateOutput[]> {
     // Filter only truly bad data — neutral skip_reason tickers can still be debated
     const validAnalyses = analystOutputs
@@ -92,6 +93,17 @@ export class ResearcherAgent {
       selectedAnalyses = validAnalyses
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, 5);
+    }
+
+    // Always include held tickers — strategist needs exit signal data for positions
+    if (heldTickers && heldTickers.length > 0) {
+      const heldInAnalysis = validAnalyses.filter(
+        (a) => heldTickers.includes(a.ticker) && !selectedAnalyses.some((s) => s.ticker === a.ticker)
+      );
+      if (heldInAnalysis.length > 0) {
+        console.log(`[Researcher] Force-including ${heldInAnalysis.length} held tickers: ${heldInAnalysis.map((a) => a.ticker).join(', ')}`);
+        selectedAnalyses = [...selectedAnalyses, ...heldInAnalysis];
+      }
     }
 
     console.log(`[Researcher] Starting bull/bear debates for ${selectedAnalyses.length} tickers (4 concurrent)`);
