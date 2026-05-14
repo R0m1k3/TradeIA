@@ -62,7 +62,7 @@ export class StrategistAgent {
       });
 
       console.log(`[Strategist] Sending ${prompt.length} chars to LLM (${debates.length} debates)`);
-      const response = await callLLM('strategist', MODELS.STRONG, STRATEGIST_SYSTEM, prompt, 1200, { thinking: true });
+      const response = await callLLM('strategist', MODELS.STRONG, STRATEGIST_SYSTEM, prompt, 2500, { thinking: true });
       console.log(`[Strategist] LLM response: ${response.content.length} chars`);
       const parsed = parseJsonResponse<OrderProposal[]>(response.content);
 

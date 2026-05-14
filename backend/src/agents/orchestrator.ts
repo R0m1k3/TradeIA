@@ -505,9 +505,25 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     console.log(`[Orchestrator] STRATEGIST TOP DEBATES: ${topDebates}`);
   }
 
+  // Pre-filter: keep top 15 debates by conviction score before sending to strategist
+  // Reduces prompt size ~60% and focuses LLM on best setups
+  const MAX_DEBATES_TO_STRATEGIST = 15;
+  const strategistDebates = debateOutputs
+    .filter((d) => d.analyst_output.confidence >= 40 || d.debate_score >= 1)
+    .sort((a, b) => {
+      const scoreA = a.analyst_output.confidence + a.debate_score * 5;
+      const scoreB = b.analyst_output.confidence + b.debate_score * 5;
+      return scoreB - scoreA;
+    })
+    .slice(0, MAX_DEBATES_TO_STRATEGIST);
+
+  if (strategistDebates.length < debateOutputs.length) {
+    console.log(`[Orchestrator] Pre-filter: ${debateOutputs.length} debates → ${strategistDebates.length} sent to strategist`);
+  }
+
   try {
     orderProposals = await strategist.run(
-      debateOutputs,
+      strategistDebates,
       portfolio,
       collectorOutput.market,
       heldTickers,

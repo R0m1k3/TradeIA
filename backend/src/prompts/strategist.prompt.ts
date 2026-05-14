@@ -59,6 +59,48 @@ Order format:
   "reasoning": ""
 }`;
 
+interface DebateLike {
+  ticker: string;
+  debate_score: number;
+  bull: { conviction: number; technical_case: string; upside_pct: number };
+  bear: { conviction: number; technical_case: string; downside_pct: number };
+  analyst_output: {
+    signal_15m: string;
+    bias_4h: string;
+    bias_1h: string;
+    confidence: number;
+    entry_price: number;
+    stop_loss: number;
+    take_profit: number;
+    rsi_15m: number;
+    volume_ratio: number;
+    candle_pattern: string;
+    trade_type: string;
+    atr: number;
+    data_quality?: string;
+    earnings_blackout?: boolean;
+  };
+}
+
+function buildCompactDebateRow(d: DebateLike): string {
+  const a = d.analyst_output;
+  const rr = a.entry_price > 0 && a.entry_price !== a.stop_loss
+    ? ((a.take_profit - a.entry_price) / Math.abs(a.entry_price - a.stop_loss)).toFixed(1)
+    : '?';
+  const bullShort = d.bull.technical_case.slice(0, 80).replace(/\n/g, ' ');
+  const bearShort = d.bear.technical_case.slice(0, 80).replace(/\n/g, ' ');
+  return [
+    d.ticker,
+    `${a.signal_15m}/${a.bias_4h}/${a.bias_1h}`,
+    `conf=${a.confidence}`,
+    `score=${d.debate_score}(B${d.bull.conviction}/b${d.bear.conviction})`,
+    `p=${a.entry_price} sl=${a.stop_loss} tp=${a.take_profit} rr=${rr}`,
+    `rsi=${a.rsi_15m} vol=${a.volume_ratio?.toFixed(1)} pat=${a.candle_pattern} type=${a.trade_type}`,
+    `BULL: ${bullShort}`,
+    `BEAR: ${bearShort}`,
+  ].join(' | ');
+}
+
 export function buildStrategistPrompt(data: {
   debates: unknown[];
   portfolio: unknown;
@@ -68,31 +110,50 @@ export function buildStrategistPrompt(data: {
   swapCandidates?: SwapCandidate[];
   regime?: RegimeAssessment;
 }): string {
+  const debates = data.debates as DebateLike[];
+
+  // Compact portfolio: only fields strategist needs
+  const port = data.portfolio as Record<string, unknown>;
+  const compactPortfolio = {
+    cash_usd: port.cash_usd,
+    total_usd: port.total_usd,
+    daily_pnl_pct: port.daily_pnl_pct,
+    risk_regime: port.risk_regime,
+    positions_count: Array.isArray(port.positions) ? port.positions.length : 0,
+  };
+
+  // Compact market: only key fields
+  const mkt = data.market as Record<string, unknown>;
+  const compactMarket = {
+    vix: mkt.vix,
+    fear_greed: mkt.fear_greed,
+    nasdaq_direction: mkt.nasdaq_direction,
+  };
+
   const budgetSection = data.budget
-    ? `\n== BUDGET D'ALLOCATION CE CYCLE ==\n${JSON.stringify(data.budget, null, 2)}\n\nRègle: ne pas dépasser les slots par segment. Si aucun candidat convaincant dans un segment → retourner [] pour ce segment, ne pas forcer.\n`
+    ? `\nBUDGET: slots=${JSON.stringify(
+        Object.fromEntries(
+          Object.entries(data.budget.segments).map(([seg, alloc]) => [seg, (alloc as any)?.slots ?? 0])
+        )
+      )} total_new=${data.budget.total_new_slots} swap=${data.budget.swap_allowed}\n`
     : '';
 
   const swapSection = data.swapCandidates && data.swapCandidates.length > 0
-    ? `\n== CANDIDATS AU REMPLACEMENT (SWAP) ==\nCes positions peuvent être vendues pour financer une meilleure opportunité.\nUn SWAP n'est valide que si: conviction_nouvelle > conviction_actuelle + 20 points ET days_held >= 2 ET pnl_actuel < +8%\n${JSON.stringify(data.swapCandidates, null, 2)}\n\nPour un SWAP: action="SWAP", ticker=new_ticker, swap_sell_ticker=old_ticker_to_sell\n`
+    ? `\nSWAP CANDIDATES (sell these to fund better setups — only if new_conf > entry_conv+20, held>=2d, pnl<+8%):\n${data.swapCandidates.map((s) => `${s.ticker}: held=${s.days_held}d pnl=${s.current_pnl_pct.toFixed(1)}% conv=${s.entry_conviction}`).join('\n')}\n`
     : '';
 
   const regimeSection = data.regime
-    ? `\n== RÉGIME DE MARCHÉ ACTUEL ==\nRegime: ${data.regime.regime}\nConfiance régime: ${data.regime.confidence}%\nSizing multiplier: ${data.regime.sizing_multiplier}\nPréfère momentum: ${data.regime.prefer_momentum}\nRaison: ${data.regime.reason}\n\n⚠️ RAPPEL RÈGLE 8: Si regime= bull_trend/bull_range et bias_4h=BEARISH → c'est une OPPORTUNITÉ (pullback/mean-reversion), PAS un skip!\n`
+    ? `REGIME: ${data.regime.regime} (conf=${data.regime.confidence}% sizing=${data.regime.sizing_multiplier} momentum=${data.regime.prefer_momentum})\n⚠️ BEARISH 4H in bull regime = PULLBACK ENTRY (type B/C, size 3-15%), NOT a skip!\n`
     : '';
 
-  return `Generate trade orders based on the following debate outcomes and portfolio state.
+  const debateRows = debates.map(buildCompactDebateRow).join('\n');
 
-Currently held positions (do not open new BUY): ${data.held_tickers.join(', ') || 'none'}
-
-Portfolio state:
-${JSON.stringify(data.portfolio, null, 2)}
-
-Market context:
-${JSON.stringify(data.market, null, 2)}
+  return `Generate trade orders. Held (skip BUY): ${data.held_tickers.join(', ') || 'none'}
+Portfolio: ${JSON.stringify(compactPortfolio)}
+Market: ${JSON.stringify(compactMarket)}
 ${regimeSection}${budgetSection}${swapSection}
-Debate outcomes per ticker:
-${JSON.stringify(data.debates, null, 2)}
+DEBATES (${debates.length} tickers — format: ticker | signal/4h/1h | conf | score(Bull/bear) | price sl tp rr | rsi vol pattern type | BULL case | BEAR case):
+${debateRows}
 
-Apply all decision logic rules strictly. Generate proposals for any setup meeting the relaxed thresholds. Empty array [] only if truly nothing qualifies.
-Output JSON array only — no explanation outside the array.`;
+Output JSON array only. Generate ≥1 proposal if any setup qualifies. Empty [] only if truly nothing.`;
 }

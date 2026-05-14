@@ -15,7 +15,7 @@ export interface LLMResponse {
 
 // ── Token budget tracker (resets each cycle via resetTokenBudget) ──
 let cycleTokensUsed = 0;
-const TOKEN_BUDGET = parseInt(process.env.LLM_TOKEN_BUDGET_PER_CYCLE || '50000', 10);
+const TOKEN_BUDGET = parseInt(process.env.LLM_TOKEN_BUDGET_PER_CYCLE || '100000', 10);
 
 export function resetTokenBudget() { cycleTokensUsed = 0; }
 export function getCycleTokensUsed() { return cycleTokensUsed; }
