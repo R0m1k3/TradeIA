@@ -32,7 +32,8 @@
       "Bash(git stash *)",
       "Bash(git reset *)",
       "WebFetch(domain:lama.vonrodbox.eu)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(rtk tsc *)"
     ]
   }
 }
