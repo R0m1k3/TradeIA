@@ -49,6 +49,7 @@ export class ResearcherAgent {
     ticker_segments?: Record<string, MarketSegment>,
     budget?: AllocationBudget
   ): Promise<DebateOutput[]> {
+    // Filter only truly bad data — neutral skip_reason tickers can still be debated
     const validAnalyses = analystOutputs
       .filter((a) => {
         if (a.confidence <= 0) {

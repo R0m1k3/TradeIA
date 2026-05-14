@@ -32,7 +32,7 @@ export class AnalystAgent {
     const results: AnalystOutput[] = [];
     const MODELS = await getModels();
     const maxLlmAnalyses = Math.max(0, parseInt(process.env.ANALYST_LLM_MAX_PER_CYCLE || '3', 10));
-    const minLlmConfidence = Math.max(0, parseInt(process.env.ANALYST_LLM_MIN_CONFIDENCE || '55', 10));
+    const minLlmConfidence = Math.max(0, parseInt(process.env.ANALYST_LLM_MIN_CONFIDENCE || '45', 10));
     let llmAnalysesUsed = 0;
 
     // Sequential counter: pre-check LLM budget under lock to avoid race in Promise.all

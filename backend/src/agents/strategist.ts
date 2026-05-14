@@ -67,8 +67,12 @@ export class StrategistAgent {
       const parsed = parseJsonResponse<OrderProposal[]>(response.content);
 
       if (!Array.isArray(parsed)) {
-        console.warn('[Strategist] Response was not an array, got:', typeof parsed);
+        console.warn('[Strategist] Response was not an array:', typeof parsed, JSON.stringify(parsed)?.slice(0, 200));
         return [];
+      }
+
+      if (parsed.length === 0) {
+        console.warn('[Strategist] LLM returned empty proposals array — debates sent:', debates.length, '— raw response slice:', response.content.slice(0, 300));
       }
 
       console.log(`[Strategist] Generated ${parsed.length} order proposals`);

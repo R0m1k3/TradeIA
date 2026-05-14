@@ -346,6 +346,7 @@ export class RiskAgent {
       filtered.push(p);
     }
 
+    console.log(`[Risk] Pre-filter: ${proposals.length} in → ${filtered.length} passed, ${proposals.length - filtered.length} rejected`);
     return filtered;
   }
 
