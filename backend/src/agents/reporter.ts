@@ -1,17 +1,10 @@
 import { broadcastCycleUpdate, broadcastAlert, AgentState, CycleUpdatePayload } from '../websocket';
 import type { DebateOutput } from './researcher';
 import type { ExecutionResult } from '../broker/mock';
-import { callLLM, parseJsonResponse } from '../llm/client';
-import { getModels } from '../llm/models';
 import { prisma } from '../lib/prisma';
 import { getEquityCurrentPrice } from '../data/yahoo';
 import { getNasdaqStatus } from '../routes/market';
 import type { DataQualitySummary } from '../data/freshness';
-
-const REPORTER_SYSTEM = `Tu es le rapporteur du cycle de trading automatisé. Résume le cycle et génère les alertes importantes.
-IMPORTANT: Toutes les alertes et le résumé DOIVENT être rédigés en français naturel, compréhensible par un non-expert.
-Explique les décisions en termes simples : "Le système a acheté NVDA car la tendance est haussière et les analystes IA sont optimistes."
-Output JSON uniquement: { "alerts": [{ "level": "info|warning|critical", "message": "", "ticker": "" }], "summary": "" }`;
 
 export class ReporterAgent {
   private agentStates: CycleUpdatePayload['agents'] = {
@@ -144,27 +137,8 @@ export class ReporterAgent {
       });
     }
 
-    // LLM reporter pour résumé enrichi
-    try {
-      const MODELS = await getModels();
-      const summary = {
-        debates: debates.length,
-        orders: execResults.length,
-        duration_ms: durationMs,
-        regime: market ? `VIX ${market.vix?.toFixed(1)} Fear&Greed ${market.fear_greed}` : '',
-        macro: (market as any)?.macro?.summary || '',
-      };
-      const response = await callLLM(
-        'reporter',
-        MODELS.LIGHT,
-        REPORTER_SYSTEM,
-        `Résumé cycle: ${JSON.stringify(summary)}\nSignaux principaux: ${JSON.stringify(signals.slice(0, 5))}\nOrdres exécutés: ${JSON.stringify(orders_executed)}`
-      );
-      const parsed = parseJsonResponse<{ alerts: CycleUpdatePayload['alerts']; summary: string }>(response.content);
-      if (parsed.alerts) alerts = [...alerts, ...parsed.alerts];
-    } catch {
-      // Non-critique
-    }
+    // Reporter LLM supprimé — les alertes déterministes ci-dessus couvrent l'essentiel.
+    // Économie : ~1000 tokens par cycle.
 
     // Sauvegarder AgentPredictions pour feedback loop
     if (watchlist && debates.length > 0) {

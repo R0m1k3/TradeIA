@@ -1,24 +1,76 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSignalsStore } from '../store/signals.store';
-import { useConfigStore } from '../store/config.store';
-import type { AgentState, DebateOutput, AnalysisEvent } from '../types';
+import type { AgentState } from '../types';
+import { DecisionViewer } from '../components/agents/DecisionViewer';
 
-const AGENT_META: Record<string, { n: string; name: string; role: string; color: string; desc: string }> = {
-  collector: { n: '01', name: 'Collecteur', role: 'Récolte les données', color: 'var(--info)', desc: 'Ingère les flux OHLC, données fondamentales, macro et secteur pour alimenter les autres agents.' },
-  analyst: { n: '02', name: 'Analyste', role: 'Analyse technique & fondamentale', color: 'var(--accent)', desc: 'Surveille fondamentaux, ratios, bilans, corrélations sectorielles et signaux techniques multi-timeframe.' },
-  bull: { n: '03', name: 'Bull', role: 'Cherche le haussier', color: 'var(--accent)', desc: 'Identifie les setups haussiers : breakouts, supports, divergences positives, catalyseurs fondamentaux.' },
-  bear: { n: '04', name: 'Bear', role: 'Cherche le baissier', color: 'var(--danger)', desc: 'Identifie les retournements baissiers, divergences négatives, cassures de structure, risques macro.' },
-  risk: { n: '05', name: 'Risk', role: "Calibre l'exposition", color: 'var(--warn)', desc: "Dimensionne chaque position via Kelly fractionné, oppose son veto si le risque est trop élevé." },
-  strategist: { n: '06', name: 'Modérateur', role: 'Tranche', color: 'oklch(0.74 0.10 280)', desc: 'Pondère les avis des autres agents, prend la décision finale, gère les conflits.' },
-  reporter: { n: '07', name: 'Reporter', role: 'Archive la décision', color: 'var(--ink-3)', desc: 'Génère une justification écrite en français pour chaque trade. Tout est auditable.' },
-};
+/**
+ * Nouvelle architecture pipeline:
+ *   1. Collecteur (déterministe)  — récolte OHLCV + news + macro
+ *   2. Analyste    (déterministe)  — calcule indicateurs RSI/MACD/EMA/ATR/ADX
+ *   3. DECIDEUR LLM (réflexion)    — UNIQUE étape AI: choisit BUY/SELL/HOLD pour chaque ticker
+ *   4. Risk        (déterministe)  — valide R/R, vol cap, Kelly, sector, cash
+ *   5. Broker      (déterministe)  — exécute les ordres approuvés
+ *
+ * Le LLM ne fait QUE choisir. Tout le reste est calcul/validation.
+ */
 
-const AGENT_IDS = ['collector', 'analyst', 'bull', 'bear', 'risk', 'strategist', 'reporter'];
-const PERF_REFRESH_MS = 5 * 60 * 1000;
-
-function Help({ tip }: { tip: string }) {
-  return <span className="card-h-help" data-tip={tip}>i</span>;
+interface StageMeta {
+  n: string;
+  name: string;
+  role: string;
+  color: string;
+  isLLM: boolean;
+  desc: string;
+  agentKey?: string; // pour mapper sur agents state
 }
+
+const STAGES: StageMeta[] = [
+  {
+    n: '01',
+    name: 'Collecteur',
+    role: 'Récolte les données brutes',
+    color: 'var(--info)',
+    isLLM: false,
+    desc: 'Récupère OHLCV (15m/1h/4h), fondamentaux, news, macro (VIX, F&G, FOMC). Aucun LLM — pure ingestion de données.',
+    agentKey: 'collector',
+  },
+  {
+    n: '02',
+    name: 'Analyste',
+    role: 'Calcule les indicateurs',
+    color: 'var(--accent)',
+    isLLM: false,
+    desc: 'Calcule RSI, MACD, EMA, ATR, ADX, Bollinger, divergences, niveaux S/R. Pénalités appliquées (surachat, volume faible). Tout est déterministe.',
+    agentKey: 'analyst',
+  },
+  {
+    n: '03',
+    name: 'Décideur LLM',
+    role: 'Réfléchit et choisit',
+    color: 'oklch(0.74 0.10 280)',
+    isLLM: true,
+    desc: 'UNIQUE étape de réflexion AI. Reçoit indicateurs + news + macro + portfolio + calibration historique. Pour chaque ticker, choisit BUY, SELL ou HOLD avec taille, stops, et reasoning complet en français.',
+    agentKey: 'strategist',
+  },
+  {
+    n: '04',
+    name: 'Risk',
+    role: 'Valide les chiffres',
+    color: 'var(--warn)',
+    isLLM: false,
+    desc: 'Validation chiffrée: R/R ≥ 1.8, Kelly half-fraction, vol targeting 4%/slot, cap secteur 40% NAV, max 5 positions/secteur, cash budget. Refuse ou réduit la taille si nécessaire.',
+    agentKey: 'risk',
+  },
+  {
+    n: '05',
+    name: 'Broker',
+    role: 'Exécute les ordres',
+    color: 'var(--ink-3)',
+    isLLM: false,
+    desc: 'Exécute en mock (ou réel) avec slippage market-cap-aware et commission 0.1%. Trailing stops automatiques (BE à +1.5R, chandelier à +3R).',
+    agentKey: 'reporter',
+  },
+];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   idle: { label: 'en attente', color: 'var(--ink-4)' },
@@ -39,66 +91,16 @@ interface PredictionStats {
   };
 }
 
-interface LiveAnalysisItem {
-  id: string;
-  timestamp: string;
-  agent: string;
-  title: string;
-  summarySimple: string;
-  summaryExpert: string;
-  confidence?: number;
-  ticker?: string;
-  freshnessScore?: number;
-}
+const PERF_REFRESH_MS = 5 * 60 * 1000;
 
-function simplifySignal(signal: string): string {
-  if (signal === 'BUY') return 'L IA veut acheter';
-  if (signal === 'SELL') return 'L IA veut vendre';
-  return 'L IA préfère attendre';
-}
-
-function buildDebateAnalysisItems(debates: DebateOutput[]): LiveAnalysisItem[] {
-  return debates.flatMap((d, idx) => {
-    const baseTs = new Date(Date.now() - (debates.length - idx) * 1000).toISOString();
-    return [
-      {
-        id: `${d.ticker}-analyst-${idx}`,
-        timestamp: baseTs,
-        agent: 'analyst',
-        title: `${d.ticker} - lecture technique`,
-        summarySimple: `Confiance ${d.analyst_output.confidence}% sur ${d.ticker}.`,
-        summaryExpert: `Bias 4H/1H: ${d.analyst_output.bias_4h}/${d.analyst_output.bias_1h}, signal 15m ${d.analyst_output.signal_15m}, RSI15 ${d.analyst_output.rsi_15m}.`,
-        confidence: d.analyst_output.confidence,
-        ticker: d.ticker,
-        freshnessScore: d.analyst_output.data_freshness_score,
-      },
-      {
-        id: `${d.ticker}-debate-${idx}`,
-        timestamp: new Date(new Date(baseTs).getTime() + 200).toISOString(),
-        agent: 'strategist',
-        title: `${d.ticker} - débat bull vs bear`,
-        summarySimple: d.debate_score > 0
-          ? `Avantage haussier sur ${d.ticker}.`
-          : d.debate_score < 0
-            ? `Avantage baissier sur ${d.ticker}.`
-            : `Les avis sont partagés sur ${d.ticker}.`,
-        summaryExpert: `Debate score ${d.debate_score}, bull ${d.bull.conviction}/10, bear ${d.bear.conviction}/10.`,
-        confidence: d.analyst_output.confidence,
-        ticker: d.ticker,
-        freshnessScore: d.analyst_output.data_freshness_score,
-      },
-    ];
-  });
+function Help({ tip }: { tip: string }) {
+  return <span className="card-h-help" data-tip={tip}>i</span>;
 }
 
 export function Agents() {
-  const { agents, signals, debates, cycleTimeline, analysisEvents, lastUpdate } = useSignalsStore();
-  const { config } = useConfigStore();
-  const [active, setActive] = useState('bull');
+  const { agents, lastUpdate, cycleTimeline } = useSignalsStore();
+  const [activeStage, setActiveStage] = useState<string>('Décideur LLM');
   const [perfStats, setPerfStats] = useState<PredictionStats | null>(null);
-  const [readingMode, setReadingMode] = useState<'beginner' | 'expert'>('beginner');
-  const [selectedItem, setSelectedItem] = useState<LiveAnalysisItem | null>(null);
-  const [activeDebateTicker, setActiveDebateTicker] = useState<string | null>(null);
   const lastPerfFetchRef = useRef(0);
 
   const api = import.meta.env.VITE_API_URL || '/api';
@@ -113,537 +115,242 @@ export function Agents() {
         if (data) setPerfStats(data);
       })
       .catch(() => {});
-  }, [lastUpdate]);
+  }, [lastUpdate, api]);
 
-  const meta = AGENT_META[active] || AGENT_META.bull;
-  const realAgent: AgentState = (agents as any)[active] || { status: 'idle' };
-  const statusInfo = STATUS_MAP[realAgent.status] || STATUS_MAP.idle;
-
-  // Find debates for active agent
-  const agentDebates = debates.filter((d) => {
-    if (active === 'bull') return d.bull;
-    if (active === 'bear') return d.bear;
-    return true;
-  });
-
-  // Latest signal for bull/bear/strategist
-  const latestSignal = signals.length > 0 ? signals[0] : null;
-  const fallbackItems: LiveAnalysisItem[] = [
-    ...cycleTimeline.slice(-10).map((ev, i) => ({
-      id: `timeline-${i}-${ev.agent}-${ev.timestamp}`,
-      timestamp: ev.timestamp,
-      agent: ev.agent,
-      title: AGENT_META[ev.agent]?.name || ev.agent,
-      summarySimple: ev.status === 'running'
-        ? `${AGENT_META[ev.agent]?.name || ev.agent} est en train d analyser.`
-        : ev.status === 'ok'
-          ? `${AGENT_META[ev.agent]?.name || ev.agent} a terminé son étape.`
-          : `${AGENT_META[ev.agent]?.name || ev.agent} a rencontré un problème.`,
-      summaryExpert: `${ev.label} - statut: ${ev.status}`,
-    })),
-    ...buildDebateAnalysisItems(debates.slice(0, 4)),
-    ...signals.slice(0, 4).map((s, i) => ({
-      id: `signal-${s.ticker}-${i}`,
-      timestamp: new Date(Date.now() - i * 400).toISOString(),
-      agent: 'strategist',
-      title: `${s.ticker} - décision`,
-      summarySimple: `${simplifySignal(s.signal)} avec confiance ${s.confidence}%.`,
-      summaryExpert: `Signal ${s.signal}, débat ${s.debate_score}, bull ${s.bull_conviction}, bear ${s.bear_conviction}.`,
-      confidence: s.confidence,
-      ticker: s.ticker,
-    })),
-  ];
-
-  const backendItems: LiveAnalysisItem[] = (analysisEvents || []).map((item: AnalysisEvent) => ({
-    id: item.id,
-    timestamp: item.timestamp,
-    agent: item.agent,
-    title: item.title,
-    summarySimple: item.summary_simple,
-    summaryExpert: item.summary_expert,
-    confidence: item.confidence,
-    ticker: item.ticker,
-    freshnessScore: item.freshness_score,
-  }));
-
-  const timelineItems: LiveAnalysisItem[] = (backendItems.length > 0 ? backendItems : fallbackItems)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 20);
+  const meta = STAGES.find((s) => s.name === activeStage) ?? STAGES[2];
+  const agentState: AgentState | undefined = meta.agentKey ? (agents as any)[meta.agentKey] : undefined;
+  const statusInfo = STATUS_MAP[agentState?.status || 'idle'];
 
   return (
     <div className="page">
       <div className="flex between center" style={{ marginBottom: 22 }}>
         <div>
-          <h1 className="h1">Agents IA</h1>
+          <h1 className="h1">Pipeline de décision</h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
-            Chaque agent a une spécialité. Aucun n'agit seul.
+            5 étapes — une seule fait réfléchir le LLM. Le reste est du calcul.
           </div>
         </div>
       </div>
 
-      {/* Cards grid */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        {AGENT_IDS.map((id) => {
-          const m = AGENT_META[id];
-          const real = (agents as any)[id] as AgentState | undefined;
-          const isRunning = real?.status === 'running';
-          const isOk = real?.status === 'ok';
-          const isErr = real?.status === 'error';
-          const st = STATUS_MAP[real?.status || 'idle'];
-          return (
-            <button
-              key={id}
-              onClick={() => setActive(id)}
-              className="card"
-              style={{
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontFamily: 'inherit',
-                border: active === id ? `1px solid ${m.color}` : '1px solid var(--rule)',
-                background: active === id ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
-                padding: 0,
-              }}
-            >
-              <div style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{m.n}</span>
+      {/* Pipeline flow visualization */}
+      <div className="card" style={{ marginBottom: 16, padding: 18 }}>
+        <div className="eyebrow" style={{ marginBottom: 14 }}>Flux du cycle</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, alignItems: 'stretch' }}>
+          {STAGES.map((s, idx) => {
+            const isActive = activeStage === s.name;
+            const real = s.agentKey ? (agents as any)[s.agentKey] as AgentState | undefined : undefined;
+            const st = STATUS_MAP[real?.status || 'idle'];
+            return (
+              <button
+                key={s.name}
+                onClick={() => setActiveStage(s.name)}
+                style={{
+                  position: 'relative',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  background: isActive ? 'var(--bg-elev-2)' : 'var(--bg-elev)',
+                  border: `1px solid ${isActive ? s.color : 'var(--rule)'}`,
+                  borderRadius: 8,
+                  padding: 14,
+                  color: 'inherit',
+                }}
+              >
+                {idx < STAGES.length - 1 && (
                   <span style={{
-                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
-                    background: st.color + '22', color: st.color,
-                    display: 'flex', alignItems: 'center', gap: 4,
+                    position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
+                    fontSize: 16, color: 'var(--ink-4)', zIndex: 1,
+                  }}>›</span>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{s.n}</span>
+                  <span style={{
+                    padding: '2px 6px', borderRadius: 4, fontSize: 9, fontFamily: 'var(--mono)',
+                    background: st.color + '22', color: st.color, display: 'flex', alignItems: 'center', gap: 4,
                   }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color }} />
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: st.color }} />
                     {st.label}
                   </span>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{m.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{m.role}</div>
-              </div>
-            </button>
-          );
-        })}
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: isActive ? s.color : 'inherit' }}>
+                  {s.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>{s.role}</div>
+                <div style={{
+                  display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 9,
+                  background: s.isLLM ? 'oklch(0.74 0.10 280 / 0.2)' : 'var(--bg-elev-2)',
+                  color: s.isLLM ? 'oklch(0.74 0.10 280)' : 'var(--ink-4)',
+                  fontFamily: 'var(--mono)', fontWeight: 600,
+                }}>
+                  {s.isLLM ? '⚡ LLM' : 'Code'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Detail */}
-      <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
+      {/* Decisions viewer = vue principale */}
+      <DecisionViewer apiBase={api} refreshKey={lastUpdate} />
+
+      {/* Bottom: étape sélectionnée + perfs */}
+      <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 12, marginTop: 12 }}>
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
               <span style={{ width: 10, height: 10, borderRadius: 50, background: meta.color }} />
               {meta.name} · <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>{meta.role}</span>
             </div>
-            <span className="card-h-meta">agent {meta.n}</span>
+            <span className="card-h-meta">
+              {meta.isLLM ? '⚡ LLM' : 'Déterministe'} · étape {meta.n}
+            </span>
           </div>
-          <div style={{ padding: 24 }}>
-            <p style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 24 }}>{meta.desc}</p>
+          <div style={{ padding: 20 }}>
+            <p style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 18 }}>
+              {meta.desc}
+            </p>
 
-            {/* Real agent info */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-              <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
-                <div className="kpi-label">Statut</div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: statusInfo.color }}>{statusInfo.label}</div>
-              </div>
-              {realAgent.lastRun && (
-                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
-                  <div className="kpi-label">Dernière exécution</div>
-                  <div className="mono" style={{ fontSize: 14 }}>{new Date(realAgent.lastRun).toLocaleTimeString('fr-FR')}</div>
+            {agentState && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+                <div style={{ background: 'var(--bg-elev-2)', padding: 12, borderRadius: 6 }}>
+                  <div className="eyebrow">Statut</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: statusInfo.color }}>{statusInfo.label}</div>
                 </div>
-              )}
-              {realAgent.durationMs != null && (
-                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
-                  <div className="kpi-label">Durée</div>
-                  <div className="mono" style={{ fontSize: 14 }}>{(realAgent.durationMs / 1000).toFixed(1)}s</div>
-                </div>
-              )}
-              {realAgent.tokensUsed != null && (
-                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8 }}>
-                  <div className="kpi-label">Tokens</div>
-                  <div className="mono" style={{ fontSize: 14 }}>{realAgent.tokensUsed.toLocaleString()}</div>
-                </div>
-              )}
-              {realAgent.error && (
-                <div style={{ background: 'var(--bg-elev-2)', padding: 16, borderRadius: 8, gridColumn: '1 / -1' }}>
-                  <div className="kpi-label">Erreur</div>
-                  <div style={{ fontSize: 12, color: 'var(--danger)' }}>{realAgent.error}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Real output from debates/signals */}
-            <div style={{ padding: 16, background: 'var(--bg-elev-2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>Dernière sortie</div>
-              {agentDebates.length > 0 ? (
-                agentDebates.slice(0, 2).map((d) => (
-                  <div key={d.ticker} style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{d.ticker}</span> — score {d.debate_score > 0 ? '+' : ''}{d.debate_score}
-                    {active === 'bull' && d.bull && (
-                      <span> · conviction {d.bull.conviction}/10{d.bull.technical_case ? ` · ${d.bull.technical_case.slice(0, 60)}` : ''}</span>
-                    )}
-                    {active === 'bear' && d.bear && (
-                      <span> · conviction {d.bear.conviction}/10</span>
-                    )}
-                    {active === 'analyst' && d.analyst_output && (
-                      <span> · confiance {d.analyst_output.confidence}%</span>
-                    )}
+                {agentState.lastRun && (
+                  <div style={{ background: 'var(--bg-elev-2)', padding: 12, borderRadius: 6 }}>
+                    <div className="eyebrow">Dernière exécution</div>
+                    <div className="mono" style={{ fontSize: 12 }}>{new Date(agentState.lastRun).toLocaleTimeString('fr-FR')}</div>
                   </div>
-                ))
-              ) : signals.length > 0 && (active === 'bull' || active === 'bear' || active === 'strategist') ? (
-                signals.slice(0, 3).map((s) => (
-                  <div key={s.ticker} style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{s.ticker}</span> — {s.signal} (score {s.debate_score > 0 ? '+' : ''}{s.debate_score}, confiance {s.confidence}%)
-                    {s.reasoning ? ` · ${s.reasoning.slice(0, 80)}` : ''}
+                )}
+                {agentState.durationMs != null && (
+                  <div style={{ background: 'var(--bg-elev-2)', padding: 12, borderRadius: 6 }}>
+                    <div className="eyebrow">Durée</div>
+                    <div className="mono" style={{ fontSize: 12 }}>{(agentState.durationMs / 1000).toFixed(1)}s</div>
                   </div>
-                ))
-              ) : (
-                <div style={{ color: 'var(--ink-4)' }}>Aucune sortie disponible — en attente du prochain cycle</div>
-              )}
-            </div>
-
-            {/* Cycle timeline */}
-            {cycleTimeline.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>Dernier cycle</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {cycleTimeline.slice(-7).map((ev, i) => {
-                    const evMeta = AGENT_META[ev.agent];
-                    return (
-                      <div key={i} style={{
-                        padding: '4px 10px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
-                        background: (ev.status === 'ok' ? 'var(--accent-soft)' : ev.status === 'running' ? 'var(--warn-soft)' : 'var(--danger-soft)'),
-                        color: ev.status === 'ok' ? 'var(--accent)' : ev.status === 'running' ? 'var(--warn)' : 'var(--danger)',
-                      }}>
-                        {evMeta?.name || ev.agent} {ev.status === 'ok' ? '✓' : ev.status === 'running' ? '⟳' : '✗'}
-                      </div>
-                    );
-                  })}
-                </div>
+                )}
+                {agentState.tokensUsed != null && (
+                  <div style={{ background: 'var(--bg-elev-2)', padding: 12, borderRadius: 6 }}>
+                    <div className="eyebrow">Tokens</div>
+                    <div className="mono" style={{ fontSize: 12 }}>{agentState.tokensUsed.toLocaleString()}</div>
+                  </div>
+                )}
+                {agentState.error && (
+                  <div style={{ background: 'var(--bg-elev-2)', padding: 12, borderRadius: 6, gridColumn: '1 / -1' }}>
+                    <div className="eyebrow">Erreur</div>
+                    <div style={{ fontSize: 11, color: 'var(--danger)' }}>{agentState.error}</div>
+                  </div>
+                )}
               </div>
             )}
 
-            <div style={{ marginTop: 20, borderTop: '1px solid var(--rule)', paddingTop: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div className="card-h-title" style={{ padding: 0, border: 'none' }}>
-                  Journal d analyses live <Help tip="Clique une ligne pour ouvrir le détail de ce que l agent a vu, conclu, et avec quel niveau de confiance." />
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setReadingMode('beginner')}
-                    style={{ borderColor: readingMode === 'beginner' ? 'var(--accent)' : undefined, color: readingMode === 'beginner' ? 'var(--accent)' : undefined }}
-                  >
-                    Débutant
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setReadingMode('expert')}
-                    style={{ borderColor: readingMode === 'expert' ? 'var(--accent)' : undefined, color: readingMode === 'expert' ? 'var(--accent)' : undefined }}
-                  >
-                    Expert
-                  </button>
+            {/* Cycle timeline */}
+            {cycleTimeline.length > 0 && (
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>Dernier cycle</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {cycleTimeline.slice(-7).map((ev, i) => (
+                    <div key={i} style={{
+                      padding: '4px 10px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)',
+                      background: (ev.status === 'ok' ? 'var(--accent-soft, rgba(34,197,94,0.15))' : ev.status === 'running' ? 'var(--warn-soft, rgba(245,158,11,0.15))' : 'var(--danger-soft, rgba(239,68,68,0.15))'),
+                      color: ev.status === 'ok' ? 'var(--accent)' : ev.status === 'running' ? 'var(--warn)' : 'var(--danger)',
+                    }}>
+                      {ev.label} {ev.status === 'ok' ? '✓' : ev.status === 'running' ? '⟳' : '✗'}
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflow: 'auto', paddingRight: 4 }}>
-                {timelineItems.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: 8 }}>
-                    Le journal se remplit automatiquement au fur et à mesure du cycle.
-                  </div>
-                )}
-                {timelineItems.map((item) => {
-                  const meta = AGENT_META[item.agent] || AGENT_META.reporter;
-                  const activeItem = selectedItem?.id === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      style={{
-                        textAlign: 'left',
-                        border: `1px solid ${activeItem ? meta.color : 'var(--rule)'}`,
-                        background: activeItem ? 'var(--bg-elev-2)' : 'transparent',
-                        borderRadius: 8,
-                        padding: '10px 12px',
-                        cursor: 'pointer',
-                        color: 'inherit',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{item.title}</div>
-                        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-                          {new Date(item.timestamp).toLocaleTimeString('fr-FR')}
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.45 }}>
-                        {readingMode === 'beginner' ? item.summarySimple : item.summaryExpert}
-                      </div>
-                      {(item.confidence != null || item.freshnessScore != null) && (
-                        <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 10 }} className="mono">
-                          {item.confidence != null && <span style={{ color: 'var(--accent)' }}>Confiance {item.confidence}%</span>}
-                          {item.freshnessScore != null && <span style={{ color: item.freshnessScore >= 70 ? 'var(--accent)' : item.freshnessScore >= 50 ? 'var(--warn)' : 'var(--danger)' }}>Fraîcheur {item.freshnessScore}/100</span>}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              Performance IA <Help tip="Win rate des prédictions des agents, basé sur les trades fermés." />
+              Performance LLM <Help tip="Win rate des décisions du Décideur LLM, basé sur les prédictions résolues 5j après." />
             </div>
           </div>
-          <div style={{ padding: 20 }}>
+          <div style={{ padding: 18 }}>
             {perfStats && perfStats.total > 0 ? (
               <>
-                {AGENT_IDS.filter((id) => ['bull', 'bear', 'strategist', 'analyst'].includes(id)).map((id) => {
-                  const m = AGENT_META[id];
-                  // Use real perf stats where available
-                  const w = id === 'bull' ? (perfStats.by_direction.BUY.total > 0 ? Math.round((perfStats.by_direction.BUY.correct / perfStats.by_direction.BUY.total) * 100) : 0) :
-                            id === 'bear' ? (perfStats.by_direction.SELL.total > 0 ? Math.round((perfStats.by_direction.SELL.correct / perfStats.by_direction.SELL.total) * 100) : 0) :
-                            Math.round(perfStats.win_rate);
-                  return (
-                    <div key={id} style={{ marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13 }}>{m.name}</span>
-                        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: m.color }}>{w}%</span>
-                      </div>
-                      <div style={{ height: 6, background: 'var(--bg-elev-2)', borderRadius: 999 }}>
-                        <div style={{ width: `${w}%`, height: '100%', background: m.color, borderRadius: 999 }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                <hr style={{ border: 0, borderTop: '1px solid var(--rule)', margin: '20px 0' }} />
+                <div style={{ marginBottom: 14 }}>
+                  <div className="eyebrow" style={{ marginBottom: 4 }}>Win rate global</div>
+                  <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>
+                    {perfStats.win_rate.toFixed(1)}<span style={{ fontSize: 14, color: 'var(--ink-3)' }}>%</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                    <span style={{ color: 'var(--accent)' }}>BUY</span>
+                    <span className="mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                      {perfStats.by_direction.BUY.total > 0
+                        ? Math.round((perfStats.by_direction.BUY.correct / perfStats.by_direction.BUY.total) * 100)
+                        : 0}%
+                      <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>({perfStats.by_direction.BUY.total})</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 5, background: 'var(--bg-elev-2)', borderRadius: 999 }}>
+                    <div style={{
+                      width: `${perfStats.by_direction.BUY.total > 0 ? (perfStats.by_direction.BUY.correct / perfStats.by_direction.BUY.total) * 100 : 0}%`,
+                      height: '100%', background: 'var(--accent)', borderRadius: 999,
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                    <span style={{ color: 'var(--danger)' }}>SELL</span>
+                    <span className="mono" style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                      {perfStats.by_direction.SELL.total > 0
+                        ? Math.round((perfStats.by_direction.SELL.correct / perfStats.by_direction.SELL.total) * 100)
+                        : 0}%
+                      <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>({perfStats.by_direction.SELL.total})</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 5, background: 'var(--bg-elev-2)', borderRadius: 999 }}>
+                    <div style={{
+                      width: `${perfStats.by_direction.SELL.total > 0 ? (perfStats.by_direction.SELL.correct / perfStats.by_direction.SELL.total) * 100 : 0}%`,
+                      height: '100%', background: 'var(--danger)', borderRadius: 999,
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                    <span style={{ color: 'var(--ink-3)' }}>HOLD</span>
+                    <span className="mono" style={{ color: 'var(--ink-3)', fontWeight: 600 }}>
+                      {perfStats.by_direction.HOLD.total > 0
+                        ? Math.round((perfStats.by_direction.HOLD.correct / perfStats.by_direction.HOLD.total) * 100)
+                        : 0}%
+                      <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>({perfStats.by_direction.HOLD.total})</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 5, background: 'var(--bg-elev-2)', borderRadius: 999 }}>
+                    <div style={{
+                      width: `${perfStats.by_direction.HOLD.total > 0 ? (perfStats.by_direction.HOLD.correct / perfStats.by_direction.HOLD.total) * 100 : 0}%`,
+                      height: '100%', background: 'var(--ink-3)', borderRadius: 999,
+                    }} />
+                  </div>
+                </div>
+
+                <hr style={{ border: 0, borderTop: '1px solid var(--rule)', margin: '16px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)' }}>
                   <span>Prédictions totales</span>
                   <span className="mono" style={{ color: 'var(--ink)' }}>{perfStats.total}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-                  <span>Résolues</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+                  <span>Résolues (5j+)</span>
                   <span className="mono" style={{ color: 'var(--ink)' }}>{perfStats.resolved}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-                  <span>Win rate global</span>
-                  <span className="mono" style={{ color: 'var(--accent)' }}>{perfStats.win_rate.toFixed(1)}%</span>
                 </div>
               </>
             ) : (
               <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-                Pas encore de données de performance — les statistiques apparaîtront avec les premiers trades
+                Les statistiques apparaîtront après les premières prédictions résolues (5 jours).
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Live card — debates + reflections feed */}
-      {(() => {
-        const activeTicker = activeDebateTicker ?? debates[0]?.ticker ?? null;
-        const d = debates.length > 0 ? (debates.find((x) => x.ticker === activeTicker) ?? debates[0]) : null;
-        const scoreColor = d ? (d.debate_score > 0 ? 'var(--accent)' : d.debate_score < 0 ? 'var(--danger)' : 'var(--warn)') : 'var(--ink-4)';
-
-        return (
-          <div className="card" style={{ marginTop: 12 }}>
-            <div className="card-h">
-              <div className="card-h-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: timelineItems.length > 0 ? 'var(--accent)' : 'var(--ink-4)', display: 'inline-block' }} />
-                Live
-              </div>
-              <span className="card-h-meta">
-                {debates.length > 0 ? `${debates.length} débats` : 'réflexions agents'}
-              </span>
-            </div>
-            <div style={{ padding: 16 }}>
-
-              {d ? (
-                <>
-                  {/* Ticker tabs */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-                    {debates.map((x) => {
-                      const sc = x.debate_score > 0 ? 'var(--accent)' : x.debate_score < 0 ? 'var(--danger)' : 'var(--warn)';
-                      const isSel = (activeDebateTicker ?? debates[0]?.ticker) === x.ticker;
-                      return (
-                        <button
-                          key={x.ticker}
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => setActiveDebateTicker(x.ticker)}
-                          style={{ borderColor: isSel ? sc : undefined, color: isSel ? sc : undefined, fontFamily: 'var(--mono)', fontSize: 11 }}
-                        >
-                          {x.ticker}
-                          <span style={{ marginLeft: 4, color: sc }}>{x.debate_score > 0 ? `+${x.debate_score}` : x.debate_score}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Bull / Bear columns */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div style={{ background: 'var(--bg-elev-2)', borderRadius: 8, padding: 16, borderLeft: '3px solid var(--accent)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 1 }}>BULL</span>
-                        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{d.bull.conviction}<span style={{ fontSize: 11, color: 'var(--ink-4)' }}>/10</span></div>
-                      </div>
-                      <div style={{ height: 4, background: 'var(--bg-elev)', borderRadius: 999, marginBottom: 12 }}>
-                        <div style={{ width: `${(d.bull.conviction / 10) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 999 }} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 12 }}>
-                        {d.bull.technical_case && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Cas technique</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bull.technical_case}</div></div>}
-                        {d.bull.fundamental_catalyst && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Catalyseur</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bull.fundamental_catalyst}</div></div>}
-                        {d.bull.upside_pct != null && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="eyebrow">Objectif hausse</span><span className="mono" style={{ color: 'var(--accent)', fontWeight: 700 }}>+{d.bull.upside_pct.toFixed(1)}%</span></div>}
-                        {d.bull.key_risk && <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '7px 10px' }}><div className="eyebrow" style={{ marginBottom: 3 }}>Risque clé</div><div style={{ color: 'var(--warn)', fontSize: 11 }}>{d.bull.key_risk}</div></div>}
-                        {d.bull.bear_rebuttal_1 && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Contre-arg. bear</div><div style={{ color: 'var(--ink-3)', fontSize: 11, lineHeight: 1.5 }}>{d.bull.bear_rebuttal_1}</div></div>}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg-elev-2)', borderRadius: 8, padding: 16, borderLeft: '3px solid var(--danger)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--danger)', letterSpacing: 1 }}>BEAR</span>
-                        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>{d.bear.conviction}<span style={{ fontSize: 11, color: 'var(--ink-4)' }}>/10</span></div>
-                      </div>
-                      <div style={{ height: 4, background: 'var(--bg-elev)', borderRadius: 999, marginBottom: 12 }}>
-                        <div style={{ width: `${(d.bear.conviction / 10) * 100}%`, height: '100%', background: 'var(--danger)', borderRadius: 999 }} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 12 }}>
-                        {d.bear.technical_case && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Cas technique</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bear.technical_case}</div></div>}
-                        {d.bear.structural_weakness && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Faiblesse structurelle</div><div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{d.bear.structural_weakness}</div></div>}
-                        {d.bear.downside_pct != null && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="eyebrow">Risque baisse</span><span className="mono" style={{ color: 'var(--danger)', fontWeight: 700 }}>-{d.bear.downside_pct.toFixed(1)}%</span></div>}
-                        {d.bear.strongest_bull_argument && <div style={{ background: 'var(--bg-elev)', borderRadius: 6, padding: '7px 10px' }}><div className="eyebrow" style={{ marginBottom: 3 }}>Meilleur arg. haussier</div><div style={{ color: 'var(--accent)', fontSize: 11 }}>{d.bear.strongest_bull_argument}</div></div>}
-                        {d.bear.bull_rebuttal_1 && <div><div className="eyebrow" style={{ marginBottom: 3 }}>Contre-arg. bull</div><div style={{ color: 'var(--ink-3)', fontSize: 11, lineHeight: 1.5 }}>{d.bear.bull_rebuttal_1}</div></div>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Analyst footer */}
-                  <div style={{ marginTop: 10, padding: '9px 14px', background: 'var(--bg-elev-2)', borderRadius: 8, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: 18 }}>
-                      {([
-                        { label: 'Biais 4H', val: d.analyst_output.bias_4h, color: d.analyst_output.bias_4h === 'BULLISH' ? 'var(--accent)' : d.analyst_output.bias_4h === 'BEARISH' ? 'var(--danger)' : 'var(--warn)' },
-                        { label: 'Biais 1H', val: d.analyst_output.bias_1h, color: d.analyst_output.bias_1h === 'BULLISH' ? 'var(--accent)' : d.analyst_output.bias_1h === 'BEARISH' ? 'var(--danger)' : 'var(--warn)' },
-                        { label: 'Signal 15m', val: d.analyst_output.signal_15m, color: 'var(--ink-2)' },
-                        { label: 'RSI 15m', val: d.analyst_output.rsi_15m?.toFixed(0), color: 'var(--ink-2)' },
-                        { label: 'Confiance', val: `${d.analyst_output.confidence}%`, color: 'var(--info)' },
-                      ] as { label: string; val: string | undefined; color: string }[]).map(({ label, val, color }) => val != null && (
-                        <div key={label}>
-                          <div className="eyebrow" style={{ marginBottom: 2 }}>{label}</div>
-                          <div className="mono" style={{ fontSize: 12, fontWeight: 600, color }}>{val}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="eyebrow" style={{ marginBottom: 2 }}>Verdict</div>
-                      <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>
-                        {d.debate_score > 0 ? `+${d.debate_score}` : d.debate_score}
-                        <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 4 }}>score</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Divider before reflections feed */}
-                  {timelineItems.length > 0 && <hr style={{ border: 0, borderTop: '1px solid var(--rule)', margin: '16px 0 12px' }} />}
-                </>
-              ) : null}
-
-              {/* Reflections feed — always shown, full-width when no debates */}
-              {timelineItems.length > 0 ? (
-                <div>
-                  {d && <div className="eyebrow" style={{ marginBottom: 8 }}>Réflexions agents</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: d ? 220 : 420, overflowY: 'auto', paddingRight: 4 }}>
-                    {timelineItems.map((item) => {
-                      const im = AGENT_META[item.agent] || AGENT_META.reporter;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => setSelectedItem(item)}
-                          style={{
-                            textAlign: 'left', border: `1px solid var(--rule)`, background: 'transparent',
-                            borderRadius: 7, padding: '9px 12px', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: im.color, flexShrink: 0 }} />
-                              <span style={{ fontSize: 11, fontWeight: 600, color: im.color }}>{im.name}</span>
-                              {item.ticker && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', background: 'var(--bg-elev-2)', padding: '1px 5px', borderRadius: 3 }}>{item.ticker}</span>}
-                            </div>
-                            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', flexShrink: 0 }}>{new Date(item.timestamp).toLocaleTimeString('fr-FR')}</span>
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.45 }}>
-                            {readingMode === 'beginner' ? item.summarySimple : item.summaryExpert}
-                          </div>
-                          {(item.confidence != null || item.freshnessScore != null) && (
-                            <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 10 }} className="mono">
-                              {item.confidence != null && <span style={{ color: 'var(--accent)' }}>conf. {item.confidence}%</span>}
-                              {item.freshnessScore != null && <span style={{ color: item.freshnessScore >= 70 ? 'var(--accent)' : item.freshnessScore >= 50 ? 'var(--warn)' : 'var(--danger)' }}>fraîcheur {item.freshnessScore}/100</span>}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: 'var(--ink-4)', padding: '12px 0', textAlign: 'center' }}>
-                  En attente du prochain cycle — les réflexions apparaîtront ici en temps réel.
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {selectedItem && (
-        <div
-          onClick={() => setSelectedItem(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'grid',
-            justifyItems: 'end', zIndex: 80,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(520px, 100vw)', height: '100%', background: 'var(--bg-elev)',
-              borderLeft: '1px solid var(--rule)', padding: 18, overflow: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div>
-                <div className="eyebrow">Détail analyse</div>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>{selectedItem.title}</div>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedItem(null)}>Fermer</button>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <span className="badge">{AGENT_META[selectedItem.agent]?.name || selectedItem.agent}</span>
-              {selectedItem.ticker && <span className="badge">{selectedItem.ticker}</span>}
-              {selectedItem.confidence != null && <span className="badge badge-up">Confiance {selectedItem.confidence}%</span>}
-              {selectedItem.freshnessScore != null && (
-                <span className={`badge ${selectedItem.freshnessScore >= 70 ? 'badge-up' : selectedItem.freshnessScore >= 50 ? 'badge-warn' : 'badge-down'}`}>
-                  Fraîcheur {selectedItem.freshnessScore}/100
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              <div className="card" style={{ padding: 12 }}>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>Version simple</div>
-                <div style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.55 }}>{selectedItem.summarySimple}</div>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>Version détaillée</div>
-                <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>{selectedItem.summaryExpert}</div>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>Conseil lecture</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.55 }}>
-                  Si la fraîcheur est basse ou la confiance est faible, la décision doit être prise avec prudence ou reportée.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

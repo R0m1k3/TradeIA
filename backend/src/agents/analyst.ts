@@ -44,6 +44,9 @@ export class AnalystAgent {
     console.log('[Analyst] Starting multi-timeframe analysis');
     const results: AnalystOutput[] = [];
     const MODELS = await getModels();
+    // L'analyst LLM interprète news + fundamentals + macro au-delà du calcul déterministe
+    // des indicateurs. Le déterministe sert de fallback sur les tickers non sélectionnés
+    // (budget LLM limité par cycle). Configurable via ANALYST_LLM_MAX_PER_CYCLE.
     const maxLlmAnalyses = Math.max(0, parseInt(process.env.ANALYST_LLM_MAX_PER_CYCLE || '3', 10));
     const minLlmConfidence = Math.max(0, parseInt(process.env.ANALYST_LLM_MIN_CONFIDENCE || '45', 10));
     let llmAnalysesUsed = 0;

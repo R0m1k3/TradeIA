@@ -1,6 +1,3 @@
-import { callLLM, parseJsonResponse } from '../llm/client';
-import { getModels } from '../llm/models';
-import { buildRiskPrompt, RISK_SYSTEM } from '../prompts/risk.prompt';
 import type { OrderProposal } from './strategist';
 import type { ApprovedOrder } from '../broker/mock';
 import type { TickerData } from './collector';
@@ -36,11 +33,6 @@ function volatilityBasedSizeCap(
   if (annualVolPct <= 0) return portfolioUsd * 0.5;
   const fraction = Math.min(0.5, VOL_TARGET_PER_SLOT / annualVolPct);
   return portfolioUsd * fraction;
-}
-
-interface RiskOutput {
-  approved: ApprovedOrder[];
-  rejected: Array<{ ticker: string; action: string; rejection_reason: string }>;
 }
 
 /** Pearson correlation entre deux séries de rendements. Retourne 0 si données insuffisantes. */
@@ -206,57 +198,11 @@ export class RiskAgent {
 
     if (deterministicApproved.length === 0) return [];
 
-    const ambiguousOrders = deterministicApproved.filter(
-      (o) => o.confidence < 70 || market.vix > 25
-    );
-
-    if (ambiguousOrders.length === 0) {
-      console.log(`[Risk] All ${deterministicApproved.length} orders validated deterministically`);
-      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio, rejections);
-    }
-
-    try {
-      const MODELS = await getModels();
-      const prompt = buildRiskPrompt({
-        proposals: ambiguousOrders.map((o) => ({
-          ticker: o.ticker,
-          action: o.action,
-          trade_type: o.trade_type,
-          limit_price: o.limit_price,
-          stop_loss: o.stop_loss,
-          take_profit: o.take_profit,
-          invalidation_condition: o.invalidation_condition,
-          size_pct: o.size_usd / portfolioUsd * 100,
-          confidence: o.confidence,
-          debate_score: o.debate_score,
-          bull_conviction: o.bull_conviction,
-          bear_conviction: o.bear_conviction,
-          reasoning: o.reasoning,
-        })),
-        portfolio_usd: portfolioUsd,
-        daily_pnl_pct: portfolio.daily_pnl_pct,
-        positions: portfolio.positions,
-        market,
-        daily_loss_limit_pct: dailyLossLimitPct,
-      });
-
-      const response = await callLLM('risk-manager', MODELS.MID, RISK_SYSTEM, prompt, 800);
-      const parsed = parseJsonResponse<RiskOutput>(response.content);
-
-      if (parsed.rejected && parsed.rejected.length > 0) {
-        for (const r of parsed.rejected) {
-          console.log(`[Risk] LLM rejected ${r.ticker} ${r.action}: ${r.rejection_reason}`);
-        }
-      }
-
-      const llmApproved = parsed.approved || [];
-      const nonAmbiguous = deterministicApproved.filter((o) => o.confidence >= 70 && market.vix <= 25);
-      console.log(`[Risk] Final: ${nonAmbiguous.length} deterministic + ${llmApproved.length} LLM-validated`);
-      return this.enforceCashBudget([...nonAmbiguous, ...llmApproved], portfolioUsd, portfolio, rejections);
-    } catch (err) {
-      console.warn('[Risk] LLM failed, using deterministic results:', (err as Error).message);
-      return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio, rejections);
-    }
+    // Risk LLM supprimé — toutes les règles (R/R, daily loss, VIX, sector, Kelly, vol cap,
+    // corrélation, cash budget) sont déjà appliquées par deterministicPreFilter + deterministicValidation.
+    // Le LLM ne re-triait que parmi des ordres déjà validés. Économie : ~2300 tokens par cycle.
+    console.log(`[Risk] ${deterministicApproved.length} ordres validés déterministiquement`);
+    return this.enforceCashBudget(deterministicApproved, portfolioUsd, portfolio, rejections);
   }
 
   private deterministicPreFilter(

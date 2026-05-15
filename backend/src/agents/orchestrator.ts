@@ -1,8 +1,7 @@
 import { DiscoveryAgent } from './discovery';
 import { CollectorAgent } from './collector';
 import { AnalystAgent } from './analyst';
-import { ResearcherAgent } from './researcher';
-import { StrategistAgent } from './strategist';
+import { DeciderAgent, decisionsToProposals, type DeciderDecision } from './decider';
 import { RiskAgent } from './risk';
 import { ReporterAgent } from './reporter';
 import { BalanceController } from './balance-controller';
@@ -17,16 +16,72 @@ import { getNasdaqStatus } from '../routes/market';
 import { isEuropeanMarketOpen } from '../data/european-markets';
 import { getYahooVIX, getFearAndGreed } from '../data/yahoo';
 import { getTickerSector } from '../data/sectors';
-import type { SwapCandidate, OrderProposal } from './strategist';
+import type { OrderProposal } from './strategist';
+import type { DebateOutput, BullOutput, BearOutput } from './researcher';
+import type { AnalystOutput } from './analyst';
 import type { MarketSegment } from './discovery';
 import type { SectorBias } from '../data/sectors';
 import type { Position } from '../broker/mock';
-import { PortfolioAllocator, computePortfolioMetrics } from './portfolio-allocator';
-import type { AllocationResult } from './portfolio-allocator';
+import { computePortfolioMetrics } from './portfolio-allocator';
 import { saveSnapshots } from '../models/ticker-snapshot';
 import { saveNotes } from '../models/ticker-note';
 import { AILogCollector } from '../utils/ai-logger';
 import { resetTokenBudget, getCycleTokensUsed } from '../llm/client';
+
+/**
+ * Convertit les décisions du Decider en DebateOutput pour rétrocompat
+ * avec reporter.finalize (AgentPrediction logging) et UI legacy.
+ */
+function decisionsToDebates(decisions: DeciderDecision[]): DebateOutput[] {
+  return decisions
+    .filter((d) => d.analyst_output)
+    .map((d) => {
+      // Convertir action → conviction bull/bear (1-10)
+      const bullConv = d.action === 'BUY' ? Math.max(6, Math.round(d.confidence / 10)) : d.action === 'HOLD' ? 4 : 2;
+      const bearConv = d.action === 'SELL' ? Math.max(6, Math.round(d.confidence / 10)) : d.action === 'HOLD' ? 4 : 2;
+
+      const upsidePct = d.limit_price > 0 && d.take_profit > 0
+        ? ((d.take_profit - d.limit_price) / d.limit_price) * 100
+        : 0;
+      const downsidePct = d.limit_price > 0 && d.stop_loss > 0
+        ? ((d.limit_price - d.stop_loss) / d.limit_price) * 100
+        : 0;
+
+      const bull: BullOutput = {
+        ticker: d.ticker,
+        upside_pct: Math.max(0, Math.round(upsidePct * 100) / 100),
+        technical_case: d.bull_case,
+        fundamental_catalyst: '',
+        sentiment_driver: '',
+        bear_rebuttal_1: '',
+        bear_rebuttal_2: '',
+        conviction: bullConv,
+        invalidation_condition: d.invalidation,
+        key_risk: d.key_risk,
+      };
+
+      const bear: BearOutput = {
+        ticker: d.ticker,
+        downside_pct: Math.max(0, Math.round(downsidePct * 100) / 100),
+        technical_case: d.bear_case,
+        structural_weakness: '',
+        macro_headwind: '',
+        bull_rebuttal_1: '',
+        bull_rebuttal_2: '',
+        conviction: bearConv,
+        invalidation_condition: d.invalidation,
+        strongest_bull_argument: d.bull_case,
+      };
+
+      return {
+        ticker: d.ticker,
+        bull,
+        bear,
+        debate_score: bullConv - bearConv,
+        analyst_output: d.analyst_output as AnalystOutput,
+      };
+    });
+}
 
 const CYCLE_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours max par cycle
 
@@ -391,162 +446,78 @@ async function runPipelineInternal(reporter: ReporterAgent): Promise<void> {
     });
   }
 
-  // Step 7: Bull/Bear debate (segment-aware)
-  reporter.updateAgent('bull', { status: 'running' });
-  reporter.updateAgent('bear', { status: 'running' });
-  const researcher = new ResearcherAgent();
-  const debateOutputs = await researcher.run(
-    analystOutputs,
-    collectorOutput,
-    discoveryResult.segments,
-    budgetWithSegments,
-    portfolioForBudget.positions.map((p) => p.ticker),
-  );
-  reporter.updateAgent('bull', { status: 'ok', lastRun: new Date().toISOString() });
-  reporter.updateAgent('bear', { status: 'ok', lastRun: new Date().toISOString() });
-
-  // Persist bull/bear debate notes
-  if (debateOutputs.length > 0) {
-    const debateNotes = debateOutputs.flatMap((d) => [
-      {
-        ticker: d.ticker,
-        noteType: 'bull',
-        content: d.bull.technical_case,
-        confidence: d.bull.conviction * 10,
-        metadata: {
-          upside_pct: d.bull.upside_pct,
-          catalyst: d.bull.fundamental_catalyst,
-          invalidation: d.bull.invalidation_condition,
-        },
-      },
-      {
-        ticker: d.ticker,
-        noteType: 'bear',
-        content: d.bear.technical_case,
-        confidence: d.bear.conviction * 10,
-        metadata: {
-          downside_pct: d.bear.downside_pct,
-          weakness: d.bear.structural_weakness,
-          invalidation: d.bear.invalidation_condition,
-        },
-      },
-    ]);
-    await saveNotes(debateNotes).catch((err) => console.warn('[Orchestrator] Failed to save debate notes:', err));
-  }
-
-  // Step 8: Strategic decision
+  // Step 7: DECIDER — unique appel LLM qui réfléchit et choisit
+  // BUY/SELL/HOLD pour chaque ticker à partir de TOUTES les infos.
   reporter.updateAgent('strategist', { status: 'running' });
   const portfolio = await getPortfolioState(portfolioUsd);
   const heldTickers = portfolio.positions.map((p) => p.ticker);
 
-  // Build swap candidates: positions held >= 2 days with pnl < +8%
-  const swapCandidates: SwapCandidate[] = portfolio.positions
-    .filter((p) => (p.days_held ?? 0) >= 2 && (p.pnlPct ?? 0) < 8)
-    .map((p) => ({
-      ticker: p.ticker,
-      segment: discoveryResult.segments[p.ticker] ?? 'nasdaq',
-      days_held: p.days_held ?? 0,
-      entry_conviction: p.entry_conviction ?? 50,
-      current_pnl_pct: p.pnlPct ?? 0,
-      current_signal: 'HOLD',
-    }));
+  console.log(`[Orchestrator] DECIDER INPUT: ${analystOutputs.length} analyses, ${heldTickers.length} held, ${budgetWithSegments.total_new_slots} free slots, regime=${regime.regime}`);
 
-  console.log(`[Orchestrator] Strategist input: ${debateOutputs.length} debates, ${heldTickers.length} held, ${swapCandidates.length} swaps, regime=${regime.regime}`);
-
-  const strategist = new StrategistAgent();
-  let orderProposals: OrderProposal[] = [];
-
-  // Debug: log pipeline state before strategist
-  const actionableCount = analystOutputs.filter((a) => !a.skip_reason && a.confidence > 0 && a.data_quality !== 'missing').length;
-  console.log(`[Orchestrator] STRATEGIST INPUT: ${debateOutputs.length} debates, ${actionableCount} actionable, ${heldTickers.length} held, ${budgetWithSegments.total_new_slots} free slots, regime=${regime.regime}`);
-  if (debateOutputs.length > 0) {
-    const topDebates = debateOutputs.slice(0, 3).map((d) => `${d.ticker}(conf=${d.analyst_output.confidence},debate=${d.debate_score})`).join(', ');
-    console.log(`[Orchestrator] STRATEGIST TOP DEBATES: ${topDebates}`);
-  }
-
-  // Pre-filter: keep top 15 debates by conviction score before sending to strategist
-  // Reduces prompt size ~60% and focuses LLM on best setups
-  const MAX_DEBATES_TO_STRATEGIST = 15;
-  const strategistDebates = debateOutputs
-    .filter((d) => d.analyst_output.confidence >= 40 || d.debate_score >= 1)
-    .sort((a, b) => {
-      const scoreA = a.analyst_output.confidence + a.debate_score * 5;
-      const scoreB = b.analyst_output.confidence + b.debate_score * 5;
-      return scoreB - scoreA;
-    })
-    .slice(0, MAX_DEBATES_TO_STRATEGIST);
-
-  if (strategistDebates.length < debateOutputs.length) {
-    console.log(`[Orchestrator] Pre-filter: ${debateOutputs.length} debates → ${strategistDebates.length} sent to strategist`);
-  }
-
-  let strategistError: string | undefined;
+  const decider = new DeciderAgent();
+  let deciderDecisions: DeciderDecision[] = [];
+  let deciderError: string | undefined;
   try {
-    orderProposals = await strategist.run(
-      strategistDebates,
-      portfolio,
-      collectorOutput.market,
-      heldTickers,
+    deciderDecisions = await decider.run(
+      analystOutputs,
+      collectorOutput,
+      discoveryResult.segments,
       budgetWithSegments,
-      swapCandidates.length > 0 ? swapCandidates : undefined,
       regime,
+      portfolio,
+      portfolioUsd,
     );
-    console.log(`[Orchestrator] Strategist output: ${orderProposals.length} proposals`);
-    if (orderProposals.length === 0 && debateOutputs.length > 0) {
-      console.warn('[Orchestrator] DIAG: Strategist returned 0 proposals despite having debates. Possible LLM filter too strict.');
-      console.warn(`[Orchestrator] DIAG details: debates=${debateOutputs.length}, regime=${regime.regime}, free_slots=${budgetWithSegments.total_new_slots}, held=[${heldTickers.join(',')}]`);
-      for (const d of debateOutputs.slice(0, 5)) {
-        const a = d.analyst_output;
-        console.warn(`[Orchestrator] DIAG debate: ${d.ticker} conf=${a.confidence} signal=${a.signal_15m} bias4h=${a.bias_4h} debate_score=${d.debate_score}`);
-      }
-    }
   } catch (err) {
-    console.error('[Orchestrator] Strategist exception:', (err as Error).message);
-    strategistError = (err as Error).message;
-    orderProposals = [];
+    console.error('[Orchestrator] Decider exception:', (err as Error).message);
+    deciderError = (err as Error).message;
   }
-  // 'error' only on real exception — 0 proposals = market had nothing valid, not a system error
   reporter.updateAgent('strategist', {
-    status: strategistError ? 'error' : 'ok',
+    status: deciderError ? 'error' : 'ok',
     lastRun: new Date().toISOString(),
-    error: strategistError,
+    error: deciderError,
   });
 
-  // Step 8b: Inject relative weakness exits (deterministic, bypass LLM)
+  // Persister chaque décision LLM avec son reasoning et inputs vus
+  if (deciderDecisions.length > 0) {
+    const decisionNotes = deciderDecisions.map((d) => ({
+      ticker: d.ticker,
+      noteType: 'decision',
+      content: d.reasoning,
+      confidence: d.confidence,
+      metadata: {
+        action: d.action,
+        size_pct: d.size_pct,
+        limit_price: d.limit_price,
+        stop_loss: d.stop_loss,
+        take_profit: d.take_profit,
+        trade_type: d.trade_type,
+        bull_case: d.bull_case,
+        bear_case: d.bear_case,
+        key_risk: d.key_risk,
+        invalidation: d.invalidation,
+        inputs_seen: d.inputs_seen,
+      },
+    }));
+    await saveNotes(decisionNotes).catch((err) => console.warn('[Orchestrator] Failed to save decision notes:', err));
+  }
+
+  // Construire DebateOutput synthétiques pour rétrocompat (AgentPrediction, UI legacy)
+  const debateOutputs = decisionsToDebates(deciderDecisions);
+
+  // Convertir décisions BUY/SELL en propositions chiffrées
+  const orderProposals = decisionsToProposals(deciderDecisions);
+
+  // Injection déterministe: faiblesse relative (vente défensive)
   const weakSells = generateWeaknessExits(portfolio.positions, collectorOutput.market.sector_biases);
   if (weakSells.length > 0) {
     console.log(`[Orchestrator] ${weakSells.length} vente(s) faiblesse relative injectée(s)`);
   }
-  const allProposals = [...orderProposals, ...weakSells];
+  const allProposals: OrderProposal[] = [...orderProposals, ...weakSells];
   aiLog.setProposals(allProposals);
 
-  // Step 8c: Portfolio-level allocation — heat budget, opportunity cost, thesis invalidation
-  const allocator = new PortfolioAllocator();
+  // preCheckedProposals = toutes les propositions (le risk agent fera la validation chiffrée finale)
+  const preCheckedProposals = allProposals;
   const sectorBiases = (collectorOutput.market.sector_biases ?? {}) as Record<string, SectorBias>;
-  const allocation: AllocationResult = allocator.allocate(
-    allProposals,
-    portfolio.positions,
-    debateOutputs,
-    budgetWithSegments,
-    portfolioUsd,
-    sectorBiases,
-    regime,
-  );
-
-  // Log allocation decisions
-  for (const logLine of allocation.allocation_log) {
-    console.log(`[Orchestrator] ALLOCATOR: ${logLine}`);
-  }
-  if (allocation.portfolio_heat.must_release) {
-    broadcastAlert('warning', `Portfolio heat ${allocation.portfolio_heat.current_heat_pct.toFixed(1)}% > cap ${allocation.portfolio_heat.max_heat_pct}% — forcing exits`);
-  }
-  if (allocation.sell_recommendations.length > 0) {
-    console.log(`[Orchestrator] SELL recommendations: ${allocation.sell_recommendations.map((s) => `${s.ticker} (${s.reasoning?.slice(0, 60)})`).join(', ')}`);
-  }
-
-  // Merge allocator sells with remaining proposals (allocator-approved buys only)
-  const preCheckedProposals = [...allocation.sell_recommendations, ...allocation.approved_proposals];
-  console.log(`[Orchestrator] Allocator: ${allocation.approved_proposals.length} BUY(s) approved, ${allocation.sell_recommendations.length} SELL(s), heat ${allocation.portfolio_heat.current_heat_pct.toFixed(1)}%`);
 
   // Compute and broadcast portfolio metrics
   const portfolioMetrics = computePortfolioMetrics(

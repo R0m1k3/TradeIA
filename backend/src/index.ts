@@ -10,6 +10,7 @@ import { initCredentials, warmCredentialsCache } from './config/credentials';
 import { prisma } from './lib/prisma';
 import portfolioRoutes from './routes/portfolio';
 import signalsRoutes from './routes/signals';
+import decisionsRoutes from './routes/decisions';
 import configRoutes from './routes/config';
 import overrideRoutes from './routes/override';
 import orchestratorRoutes from './routes/orchestrator';
@@ -116,6 +117,7 @@ async function main() {
 
   await app.register(portfolioRoutes, { prefix: '/api/portfolio' });
   await app.register(signalsRoutes, { prefix: '/api/signals' });
+  await app.register(decisionsRoutes, { prefix: '/api/decisions' });
   await app.register(configRoutes, { prefix: '/api/config' });
   await app.register(overrideRoutes, { prefix: '/api/override' });
   await app.register(orchestratorRoutes, { prefix: '/api/orchestrator' });
