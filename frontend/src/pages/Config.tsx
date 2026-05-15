@@ -203,7 +203,7 @@ export function Config() {
         <div>
           <h1 className="h1">Configuration</h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
-            Ajustez la stratégie, les agents et les paramètres système.
+            Ajustez la stratégie, le modèle LLM du Décideur et les paramètres système.
           </div>
         </div>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -216,7 +216,7 @@ export function Config() {
         <div className="card">
           <div className="card-h">
             <div className="card-h-title">
-              IA & LLM <Help tip="Configurez votre provider IA, la clé API et les modèles utilisés par les agents." />
+              IA & LLM <Help tip="Configurez votre provider IA, la clé API et les modèles. Une seule étape du pipeline (le Décideur) appelle un LLM ; le reste est calcul déterministe." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
@@ -262,44 +262,67 @@ export function Config() {
               />
             )}
 
-            <label className="label">Modèle Léger <Help tip="Modèle rapide pour les tâches simples (screening, formatage)." /></label>
-            <select
-              className="select"
-              value={config.model_light}
-              onChange={(e) => saveConfig({ model_light: e.target.value })}
-              disabled={loadingModels}
-              style={{ marginBottom: 12 }}
-            >
-              {loadingModels && <option value="">Chargement...</option>}
-              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            {/* Décideur — l'unique étape LLM du pipeline */}
+            <div style={{
+              padding: 14,
+              background: 'oklch(0.74 0.10 280 / 0.08)',
+              borderRadius: 8,
+              border: '1px solid oklch(0.74 0.10 280 / 0.35)',
+              marginBottom: 14,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  padding: '2px 7px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700,
+                  background: 'oklch(0.74 0.10 280 / 0.25)', color: 'oklch(0.74 0.10 280)',
+                }}>⚡ LLM PRINCIPAL</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Décideur</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10, lineHeight: 1.45 }}>
+                Le seul agent qui réfléchit. Reçoit indicateurs + news + macro + portfolio + calibration historique
+                et choisit BUY / SELL / HOLD pour chaque ticker avec taille, stops et reasoning. Recommandé : un
+                modèle puissant (Claude Opus, GPT-5, etc.).
+              </div>
+              <select
+                className="select"
+                value={config.model_strong}
+                onChange={(e) => saveConfig({ model_strong: e.target.value })}
+                disabled={loadingModels}
+              >
+                {loadingModels && <option value="">Chargement...</option>}
+                {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
 
-            <label className="label">Modèle Intermédiaire <Help tip="Modèle équilibré pour l'analyse et la recherche." /></label>
-            <select
-              className="select"
-              value={config.model_mid}
-              onChange={(e) => saveConfig({ model_mid: e.target.value })}
-              disabled={loadingModels}
-              style={{ marginBottom: 12 }}
-            >
-              {loadingModels && <option value="">Chargement...</option>}
-              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            {/* Analyste — optionnel, désactivé par défaut */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  padding: '2px 7px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600,
+                  background: 'var(--bg-elev-2)', color: 'var(--ink-3)',
+                }}>OPTIONNEL</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Analyste</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8, lineHeight: 1.45 }}>
+                Désactivé par défaut. Les indicateurs techniques sont déjà calculés en code ; l'Analyste LLM
+                ne sert qu'à interpréter qualitativement news / fondamentaux sur les setups ambigus.
+                Activable via la variable d'environnement <code style={{ fontFamily: 'var(--mono)', background: 'var(--bg-elev-2)', padding: '0 4px', borderRadius: 3 }}>ANALYST_LLM_MAX_PER_CYCLE</code>.
+              </div>
+              <select
+                className="select"
+                value={config.model_mid}
+                onChange={(e) => saveConfig({ model_mid: e.target.value })}
+                disabled={loadingModels}
+              >
+                {loadingModels && <option value="">Chargement...</option>}
+                {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
 
-            <label className="label">Modèle Puissant <Help tip="Modèle le plus capable pour les décisions critiques et le raisonnement complexe." /></label>
-            <select
-              className="select"
-              value={config.model_strong}
-              onChange={(e) => saveConfig({ model_strong: e.target.value })}
-              disabled={loadingModels}
-              style={{ marginBottom: 16 }}
-            >
-              {loadingModels && <option value="">Chargement...</option>}
-              {!loadingModels && models.length === 0 && <option value="">Aucun modèle disponible</option>}
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            {/* Note: le slot "Léger" n'est plus utilisé depuis la refonte
+                (Reporter et autres étapes secondaires sont 100% déterministes).
+                On conserve `model_light` côté config pour rétrocompat env. */}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <button className="btn btn-ghost btn-sm" onClick={testLLM} disabled={testing}>
@@ -455,7 +478,7 @@ export function Config() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>Mode automatique</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Les agents exécutent les trades sans validation manuelle</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>Le pipeline exécute les ordres sans validation manuelle</div>
               </div>
               <button
                 onClick={() => saveConfig({ mock_broker: config.mock_broker === 'true' ? 'false' : 'true' })}
@@ -529,7 +552,7 @@ export function Config() {
         <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-h">
             <div className="card-h-title">
-              Watchlist <Help tip="Liste des actifs surveillés en permanence par les agents. Ajoutez ou retirez des tickers." />
+              Watchlist <Help tip="Liste des actifs surveillés en permanence par le pipeline. Ajoutez ou retirez des tickers." />
             </div>
           </div>
           <div style={{ padding: 20 }}>
