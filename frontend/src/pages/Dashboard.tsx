@@ -710,19 +710,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {typeStats && typeStats.overall.total_trades > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card-h">
-            <div className="card-h-title">Performance par type <Help tip="Type A = Tendance, Type B = Swing, Type C = Range. Statistiques basées sur les trades fermés." /></div>
+            <div className="card-h-title">Performance par type <Help tip="Type A = Tendance, Type B = Swing, Type C = Range. Win rate affiché à partir de 3 trades minimum (échantillon significatif)." /></div>
+            <span className="card-h-meta">{typeStats.overall.total_trades} trades fermés</span>
           </div>
           <div style={{ padding: 18 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-              {Object.entries(typeStats.by_type).map(([type, stats]) => {
-                const label = type === 'A' ? 'Tendance (A)' : type === 'B' ? 'Swing (B)' : type === 'C' ? 'Range (C)' : type;
-                const color = stats.win_rate >= 55 ? 'var(--accent)' : stats.win_rate >= 45 ? 'var(--warn)' : 'var(--danger)';
+              {Object.entries(typeStats.by_type)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([type, stats]) => {
+                const label = type === 'A' ? 'Tendance (A)' : type === 'B' ? 'Swing (B)' : type === 'C' ? 'Range (C)' : (type || 'Sans type');
+                const enoughSample = stats.trades >= 3;
+                const wrText = enoughSample ? `${stats.win_rate.toFixed(0)}%` : '—';
+                const color = !enoughSample ? 'var(--ink-3)' : stats.win_rate >= 55 ? 'var(--accent)' : stats.win_rate >= 45 ? 'var(--warn)' : 'var(--danger)';
+                const pnlColor = stats.total_pnl >= 0 ? 'var(--accent)' : 'var(--danger)';
                 return (
                   <div key={type} style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--bg-elev-2)' }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-                    <div className="mono" style={{ fontSize: 22, fontWeight: 700, color }}>{stats.win_rate.toFixed(0)}%</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 700, color }}>{wrText}</div>
+                    {!enoughSample && (
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+                        échantillon trop petit
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
-                      {stats.trades} trades · P&L {stats.total_pnl >= 0 ? '+' : ''}{stats.total_pnl.toFixed(0)}$
+                      {stats.trades} trade{stats.trades > 1 ? 's' : ''} · P&L <span style={{ color: pnlColor }}>{stats.total_pnl >= 0 ? '+' : ''}{stats.total_pnl.toFixed(0)}$</span>
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
                       Moy. {stats.avg_pnl >= 0 ? '+' : ''}{stats.avg_pnl.toFixed(1)}$ · Hold {stats.avg_hold_hours.toFixed(0)}h

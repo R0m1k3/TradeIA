@@ -60,22 +60,65 @@ async function simulateLatency(): Promise<void> {
 export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResult> {
   await simulateLatency();
 
+  // SELL ordre = fermer la position BUY existante sur ce ticker
+  // (sinon le BUY reste éternellement ouvert et les stats sont faussées)
+  if (order.action === 'SELL') {
+    const openTrade = await prisma.trade.findFirst({
+      where: { ticker: order.ticker, action: 'BUY', closedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!openTrade) {
+      throw new Error(`SELL ${order.ticker}: aucune position BUY ouverte à fermer`);
+    }
+
+    const filledPrice = applySlippage(order.limit_price || (await getEquityCurrentPrice(order.ticker)) || openTrade.filledPrice, 'SELL', order.ticker);
+    const commission = openTrade.sizeUsd * 0.001;
+    const orderId = `MOCK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    // Fermer le BUY original avec le pnl + reason "LLM_SELL"
+    await closeTrade(openTrade.id, filledPrice, `LLM_SELL: ${order.reasoning?.slice(0, 80) || 'décision LLM'}`);
+
+    console.log(
+      JSON.stringify({
+        event: 'order_executed',
+        order_id: orderId,
+        ticker: order.ticker,
+        action: 'SELL',
+        filled_price: filledPrice,
+        size_usd: openTrade.sizeUsd,
+        commission,
+        closed_trade: openTrade.id,
+      })
+    );
+
+    return {
+      order_id: orderId,
+      ticker: order.ticker,
+      action: 'SELL',
+      filled_price: filledPrice,
+      filled_qty: openTrade.quantity,
+      size_usd: openTrade.sizeUsd,
+      timestamp: new Date().toISOString(),
+      commission,
+    };
+  }
+
+  // BUY: nouvelle position
   const portfolioUsdRaw = await getCredential('portfolio_usd', 'PORTFOLIO_USD');
   const portfolioUsd = parseFloat(portfolioUsdRaw || '10000');
   const state = await getPortfolioState(Number.isFinite(portfolioUsd) ? portfolioUsd : 10000);
-  const executableSizeUsd = order.action === 'BUY'
-    ? Math.min(order.size_usd, Math.max(0, state.cash_usd))
-    : order.size_usd;
+  const executableSizeUsd = Math.min(order.size_usd, Math.max(0, state.cash_usd));
 
-  if (order.action === 'BUY' && executableSizeUsd < MIN_ORDER_USD) {
+  if (executableSizeUsd < MIN_ORDER_USD) {
     throw new Error(`Insufficient cash for ${order.ticker}: available $${state.cash_usd.toFixed(2)}, requested $${order.size_usd.toFixed(2)}`);
   }
 
-  if (order.action === 'BUY' && executableSizeUsd < order.size_usd) {
+  if (executableSizeUsd < order.size_usd) {
     console.warn(`[Broker] ${order.ticker}: reducing order from $${order.size_usd.toFixed(2)} to available cash $${executableSizeUsd.toFixed(2)}`);
   }
 
-  const filledPrice = applySlippage(order.limit_price, order.action, order.ticker);
+  const filledPrice = applySlippage(order.limit_price, 'BUY', order.ticker);
   const filledQty = executableSizeUsd / filledPrice;
   const commission = executableSizeUsd * 0.001;
   const orderId = `MOCK-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -84,7 +127,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
     data: {
       id: orderId,
       ticker: order.ticker,
-      action: order.action,
+      action: 'BUY',
       tradeType: order.trade_type,
       filledPrice,
       quantity: filledQty,
@@ -106,7 +149,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
       event: 'order_executed',
       order_id: orderId,
       ticker: order.ticker,
-      action: order.action,
+      action: 'BUY',
       filled_price: filledPrice,
       size_usd: executableSizeUsd,
       commission,
@@ -116,7 +159,7 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
   return {
     order_id: orderId,
     ticker: order.ticker,
-    action: order.action,
+    action: 'BUY',
     filled_price: filledPrice,
     filled_qty: filledQty,
     size_usd: executableSizeUsd,
