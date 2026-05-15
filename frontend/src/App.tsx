@@ -17,7 +17,6 @@ export type Page = 'dashboard' | 'portfolio' | 'agents' | 'markets' | 'config' |
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const { status: wsStatus } = useWebSocket();
   const { fetchPortfolio, fetchHistory } = usePortfolioStore();
   const { fetchConfig, paused, setPaused } = useConfigStore();
@@ -28,9 +27,10 @@ export default function App() {
     fetchConfig();
   }, [fetchPortfolio, fetchHistory, fetchConfig]);
 
+  // Thème fixé à "dark" — le mode clair n'est pas supporté
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }, []);
 
   return (
     <div className="app-layout" data-screen-label={page}>
@@ -47,29 +47,6 @@ export default function App() {
           {page === 'research' && <TickerResearch />}
         </div>
       </div>
-
-      {/* Theme toggle */}
-      <button
-        onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        style={{
-          position: 'fixed',
-          bottom: 18,
-          right: 18,
-          zIndex: 50,
-          width: 40,
-          height: 40,
-          borderRadius: '50%',
-          border: '1px solid var(--rule-strong)',
-          background: 'var(--bg-elev)',
-          color: 'var(--ink-2)',
-          cursor: 'pointer',
-          fontSize: 16,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-        }}
-        title="Changer thème"
-      >
-        {theme === 'dark' ? '☀' : '☾'}
-      </button>
 
       <AlertToast />
     </div>

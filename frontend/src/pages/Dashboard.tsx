@@ -5,6 +5,7 @@ import { useConfigStore } from '../store/config.store';
 import { HeatMap } from '../components/charts/HeatMap';
 import type { Page } from '../App';
 import type { SectorBias } from '../types';
+import type { DecisionItem, DecisionsLatestResponse } from '../types/decision';
 
 const SIGNAL_COLOR: Record<string, string> = {
   BUY: 'var(--accent)',
@@ -52,14 +53,16 @@ function freshnessLabel(status?: string): { label: string; text: string; color: 
   return { label: 'Incomplètes', text: 'Certaines sources manquent', color: 'var(--danger)' };
 }
 
-const AGENT_PIPELINE = [
-  { id: 'collector', name: 'Collecteur' },
-  { id: 'analyst', name: 'Analyste' },
-  { id: 'bull', name: 'Bull' },
-  { id: 'bear', name: 'Bear' },
-  { id: 'strategist', name: 'Modérateur' },
-  { id: 'risk', name: 'Risk' },
-  { id: 'reporter', name: 'Reporter' },
+/**
+ * Pipeline 5 étapes — une seule appelle le LLM.
+ * Les clés mappent les états `agents` du store (mis à jour par l'orchestrator).
+ */
+const PIPELINE: Array<{ id: string; name: string; isLLM: boolean }> = [
+  { id: 'collector', name: 'Collecteur', isLLM: false },
+  { id: 'analyst', name: 'Analyste', isLLM: false },
+  { id: 'strategist', name: 'Décideur', isLLM: true },
+  { id: 'risk', name: 'Risk', isLLM: false },
+  { id: 'reporter', name: 'Broker', isLLM: false },
 ];
 
 const STATS_REFRESH_MS = 5 * 60 * 1000;
@@ -73,7 +76,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { signals, market, agents, alerts, lastUpdate } = useSignalsStore();
   const { config } = useConfigStore();
   const [tab, setTab] = useState<'open' | 'hist'>('open');
+  const [latestDecisions, setLatestDecisions] = useState<DecisionItem[]>([]);
   const lastStatsFetchRef = useRef(0);
+  const lastDecisionsFetchRef = useRef(0);
+  const api = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
     const now = Date.now();
@@ -81,6 +87,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     lastStatsFetchRef.current = now;
     void fetchTypeStats();
   }, [fetchTypeStats, lastUpdate]);
+
+  useEffect(() => {
+    const now = Date.now();
+    // refresh décisions au moins toutes les 60s ou sur lastUpdate WS
+    if (lastDecisionsFetchRef.current && now - lastDecisionsFetchRef.current < 60_000) return;
+    lastDecisionsFetchRef.current = now;
+    fetch(`${api}/decisions/latest`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: DecisionsLatestResponse | null) => {
+        if (d) setLatestDecisions(d.decisions || []);
+      })
+      .catch(() => {});
+  }, [api, lastUpdate]);
 
   const nav = portfolio.total_usd;
   const pnl = portfolio.daily_pnl_pct;
@@ -160,9 +179,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return `il y a ${Math.floor(diff / 3600000)}h`;
   }, [lastUpdate]);
 
-  // Cycle progress
-  const completedSteps = AGENT_PIPELINE.filter((a) => (agents as any)[a.id]?.status === 'ok').length;
-  const isCycleActive = AGENT_PIPELINE.some((a) => (agents as any)[a.id]?.status === 'running');
+  // Pipeline progress (5 étapes)
+  const completedSteps = PIPELINE.filter((a) => (agents as any)[a.id]?.status === 'ok').length;
+  const isCycleActive = PIPELINE.some((a) => (agents as any)[a.id]?.status === 'running');
 
   // Sector biases from market data
   const sectorList = useMemo(() => {
@@ -186,7 +205,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <div>
           <h1 className="h1">Tableau de bord</h1>
           <div style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 6 }}>
-            Vue synthétique de votre portefeuille et des positions actives gérées par les agents.
+            Vue synthétique du portefeuille, du marché et des décisions LLM en temps réel.
           </div>
         </div>
         <div className="flex gap-2">
@@ -483,16 +502,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      {/* Cycle IA Pipeline */}
+      {/* Pipeline de décision */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
-          <div className="card-h-title">Cycle IA <Help tip="Les 7 étapes que l'IA suit pour chaque cycle de décision. Un cycle complet prend quelques minutes." /></div>
-          <span className="card-h-meta">{isCycleActive ? 'En cours' : 'En attente'} · {completedSteps}/7</span>
+          <div className="card-h-title">
+            Pipeline <Help tip="5 étapes par cycle. Une seule (Décideur) appelle le LLM ; les autres sont du calcul déterministe." />
+          </div>
+          <span className="card-h-meta">{isCycleActive ? 'En cours' : 'En attente'} · {completedSteps}/{PIPELINE.length}</span>
         </div>
         <div style={{ padding: '18px 20px' }}>
           {/* Progress bar */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, height: 6 }}>
-            {AGENT_PIPELINE.map((a) => {
+            {PIPELINE.map((a) => {
               const st = (agents as any)[a.id]?.status || 'idle';
               return (
                 <div key={a.id} style={{
@@ -504,13 +525,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            {AGENT_PIPELINE.map((a) => {
+            {PIPELINE.map((a) => {
               const st = (agents as any)[a.id]?.status || 'idle';
               const icon = st === 'ok' ? '✓' : st === 'running' ? '⟳' : st === 'error' ? '✗' : '·';
               const color = st === 'ok' ? 'var(--accent)' : st === 'running' ? 'var(--warn)' : st === 'error' ? 'var(--danger)' : 'var(--ink-4)';
               return (
-                <span key={a.id} style={{ fontSize: 12, color, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>{icon}</span> {a.name}
+                <span key={a.id} style={{ fontSize: 12, color, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span>{icon}</span>
+                  <span>{a.name}</span>
+                  {a.isLLM && (
+                    <span style={{
+                      fontSize: 9, padding: '1px 5px', borderRadius: 3, fontFamily: 'var(--mono)', fontWeight: 600,
+                      background: 'oklch(0.74 0.10 280 / 0.2)', color: 'oklch(0.74 0.10 280)',
+                    }}>LLM</span>
+                  )}
                 </span>
               );
             })}
@@ -522,6 +550,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {/* Dernières décisions LLM */}
+      <DecisionsSummary decisions={latestDecisions} onSeeAll={() => onNavigate('agents')} />
 
       {/* Positions tabs */}
       <div className="card">
@@ -715,6 +746,91 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Synthèse des dernières décisions LLM du cycle en cours.
+ * Affiche compteurs BUY/SELL/HOLD + 3 dernières décisions BUY/SELL avec reasoning court.
+ * Cliquer "Voir tout" navigue vers la page Décisions LLM.
+ */
+function DecisionsSummary({ decisions, onSeeAll }: { decisions: DecisionItem[]; onSeeAll: () => void }) {
+  const counts = useMemo(() => ({
+    BUY: decisions.filter((d) => d.action === 'BUY').length,
+    SELL: decisions.filter((d) => d.action === 'SELL').length,
+    HOLD: decisions.filter((d) => d.action === 'HOLD').length,
+  }), [decisions]);
+
+  // Top 3 décisions actionnables (BUY puis SELL, par confidence)
+  const actionable = useMemo(() => {
+    const buys = decisions.filter((d) => d.action === 'BUY').sort((a, b) => b.confidence - a.confidence);
+    const sells = decisions.filter((d) => d.action === 'SELL').sort((a, b) => b.confidence - a.confidence);
+    return [...buys, ...sells].slice(0, 3);
+  }, [decisions]);
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-h">
+        <div className="card-h-title">
+          Dernières décisions LLM <Help tip="Le Décideur a réfléchi à partir de toutes les infos (indicateurs, news, macro, portfolio) et a choisi pour chaque ticker BUY, SELL ou HOLD." />
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onSeeAll}>Voir tout →</button>
+      </div>
+      <div style={{ padding: 18 }}>
+        {decisions.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, padding: 16 }}>
+            En attente du prochain cycle — le LLM décidera puis les choix apparaîtront ici.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+              <div style={{ padding: '10px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--accent)' }}>
+                <div className="eyebrow">Achats</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>{counts.BUY}</div>
+              </div>
+              <div style={{ padding: '10px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--danger)' }}>
+                <div className="eyebrow">Ventes</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: 'var(--danger)' }}>{counts.SELL}</div>
+              </div>
+              <div style={{ padding: '10px 12px', background: 'var(--bg-elev-2)', borderRadius: 6, borderLeft: '3px solid var(--ink-3)' }}>
+                <div className="eyebrow">Attentes</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-3)' }}>{counts.HOLD}</div>
+              </div>
+            </div>
+
+            {actionable.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {actionable.map((d) => {
+                  const col = d.action === 'BUY' ? 'var(--accent)' : 'var(--danger)';
+                  const label = d.action === 'BUY' ? 'ACHAT' : 'VENTE';
+                  return (
+                    <div key={`${d.ticker}-${d.timestamp}`} style={{
+                      display: 'grid', gridTemplateColumns: '70px 60px 1fr 80px', gap: 10, alignItems: 'center',
+                      padding: '10px 12px', borderRadius: 6, background: 'var(--bg-elev-2)', borderLeft: `3px solid ${col}`,
+                    }}>
+                      <span className="mono" style={{ fontWeight: 600, fontSize: 13 }}>{d.ticker}</span>
+                      <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, background: col + '22', color: col, textAlign: 'center' }}>
+                        {label}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {d.reasoning}
+                      </span>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--accent)', textAlign: 'right' }}>
+                        conf {d.confidence}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, padding: 10 }}>
+                Le LLM a choisi d'attendre sur tous les tickers ce cycle.
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
