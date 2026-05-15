@@ -3,6 +3,7 @@ import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
+import { getTickerName, hasTickerName } from '../data/tickerNames';
 import type { OHLCVBar } from '../types';
 
 function Help({ tip }: { tip: string }) {
@@ -190,8 +191,15 @@ export function Markets() {
         <div className="card">
           <div className="card-h">
             <div className="flex gap-3 center">
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>
-                {chartTicker}
+              <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600 }}>
+                  {chartTicker.includes(':') ? chartTicker.split(':')[0] : chartTicker}
+                </span>
+                {hasTickerName(chartTicker) && (
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                    {getTickerName(chartTicker)}
+                  </span>
+                )}
               </span>
               <span className="mono" style={{ fontSize: 18, fontWeight: 600 }}>
                 {market.nasdaq_change_pct !== 0 ? `${market.nasdaq_change_pct >= 0 ? '+' : ''}${market.nasdaq_change_pct.toFixed(2)}%` : '—'}

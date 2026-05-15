@@ -3,6 +3,7 @@ import { usePortfolioStore } from '../store/portfolio.store';
 import { useSignalsStore } from '../store/signals.store';
 import { useConfigStore } from '../store/config.store';
 import { HeatMap } from '../components/charts/HeatMap';
+import { TickerLabel } from '../components/cards/TickerLabel';
 import type { Page } from '../App';
 import type { SectorBias } from '../types';
 import type { DecisionItem, DecisionsLatestResponse } from '../types/decision';
@@ -592,12 +593,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '90px 70px 70px 100px 100px 1fr 110px 90px', padding: '10px 18px', borderBottom: '1px solid var(--rule)', fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '130px 70px 70px 100px 100px 1fr 110px 90px', padding: '10px 18px', borderBottom: '1px solid var(--rule)', fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
                   <span>Actif</span><span>Sens</span><span>Qté</span><span>Entrée</span><span>Marché</span><span>Décision IA</span><span style={{ textAlign: 'right' }}>P&L $</span><span style={{ textAlign: 'right' }}>P&L %</span>
                 </div>
                 {openPositions.map((p, i) => (
-                  <div key={p.sym} style={{ display: 'grid', gridTemplateColumns: '90px 70px 70px 100px 100px 1fr 110px 90px', padding: '14px 18px', borderBottom: i < openPositions.length - 1 ? '1px solid var(--rule)' : 'none', alignItems: 'center', fontSize: 13 }}>
-                    <span className="mono" style={{ fontWeight: 600 }}>{p.sym}</span>
+                  <div key={p.sym} style={{ display: 'grid', gridTemplateColumns: '130px 70px 70px 100px 100px 1fr 110px 90px', padding: '14px 18px', borderBottom: i < openPositions.length - 1 ? '1px solid var(--rule)' : 'none', alignItems: 'center', fontSize: 13 }}>
+                    <TickerLabel ticker={p.sym} variant="stacked" hideExchange size={13} />
                     <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)', background: 'var(--accent-soft)', color: 'var(--accent)' }}>{p.side}</span>
                     <span className="mono" style={{ color: 'var(--ink-3)' }}>{p.qty.toFixed(2)}</span>
                     <span className="mono">${p.entry.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
@@ -627,13 +628,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '100px 70px 70px 1fr 100px 80px', padding: '10px 18px', borderBottom: '1px solid var(--rule)', fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '100px 130px 70px 1fr 100px 80px', padding: '10px 18px', borderBottom: '1px solid var(--rule)', fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
                   <span>Date</span><span>Actif</span><span>Action</span><span>Raison</span><span style={{ textAlign: 'right' }}>P&L $</span><span style={{ textAlign: 'right' }}>P&L %</span>
                 </div>
                 {history.slice(0, 20).map((h, i) => (
-                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '100px 70px 70px 1fr 100px 80px', padding: '14px 18px', borderBottom: i < Math.min(history.length, 20) - 1 ? '1px solid var(--rule)' : 'none', alignItems: 'center', fontSize: 13 }}>
+                  <div key={h.id} style={{ display: 'grid', gridTemplateColumns: '100px 130px 70px 1fr 100px 80px', padding: '14px 18px', borderBottom: i < Math.min(history.length, 20) - 1 ? '1px solid var(--rule)' : 'none', alignItems: 'center', fontSize: 13 }}>
                     <span className="mono" style={{ color: 'var(--ink-3)' }}>{h.closedAt ? new Date(h.closedAt).toLocaleDateString('fr-FR') : '—'}</span>
-                    <span className="mono" style={{ fontWeight: 600 }}>{h.ticker}</span>
+                    <TickerLabel ticker={h.ticker} variant="stacked" hideExchange size={13} />
                     <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)', background: h.action === 'BUY' ? 'var(--accent-soft)' : 'var(--danger-soft)', color: h.action === 'BUY' ? 'var(--accent)' : 'var(--danger)' }}>{h.action}</span>
                     <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{h.closeReason || '—'} {h.reasoning ? `· ${h.reasoning.slice(0, 40)}` : ''}</span>
                     <span className="mono" style={{ textAlign: 'right', fontWeight: 600, color: (h.pnlUsd || 0) >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{(h.pnlUsd || 0) >= 0 ? '+' : ''}${(h.pnlUsd || 0).toFixed(2)}</span>
@@ -817,10 +818,10 @@ function DecisionsSummary({ decisions, onSeeAll }: { decisions: DecisionItem[]; 
                   const label = d.action === 'BUY' ? 'ACHAT' : 'VENTE';
                   return (
                     <div key={`${d.ticker}-${d.timestamp}`} style={{
-                      display: 'grid', gridTemplateColumns: '70px 60px 1fr 80px', gap: 10, alignItems: 'center',
+                      display: 'grid', gridTemplateColumns: '130px 60px 1fr 80px', gap: 10, alignItems: 'center',
                       padding: '10px 12px', borderRadius: 6, background: 'var(--bg-elev-2)', borderLeft: `3px solid ${col}`,
                     }}>
-                      <span className="mono" style={{ fontWeight: 600, fontSize: 13 }}>{d.ticker}</span>
+                      <TickerLabel ticker={d.ticker} variant="stacked" hideExchange size={13} />
                       <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, background: col + '22', color: col, textAlign: 'center' }}>
                         {label}
                       </span>

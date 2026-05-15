@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DecisionItem, DecisionsLatestResponse } from '../../types/decision';
+import { TickerLabel } from '../cards/TickerLabel';
+import { getTickerName } from '../../data/tickerNames';
 
 interface Props {
   apiBase: string;
@@ -129,7 +131,7 @@ export function DecisionViewer({ apiBase, refreshKey }: Props) {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span className="mono" style={{ fontSize: 14, fontWeight: 700 }}>{d.ticker}</span>
+                      <TickerLabel ticker={d.ticker} variant="inline" hideExchange size={14} />
                       <span style={{
                         padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700,
                         background: m.color + '22', color: m.color,
@@ -184,7 +186,12 @@ export function DecisionViewer({ apiBase, refreshKey }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <div className="eyebrow">Décision LLM</div>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)' }}>{selected.ticker}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)' }}>
+                  {selected.ticker.includes(':') ? selected.ticker.split(':')[0] : selected.ticker}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
+                  {getTickerName(selected.ticker)}
+                </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>Fermer</button>
             </div>

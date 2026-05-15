@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getTickerName } from '../data/tickerNames';
 
 type Segment = 'nasdaq' | 'cac40' | 'dax40' | 'ftse100' | 'eu_other';
 
@@ -270,7 +271,7 @@ export function Watchlist() {
                     {sym}
                   </td>
                   <td style={{ padding: '10px 12px', color: 'var(--ink-2)' }}>
-                    {row.name ?? <span style={{ color: 'var(--ink-5)', fontStyle: 'italic' }}>{sym}</span>}
+                    {row.name ?? getTickerName(row.ticker)}
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'var(--mono)' }}>
                     {row.price === null

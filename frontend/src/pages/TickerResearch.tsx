@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { TickerSnapshot, TickerNote, PreMarketPrep } from '../types';
 import { CandlestickChart } from '../components/charts/CandlestickChart';
+import { getTickerName, hasTickerName } from '../data/tickerNames';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -94,7 +95,7 @@ export function TickerResearch() {
       {tab === 'history' && !loading && (
         <div className="card">
           <div className="card-h">
-            <div className="card-h-title">Historique {ticker}</div>
+            <div className="card-h-title">Historique {ticker}{hasTickerName(ticker) ? ` — ${getTickerName(ticker)}` : ''}</div>
             <span className="card-h-meta">{history.length} bars</span>
           </div>
           <div style={{ padding: 16, height: 400 }}>
@@ -112,7 +113,7 @@ export function TickerResearch() {
       {tab === 'notes' && !loading && (
         <div className="card">
           <div className="card-h">
-            <div className="card-h-title">Notes {ticker}</div>
+            <div className="card-h-title">Notes {ticker}{hasTickerName(ticker) ? ` — ${getTickerName(ticker)}` : ''}</div>
             <span className="card-h-meta">{notes.length} notes</span>
           </div>
           <div style={{ padding: '12px 16px' }}>
@@ -168,7 +169,7 @@ export function TickerResearch() {
       {tab === 'prep' && !loading && (
         <div className="card">
           <div className="card-h">
-            <div className="card-h-title">Préparation ouverture {ticker}</div>
+            <div className="card-h-title">Préparation ouverture {ticker}{hasTickerName(ticker) ? ` — ${getTickerName(ticker)}` : ''}</div>
             <span className="card-h-meta">{prep.length} jours</span>
           </div>
           <div style={{ padding: '12px 16px' }}>

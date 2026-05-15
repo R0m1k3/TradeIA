@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSignalsStore } from '../../store/signals.store';
+import { TickerLabel } from '../cards/TickerLabel';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -58,7 +59,7 @@ export function OverridePanel() {
               background: 'var(--bg-elev-2)', border: '1px solid var(--rule)',
             }}
           >
-            <span className="mono" style={{ fontWeight: 600, fontSize: 12, width: 48 }}>{s.ticker}</span>
+            <TickerLabel ticker={s.ticker} variant="inline" hideExchange size={12} />
             <div style={{ flex: 1 }} />
             <button
               onClick={() => handleClose(s.ticker)}
