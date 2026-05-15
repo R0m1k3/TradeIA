@@ -7,9 +7,21 @@ const NAV = [
   { id: 'markets' as Page, label: 'Vue Marché', sub: 'Synthèse temps réel', icon: IcMarket },
   { id: 'watchlist' as Page, label: 'Watchlist', sub: 'NASDAQ · CAC · DAX · FTSE', icon: IcWatchlist },
   { id: 'research' as Page, label: 'Recherche', sub: 'Historique & notes', icon: IcResearch },
-  { id: 'agents' as Page, label: 'Agents IA', sub: 'Pipeline & décisions', icon: IcAgents },
-  { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & décisions IA', icon: IcChart },
+  { id: 'agents' as Page, label: 'Décisions LLM', sub: 'Pipeline & choix IA', icon: IcAgents },
+  { id: 'portfolio' as Page, label: 'Portefeuille', sub: 'Positions & ordres', icon: IcChart },
   { id: 'config' as Page, label: 'Configuration', sub: 'Stratégie & système', icon: IcConfig },
+];
+
+/**
+ * Pipeline réel: 5 étapes. Une seule (Décideur) appelle le LLM.
+ * Les clés mappent les `agents` du store (mis à jour par l'orchestrator).
+ */
+const PIPELINE_STAGES: Array<{ key: string; label: string; isLLM: boolean }> = [
+  { key: 'collector', label: 'Collecteur', isLLM: false },
+  { key: 'analyst', label: 'Analyste', isLLM: false },
+  { key: 'strategist', label: 'Décideur', isLLM: true },
+  { key: 'risk', label: 'Risk', isLLM: false },
+  { key: 'reporter', label: 'Broker', isLLM: false },
 ];
 
 function BrandMark() {
@@ -57,12 +69,15 @@ function IcWatchlist() {
   );
 }
 function IcAgents() {
+  // Pipeline icon: data flowing through stages with a spark on the LLM step
   return (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="6" cy="6" r="2.5" />
-      <circle cx="13" cy="6" r="2.5" />
-      <circle cx="9.5" cy="13" r="2.5" />
-      <path d="M7.5 7.5 L12 11 M11 7.5 L8 11" />
+      <circle cx="3" cy="9" r="1.5" />
+      <path d="M4.5 9 H7" />
+      <rect x="7" y="6" width="4" height="6" rx="1" />
+      <path d="M11 9 H13.5" />
+      <circle cx="15" cy="9" r="1.5" />
+      <path d="M9 4 L9.7 5.4 L11 5.6 L10 6.6 L10.3 8 L9 7.3 L7.7 8 L8 6.6 L7 5.6 L8.3 5.4 Z" fill="currentColor" stroke="none" opacity="0.65" />
     </svg>
   );
 }
@@ -145,10 +160,10 @@ export function Sidebar({ page, setPage, wsStatus }: SidebarProps) {
       </ul>
 
       <div className="sb-foot">
-        {/* Agents mini status */}
+        {/* Pipeline mini status — 5 stages, only one is LLM */}
         <div style={{ padding: '10px 8px 0', borderTop: '1px solid var(--rule)', marginTop: 8 }}>
           <div className="sb-watchlist-title" style={{ padding: '4px 0 6px' }}>
-            <span>Agents</span>
+            <span>Pipeline</span>
             <span
               className="mono"
               style={{ color: wsColors[wsStatus], fontSize: 10 }}
@@ -156,33 +171,45 @@ export function Sidebar({ page, setPage, wsStatus }: SidebarProps) {
               {wsStatus === 'connected' ? 'live' : wsStatus}
             </span>
           </div>
-          {Object.entries(agents).map(([name, a]) => (
-            <div key={name} className="sb-wl-row" style={{ padding: '3px 0' }}>
-              <span className="sb-wl-sym" style={{ textTransform: 'capitalize', fontSize: 10 }}>
-                {name}
-              </span>
-              <span
-                className="mono"
-                style={{
-                  fontSize: 10,
-                  color:
-                    a.status === 'ok'
-                      ? 'var(--accent)'
-                      : a.status === 'running'
-                      ? 'var(--warn)'
-                      : a.status === 'error'
-                      ? 'var(--danger)'
-                      : 'var(--ink-4)',
-                }}
-              >
-                {a.status === 'ok' ? '✓' : a.status === 'running' ? '⟳' : a.status === 'error' ? '✗' : '·'}
-              </span>
-            </div>
-          ))}
+          {PIPELINE_STAGES.map((stage) => {
+            const a = (agents as any)[stage.key] ?? { status: 'idle' };
+            const statusColor =
+              a.status === 'ok' ? 'var(--accent)'
+              : a.status === 'running' ? 'var(--warn)'
+              : a.status === 'error' ? 'var(--danger)'
+              : 'var(--ink-4)';
+            const statusIcon =
+              a.status === 'ok' ? '✓'
+              : a.status === 'running' ? '⟳'
+              : a.status === 'error' ? '✗'
+              : '·';
+            return (
+              <div key={stage.key} className="sb-wl-row" style={{ padding: '3px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+                  <span className="sb-wl-sym">{stage.label}</span>
+                  {stage.isLLM && (
+                    <span style={{
+                      fontSize: 8,
+                      padding: '1px 4px',
+                      borderRadius: 3,
+                      background: 'oklch(0.74 0.10 280 / 0.2)',
+                      color: 'oklch(0.74 0.10 280)',
+                      fontFamily: 'var(--mono)',
+                      fontWeight: 600,
+                      letterSpacing: 0.3,
+                    }}>LLM</span>
+                  )}
+                </span>
+                <span className="mono" style={{ fontSize: 10, color: statusColor }}>
+                  {statusIcon}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ padding: '10px 8px 0', color: 'var(--ink-4)', fontSize: 10 }}>
-          v2.4 · démo
+          v2.5 · démo
         </div>
       </div>
     </aside>
