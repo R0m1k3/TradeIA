@@ -124,13 +124,14 @@ export async function classifyRegime(vix: number): Promise<RegimeAssessment> {
     };
   }
 
-  // Bear trend — short bias only; we don't short, so reduce drastically
+  // Bear trend — on ne shorte pas, donc 0 nouveaux trades.
+  // Mieux vaut tenir le cash que de prendre des longs à contre-tendance.
   if (direction === 'bear' && trending && qqq5dChange < -1.0) {
     return {
       regime: 'bear_trend',
       confidence: 80,
-      reason: `QQQ ${qqq5dChange.toFixed(1)}% over 5d, trend score ${qqqAdx} — bearish`,
-      sizing_multiplier: 0.3,
+      reason: `QQQ ${qqq5dChange.toFixed(1)}% over 5d, trend score ${qqqAdx} — bearish, hold cash`,
+      sizing_multiplier: 0.0,
       prefer_momentum: false,
       inputs,
     };

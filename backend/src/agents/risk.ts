@@ -12,10 +12,12 @@ import { prisma } from '../lib/prisma';
 const MAX_POSITIONS_PER_SECTOR = 5;
 const MAX_SECTOR_NAV_PCT = 0.40;
 const MIN_BUY_CONFIDENCE = 40;
-const CORR_THRESHOLD = 0.65; // au-delà : réduire la taille proportionnellement
+const CORR_THRESHOLD = 0.75; // au-delà : réduire la taille proportionnellement
 
-/** Volatility targeting: contribute at most 1.5% annualized vol per slot. */
-const VOL_TARGET_PER_SLOT = 0.015;
+/** Volatility targeting: contribute at most 4% annualized vol per slot.
+ * Calibré pour un compte retail $10k–$100k: 5 slots × 4% ≈ 20% vol portefeuille,
+ * cohérent avec un swing trading actif (vs ~1.5% qui produit des positions de 300$). */
+const VOL_TARGET_PER_SLOT = 0.04;
 
 /**
  * Compute volatility-based size cap.
@@ -322,8 +324,8 @@ export class RiskAgent {
           continue;
         }
         const rr = (p.take_profit - p.limit_price) / denominator;
-        if (rr < 2.0) {
-          reject(p, `R/R ${rr.toFixed(2)} < 2.0`);
+        if (rr < 1.8) {
+          reject(p, `R/R ${rr.toFixed(2)} < 1.8`);
           continue;
         }
       }

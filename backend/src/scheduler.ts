@@ -17,23 +17,22 @@ export function initScheduler() {
     }
   });
 
-  // FULL pipeline every 30 min during market hours: discovery → analyst → research → strategist → risk.
-  // Suitable cadence for swing trading (5–20 day holds). Reduces LLM cost by ~83%.
-  cron.schedule('*/30 * * * *', async () => {
+  // FULL pipeline 4× par jour de semaine sur horaires fixes alignés sur swing trading (5–20j).
+  // Évite la sur-réaction au bruit intra-day et réduit le coût LLM de ~95%.
+  // Horaires UTC : 08h (EU mid-morning), 13h (US pre-open), 15h (US mid-session), 19h (US afternoon).
+  cron.schedule('0 8,13,15,19 * * 1-5', async () => {
     const nasdaq = getNasdaqStatus();
     const now = new Date();
     const usOrEuOpen = nasdaq.isOpen || isEuropeanMarketOpen(now);
 
-    if (!usOrEuOpen && now.getMinutes() !== 0) {
-      // Outside market hours, only run hourly health check
+    if (!usOrEuOpen) {
+      console.log('[Scheduler] Full cycle skipped — all markets closed');
       return;
     }
 
     const mode = nasdaq.isOpen
       ? 'US market open'
-      : isEuropeanMarketOpen(now)
-        ? 'EU market open'
-        : 'closed-market hourly check';
+      : 'EU market open';
     console.log(`[Scheduler] Triggering FULL trading cycle - ${mode}`);
     try {
       await addCycleJob('full');
@@ -79,7 +78,7 @@ export function initScheduler() {
     }
   }, 5000);
 
-  console.log('[Scheduler] Initialized — lite=5min, full=30min, pre_market=8h30 CET');
+  console.log('[Scheduler] Initialized — lite=5min, full=4×/day (08/13/15/19 UTC), pre_market=8h30 CET');
 }
 
 function isEuropeanMarketOpen(now: Date): boolean {

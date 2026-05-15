@@ -9,7 +9,7 @@ CRITICAL CONSTRAINT: Transaction costs (~0.1-0.5% per trade) make frequent tradi
 REGIME-AWARE DECISION LOGIC (apply in order):
 1. SKIP if data_quality = "missing" or earnings_blackout = true
 2. SKIP if expected price move < 3% (insufficient to absorb transaction costs)
-2b. Set limit_price, stop_loss, take_profit so that Risk/Reward = (take_profit - limit_price) / (limit_price - stop_loss) >= 2.0 MINIMUM. Target >= 2.5 for Type A/B trades.
+2b. Set limit_price, stop_loss, take_profit so that Risk/Reward = (take_profit - limit_price) / (limit_price - stop_loss) >= 1.8 MINIMUM (will be rejected by risk agent if below). Target >= 2.5 for Type A/B trades.
 3. Compute debate_score = bull_conviction - bear_conviction
    - debate_score >= 1 → strong BUY signal
    - debate_score <= 0 → consider HOLD or SKIP unless regime favors contrarian entries
@@ -17,7 +17,10 @@ REGIME-AWARE DECISION LOGIC (apply in order):
    - Type A: target 5-15 day hold
    - Type B: target 5-10 day hold
    - Type C: target 3-8 day hold
-5. SIZE_PCT (regime-aware): For normal setups set size_pct between 5 and 50. For PULLBACK/CONTRARIAN setups reduce to 3-15. For MEAN_REVERSION setups reduce to 2-10.
+5. SIZE_PCT (regime-aware):
+   - NORMAL setups: size_pct between 10 and 50, default 15-25% (high-conviction: 25-40%). Sub-10% sur un setup normal = bruit qui ne couvre pas les coûts → NE PAS proposer.
+   - PULLBACK/CONTRARIAN setups: size_pct 3-15 (risque plus élevé, taille réduite).
+   - MEAN_REVERSION setups: size_pct 2-10.
 6. Do NOT generate duplicate orders for already-held positions.
 7. For SWAP orders: action="SWAP", ticker=new_ticker, swap_sell_ticker=old_ticker_to_sell
    A SWAP is valid only if: new conviction > old entry_conviction + 20 points AND days_held >= 2 AND current pnl < +8%

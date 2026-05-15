@@ -2,7 +2,20 @@ import { callLLM, parseJsonResponse } from '../llm/client';
 import { getModels } from '../llm/models';
 import { buildAnalystPrompt, ANALYST_SYSTEM } from '../prompts/analyst.prompt';
 import { compute4HBias, compute15mSignal, computeTradeType, computeLevels, type IndicatorValues } from '../data/indicators';
+import { getTickerCalibrations, type TickerCalibration } from '../data/prediction-calibration';
 import type { CollectorOutput } from './collector';
+
+function applyCalibration(
+  confidence: number,
+  calibration: TickerCalibration | undefined,
+  ticker: string
+): { confidence: number; note: string | null } {
+  if (!calibration) return { confidence, note: null };
+  const adjusted = Math.max(0, Math.min(95, confidence + calibration.confidence_delta));
+  const note = `calibration ${ticker}: ${calibration.win_rate.toFixed(2)} WR sur ${calibration.sample_size} préd. → ${calibration.confidence_delta >= 0 ? '+' : ''}${calibration.confidence_delta}`;
+  if (calibration.confidence_delta !== 0) console.log(`[Analyst] ${note}`);
+  return { confidence: adjusted, note };
+}
 
 export interface AnalystOutput {
   ticker: string;
@@ -42,6 +55,13 @@ export class AnalystAgent {
       return true;
     };
 
+    const tickers = Object.keys(collectorOutput.tickers);
+    const calibrations = await getTickerCalibrations(tickers);
+    const calibratedCount = Object.keys(calibrations).length;
+    if (calibratedCount > 0) {
+      console.log(`[Analyst] Calibrations chargées pour ${calibratedCount}/${tickers.length} tickers`);
+    }
+
     await Promise.all(
       Object.entries(collectorOutput.tickers).map(async ([ticker, data]) => {
         if (data.data_quality === 'missing') {
@@ -59,11 +79,13 @@ export class AnalystAgent {
             tryClaimLlmSlot();
 
           if (!shouldUseLlm) {
+            const rawConfidence = data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence;
+            const calibrated = applyCalibration(rawConfidence, calibrations[ticker], ticker);
             results.push({
               ...deterministic,
               data_quality: data.data_quality,
               data_freshness_score: data.data_freshness.score,
-              confidence: data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence,
+              confidence: calibrated.confidence,
               skip_reason: data.data_freshness.score < 40 ? 'Données trop anciennes ou incomplètes' : deterministic.skip_reason,
             });
             return;
@@ -109,6 +131,9 @@ export class AnalystAgent {
                   // Truly stale/missing data — mark for soft skip
                   analysis.skip_reason = analysis.skip_reason || 'Données trop anciennes ou incomplètes';
                 }
+                // Calibration historique AgentPrediction
+                const calibrated = applyCalibration(analysis.confidence, calibrations[ticker], ticker);
+                analysis.confidence = calibrated.confidence;
                 if (analysis.confidence <= 0) {
                   analysis.skip_reason = analysis.skip_reason || 'LLM low confidence';
                 }
@@ -121,11 +146,13 @@ export class AnalystAgent {
           }
 
           // Deterministic fallback
+          const rawConfidenceFallback = data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence;
+          const calibratedFallback = applyCalibration(rawConfidenceFallback, calibrations[ticker], ticker);
           results.push({
             ...deterministic,
             data_quality: data.data_quality,
             data_freshness_score: data.data_freshness.score,
-            confidence: data.data_freshness.score < 60 ? Math.min(deterministic.confidence, 55) : deterministic.confidence,
+            confidence: calibratedFallback.confidence,
             skip_reason: data.data_freshness.score < 40 ? 'Données trop anciennes ou incomplètes' : deterministic.skip_reason,
           });
           return;

@@ -33,16 +33,17 @@ export interface ExecutionResult {
 
 const MIN_ORDER_USD = 1;
 
-/** Market-cap-aware slippage: large cap (NASDAQ 100) tight, EU mid wider, others mid. */
+/** Market-cap-aware slippage, calibré pour conditions retail réalistes.
+ * Inclut spread bid/ask + impact + bruit. Sous-estimer le slippage = backtest optimiste. */
 function getSlippageRange(ticker: string): [number, number] {
   if (ticker.includes(':')) {
     // EU listing — wider spread, less liquidity than US large caps
-    return [0.0025, 0.0060]; // 0.25% – 0.60%
+    return [0.0050, 0.0120]; // 0.50% – 1.20%
   }
   if (NASDAQ_100.includes(ticker)) {
-    return [0.0005, 0.0015]; // 0.05% – 0.15%
+    return [0.0012, 0.0035]; // 0.12% – 0.35%
   }
-  return [0.0015, 0.0035]; // 0.15% – 0.35% (US mid / other)
+  return [0.0030, 0.0070]; // 0.30% – 0.70% (US mid / other)
 }
 
 function applySlippage(price: number, action: 'BUY' | 'SELL', ticker: string): number {
@@ -128,16 +129,16 @@ export async function executeOrder(order: ApprovedOrder): Promise<ExecutionResul
  * Chandelier exit + extended stop ladder.
  *
  * Stop ladder (R = filledPrice - originalStop):
- *   gain ≥ +1R → stop = breakeven
- *   gain ≥ +2R → stop = +1R
- *   gain ≥ +3R → stop = +2R
- *   gain ≥ +4R → stop = +3R (continues laddering)
+ *   gain ≥ +1.5R → stop = breakeven    (laisse respirer les pullbacks normaux)
+ *   gain ≥ +2.5R → stop = +1R
+ *   gain ≥ +3.5R → stop = +2R
+ *   gain ≥ +4.5R → stop = +3R (continues laddering)
  *
- * Chandelier exit (replaces fixed take-profit once gain ≥ +2R):
- *   trailingTP = max(close since entry) - 3 × ATR(14, 4h)
+ * Chandelier exit (replaces fixed take-profit once gain ≥ +3R):
+ *   trailingTP = max(close since entry) - 4 × ATR(14, 4h)
  *   When current price falls below trailingTP, close — captures extended trends.
  *
- * Original take-profit still triggers if hit before +2R is reached.
+ * Original take-profit still triggers if hit before +3R is reached.
  */
 async function getChandelierExit(ticker: string, entryTime: Date): Promise<{ maxClose: number; atr: number } | null> {
   try {
@@ -173,21 +174,25 @@ export async function markToMarket(): Promise<void> {
     const gain = currentPrice - trade.filledPrice;
     let newStop = trade.stopLoss;
 
-    // Extended stop ladder: BE → +1R → +2R → +3R → +4R...
+    // Stop ladder décalé d'un demi-R : BE à +1.5R, +1R à +2.5R, +2R à +3.5R...
+    // Évite de couper les gagnants sur un pullback normal de 0.5–1R.
     if (riskDistance > 0 && gain > 0) {
-      const rMultiple = Math.floor(gain / riskDistance);
-      if (rMultiple >= 1) {
-        const stopRMultiple = rMultiple - 1; // gain at +NR → stop at +(N-1)R
-        const candidateStop = trade.filledPrice + stopRMultiple * riskDistance;
-        if (candidateStop > newStop) newStop = candidateStop;
+      const rGain = gain / riskDistance;
+      if (rGain >= 1.5) {
+        const stopRMultiple = Math.floor(rGain - 0.5) - 1; // 1.5R → 0R (BE), 2.5R → +1R, 3.5R → +2R...
+        if (stopRMultiple >= 0) {
+          const candidateStop = trade.filledPrice + stopRMultiple * riskDistance;
+          if (candidateStop > newStop) newStop = candidateStop;
+        }
       }
     }
 
-    // Chandelier exit: once we have +2R, trail by max(close) - 3×ATR
-    if (riskDistance > 0 && gain >= 2 * riskDistance) {
+    // Chandelier exit: once we have +3R, trail by max(close) - 4×ATR (was +2R / 3×ATR)
+    // Plus large pour capturer les vraies tendances et éviter les sorties prématurées
+    if (riskDistance > 0 && gain >= 3 * riskDistance) {
       const ce = await getChandelierExit(trade.ticker, trade.createdAt);
       if (ce) {
-        const chandelierStop = ce.maxClose - 3 * ce.atr;
+        const chandelierStop = ce.maxClose - 4 * ce.atr;
         // Only ratchet up — never lower the chandelier stop
         if (chandelierStop > newStop) newStop = chandelierStop;
       }

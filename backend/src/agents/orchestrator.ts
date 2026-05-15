@@ -50,7 +50,19 @@ async function maybeRunDecayCheck(reporter: ReporterAgent): Promise<void> {
 
     if (decay.decay_detected) {
       console.error(`[Orchestrator] ${decay.message}`);
-      broadcastAlert('critical', `⚠️ STRATEGY DECAY — ${decay.message}`);
+      // Auto-pause sur decay détecté: le système ne doit pas continuer à perdre.
+      // L'opérateur peut reprendre via POST /api/override/resume après analyse.
+      await prisma.config.upsert({
+        where: { key: 'system_paused' },
+        update: { value: 'true' },
+        create: { key: 'system_paused', value: 'true' },
+      });
+      await prisma.config.upsert({
+        where: { key: 'paused_reason' },
+        update: { value: `decay_auto: ${decay.message}` },
+        create: { key: 'paused_reason', value: `decay_auto: ${decay.message}` },
+      });
+      broadcastAlert('critical', `⚠️ STRATEGY DECAY — Trading auto-suspendu. ${decay.message}`);
       reporter.updateAgent('reporter', { status: 'error', error: decay.message });
     } else {
       console.log(`[Orchestrator] Decay check OK: ${decay.message}`);
@@ -72,12 +84,13 @@ function generateWeaknessExits(
   for (const pos of positions) {
     const daysHeld = pos.days_held ?? 0;
     const pnlPct = pos.pnlPct ?? 0;
-    if (daysHeld < 1) continue;   // Pas de sortie le jour même
+    if (daysHeld < 2) continue;   // Au moins 2 jours — laisse le setup respirer
     if (pnlPct >= 0) continue;    // Position en profit → garder
+    if (pnlPct > -2) continue;    // Bruit < 2%, pas une vraie faiblesse
     const sector = getTickerSector(pos.ticker);
     const bias = sectorBiases[sector];
-    if (!bias || bias.direction !== 'bullish' || bias.change_pct < 1.5) continue;
-    // Secteur +1.5% mais position rouge = vraie faiblesse relative
+    if (!bias || bias.direction !== 'bullish' || bias.change_pct < 3.0) continue;
+    // Secteur +3% mais position rouge ≥ 2j = vraie faiblesse relative
     console.log(`[Orchestrator] Faiblesse relative: ${pos.ticker} ${pnlPct.toFixed(1)}% vs secteur ${sector} +${bias.change_pct.toFixed(1)}%`);
     sells.push({
       ticker: pos.ticker,
