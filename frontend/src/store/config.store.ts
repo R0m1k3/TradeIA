@@ -71,10 +71,12 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
       const res = await fetch(`${API}/config`);
       if (res.ok) {
         const data = await res.json();
-        const { secrets_configured, ...configData } = data;
+        const { secrets_configured, system_paused, ...configData } = data;
         set({
           config: { ...get().config, ...configData },
           secretsConfigured: secrets_configured || get().secretsConfigured,
+          // Sync system_paused from DB so UI reflects true server state
+          paused: system_paused === 'true',
         });
       }
     } catch {

@@ -1,7 +1,22 @@
+import { useState } from 'react';
 import { usePortfolioStore } from '../../store/portfolio.store';
 import { useSignalsStore } from '../../store/signals.store';
 
+const API = import.meta.env.VITE_API_URL || '/api';
+
 export function TopBar({ paused, onToggleRun }: { paused: boolean; onToggleRun: () => void }) {
+  const [forceRunning, setForceRunning] = useState(false);
+
+  async function forceRun() {
+    setForceRunning(true);
+    try {
+      await fetch(`${API}/orchestrator/run`, { method: 'POST' });
+    } catch {
+      // ignore
+    } finally {
+      setTimeout(() => setForceRunning(false), 3000);
+    }
+  }
   const { portfolio } = usePortfolioStore();
   const { market } = useSignalsStore();
 
@@ -55,6 +70,14 @@ export function TopBar({ paused, onToggleRun }: { paused: boolean; onToggleRun: 
           </>
         )}
       </span>
+      <button
+        onClick={forceRun}
+        disabled={forceRunning}
+        title="Forcer un cycle complet maintenant"
+        className={`btn btn-sm font-mono text-xs border transition-colors ${forceRunning ? 'opacity-50 cursor-wait border-accent-green/30 text-accent-green/50' : 'border-accent-green/50 text-accent-green hover:bg-accent-green/10'}`}
+      >
+        {forceRunning ? '...' : '▶ Run'}
+      </button>
       <button
         className={`btn ${paused ? 'btn-primary' : 'btn-ghost'} btn-sm`}
         onClick={onToggleRun}

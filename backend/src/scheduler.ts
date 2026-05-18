@@ -23,7 +23,10 @@ export function initScheduler() {
   cron.schedule('0 8,13,15,19 * * 1-5', async () => {
     const nasdaq = getNasdaqStatus();
     const now = new Date();
-    const usOrEuOpen = nasdaq.isOpen || isEuropeanMarketOpen(now);
+    const euOpen = isEuropeanMarketOpen(now);
+    const usOrEuOpen = nasdaq.isOpen || euOpen;
+
+    console.log(`[Scheduler] Full cron tick — utc=${now.toISOString()} nasdaq=${nasdaq.isOpen} eu=${euOpen} usOrEuOpen=${usOrEuOpen}`);
 
     if (!usOrEuOpen) {
       console.log('[Scheduler] Full cycle skipped — all markets closed');
